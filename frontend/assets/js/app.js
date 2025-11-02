@@ -798,10 +798,10 @@ function editBlockText(blockIndex) {
     modalSuggestionField.style.display = 'none'
   }
 
-  // Remplir le modal avec respect des sauts de ligne
-  // Utiliser escapeHtml pour préserver les caractères spéciaux (apostrophes, etc.)
-  modalOriginal.innerHTML = SRTParser.escapeHtml(block.original).replace(/\n/g, '<br>')
-  modalSuggestion.innerHTML = SRTParser.escapeHtml(block.corrected).replace(/\n/g, '<br>')
+  // Remplir le modal avec textContent pour préserver les apostrophes et caractères spéciaux
+  // white-space: pre-wrap dans le CSS gère les sauts de ligne
+  modalOriginal.textContent = block.original
+  modalSuggestion.textContent = block.corrected
   modalInput.value = block.corrected
   modal.style.display = 'flex'
   modalInput.focus()
@@ -939,10 +939,10 @@ function editCorrection(blockIndex, corrIndex) {
     modalSuggestionField.style.display = 'block'
   }
 
-  // Remplir le modal - la suggestion reste TOUJOURS la suggestion originale
-  // Utiliser escapeHtml pour préserver les caractères spéciaux (apostrophes, etc.)
-  modalOriginal.innerHTML = SRTParser.escapeHtml(correction.original).replace(/\n/g, '<br>')
-  modalSuggestion.innerHTML = SRTParser.escapeHtml(correction.originalSuggestion).replace(/\n/g, '<br>')
+  // Remplir le modal avec textContent pour préserver les apostrophes et caractères spéciaux
+  // white-space: pre-wrap dans le CSS gère les sauts de ligne
+  modalOriginal.textContent = correction.original
+  modalSuggestion.textContent = correction.originalSuggestion
   modalInput.value = correction.corrected
   modal.style.display = 'flex'
   modalInput.focus()
