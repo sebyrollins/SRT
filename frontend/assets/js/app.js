@@ -959,7 +959,7 @@ function resetToInitialState() {
 function downloadSRT() {
   const content = SRTParser.generate(AppState.blocks)
   const filename = SRTParser.generateFilename(AppState.originalFilename, '_SR')
-  SRTParser.downloadFile(content, filename, 'text/plain;charset=utf-8')
+  SRTParser.downloadFile(content, filename, 'text/plain')
 }
 
 /**
@@ -968,7 +968,7 @@ function downloadSRT() {
 function downloadTXT() {
   const content = SRTParser.generateTXT(AppState.blocks)
   const filename = SRTParser.generateFilename(AppState.originalFilename, '_SR', 'txt')
-  SRTParser.downloadFile(content, filename, 'text/plain;charset=utf-8')
+  SRTParser.downloadFile(content, filename, 'text/plain')
 }
 
 /**

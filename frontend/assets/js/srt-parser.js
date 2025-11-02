@@ -198,9 +198,14 @@ const SRTParser = {
     const BOM = '\uFEFF'
     const contentWithBOM = BOM + content
 
-    // Créer le Blob avec charset UTF-8 explicite
+    // S'assurer que le charset est spécifié (éviter les doublons)
+    const finalMimeType = mimeType.includes('charset')
+      ? mimeType
+      : `${mimeType};charset=utf-8`
+
+    // Créer le Blob avec le type MIME correct
     const blob = new Blob([contentWithBOM], {
-      type: `${mimeType};charset=utf-8`
+      type: finalMimeType
     })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
