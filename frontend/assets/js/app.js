@@ -208,17 +208,16 @@ async function processUploadedFile(content, filename) {
   // Afficher la section de chargement
   showSection('loading')
 
-  // Estimer le temps de traitement en fonction de la taille du fichier
+  // Estimer le temps de traitement en fonction de la taille du fichier (formule continue)
   const fileSizeKB = new Blob([content]).size / 1024
-  let estimatedTimeMs
 
-  if (fileSizeKB < 50) {
-    estimatedTimeMs = 35000  // 35 secondes pour petits fichiers (légèrement plus lent)
-  } else if (fileSizeKB < 200) {
-    estimatedTimeMs = 65000  // 65 secondes pour fichiers moyens (légèrement plus lent)
-  } else {
-    estimatedTimeMs = 95000  // 95 secondes pour gros fichiers (légèrement plus lent)
-  }
+  // Formule linéaire: temps de base + (taille × coefficient)
+  // Exemples: 0 Ko → 30s, 50 Ko → 44s, 200 Ko → 86s, 250 Ko → 100s (max)
+  const baseTimeMs = 30000  // 30 secondes minimum
+  const msPerKB = 280       // 280 ms par Ko
+  const maxTimeMs = 100000  // 100 secondes maximum
+
+  const estimatedTimeMs = Math.min(maxTimeMs, baseTimeMs + (fileSizeKB * msPerKB))
 
   // Progression fictive fluide jusqu'à 80%
   let currentProgress = 0
