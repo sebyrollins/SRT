@@ -1449,7 +1449,7 @@ function getBlockMinimapClass(block) {
   const allValidated = block.corrections && block.corrections.length > 0 &&
     block.corrections.every((c, idx) => AppState.validatedCorrections.has(`${block.index}-${idx}`))
 
-  // Pas de correction
+  // Pas de correction → afficher quand même dans la minimap
   if (!block.corrections || block.corrections.length === 0) {
     return 'minimap-no-correction'
   }
@@ -1462,8 +1462,8 @@ function getBlockMinimapClass(block) {
     if (hasDoubt) {
       return 'minimap-validated-doubt'
     } else if (hasMinor && !block.corrections.some(c => c.type === 'major')) {
-      // Corrections mineures validées (non-doute) → masquer de la minimap
-      return 'minimap-hidden'
+      // Corrections mineures validées → afficher aussi dans la minimap
+      return 'minimap-validated-minor'
     } else {
       return 'minimap-validated'
     }

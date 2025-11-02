@@ -1717,17 +1717,6 @@ body {
   z-index: 1;
 }
 
-/* Indicateur de position actuelle (bloc cliqué) */
-.minimap-block.minimap-current {
-  transform: scaleX(1.6);
-  outline: 3px solid #4a4a4a;
-  outline-offset: 1px;
-  box-shadow: 0 0 16px rgba(0, 0, 0, 0.8),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  z-index: 2;
-  opacity: 1 !important;
-}
-
 /* États des blocs dans la minimap */
 .minimap-block.minimap-validated {
   background: var(--color-border);
@@ -1763,6 +1752,39 @@ body {
 
 .minimap-block.minimap-minor {
   background: #42a5f5;
+}
+
+/* Indicateur de position actuelle (bloc cliqué) - DOIT venir après les couleurs */
+.minimap-block.minimap-current {
+  transform: scaleX(1.6);
+  outline: 3px solid #4a4a4a;
+  outline-offset: 1px;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.8),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  z-index: 2;
+  opacity: 1 !important;
+  /* PAS de background ici pour préserver la couleur originale du bloc */
+}
+
+/* Forcer les couleurs à rester visibles même quand le bloc est sélectionné */
+.minimap-block.minimap-current.minimap-major {
+  background: #ef5350 !important;
+}
+
+.minimap-block.minimap-current.minimap-doubt {
+  background: #ff9800 !important;
+}
+
+.minimap-block.minimap-current.minimap-minor {
+  background: #42a5f5 !important;
+}
+
+.minimap-block.minimap-current.minimap-validated-doubt {
+  background: #ffe0b2 !important;
+}
+
+.minimap-block.minimap-current.minimap-validated-minor {
+  background: #bbdefb !important;
 }
 
 /* Tooltip au survol */
