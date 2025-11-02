@@ -199,9 +199,38 @@ async function correctWithClaude(blocks) {
     const parsed = JSON.parse(content.trim())
     const correctedBlocks = parsed.blocks || []
 
-    // Réinjecter les timecodes depuis les blocs originaux
+    // Réinjecter les timecodes et valider les corrections
     return correctedBlocks.map(correctedBlock => {
       const originalBlock = blocks.find(b => b.index === correctedBlock.index)
+
+      // Valider les corrections de ce bloc
+      if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
+        const validatedCorrections = correctedBlock.corrections.filter(correction => {
+          // Vérifier que la position et la longueur sont valides
+          const startPos = correction.position
+          const endPos = startPos + correction.original.length
+          const blockText = originalBlock ? originalBlock.text : correctedBlock.original
+
+          if (!blockText || startPos < 0 || endPos > blockText.length) {
+            console.warn(`Bloc ${correctedBlock.index}: Position invalide ${startPos}-${endPos} (texte length: ${blockText?.length})`)
+            return false
+          }
+
+          // Vérifier que le texte à cette position correspond à correction.original
+          const actualText = blockText.substring(startPos, endPos)
+          if (actualText !== correction.original) {
+            console.warn(`Bloc ${correctedBlock.index}: Texte ne correspond pas à position ${startPos}-${endPos}`)
+            console.warn(`  Attendu: "${correction.original}"`)
+            console.warn(`  Trouvé: "${actualText}"`)
+            return false
+          }
+
+          return true
+        })
+
+        correctedBlock.corrections = validatedCorrections
+      }
+
       return {
         ...correctedBlock,
         timecode: originalBlock ? originalBlock.timecode : 'undefined'
@@ -298,15 +327,21 @@ RÈGLES STRICTES :
 1. Garde l'index exact du bloc original
 2. Si aucune correction nécessaire : corrections = []
 3. Reason doit être courte et claire (max 60 caractères)
-4. Position = index du début de la correction dans le texte original
+4. CRITIQUE - Position = index EXACT (compte de 0) du début de la correction dans le texte original
+   - Les retours à la ligne \\n comptent comme UN caractère
+   - Exemple: "Bonjour\\nle monde" → "le" commence à position 8 (B=0, o=1, n=2, j=3, o=4, u=5, r=6, \\n=7, l=8)
+   - La position doit pointer EXACTEMENT où commence le texte à corriger
+   - Vérifie que text.substring(position, position + original.length) === original
 5. Ne change PAS le sens ou le style, uniquement les erreurs
 6. CRITIQUE: Le champ "original" doit contenir EXACTEMENT le texte du fichier original (sans modification)
    - Si le fichier contient "l'eau" (apostrophe droite '), le champ original doit être "l'eau" (apostrophe droite ')
    - Si le fichier contient "Assemblée", le champ original doit être "Assemblée" (même texte, même caractères)
    - NE PAS corriger le texte dans le champ "original", garde-le TEL QUEL
+   - IMPORTANT: Si le texte contient des retours à la ligne, inclus-les dans "original" si nécessaire
 7. Le champ "corrected" contient la version corrigée
    - Exemple: original="l'eau" corrected="l'eau" (apostrophe droite → courbe)
 8. Ne crée JAMAIS de correction où "original" et "corrected" sont identiques caractère par caractère
+9. VÉRIFIE TOUJOURS que les corrections ne se chevauchent PAS (positions différentes sans overlap)
 
 TEXTE À CORRIGER :
 
