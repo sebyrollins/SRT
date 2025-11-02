@@ -1665,8 +1665,9 @@ body {
   position: fixed;
   right: 20px;
   top: 220px;
+  bottom: 20px;
   width: 50px;
-  max-height: calc(100vh - 240px);
+  height: calc(100vh - 240px);
   background: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
@@ -1693,7 +1694,6 @@ body {
   gap: 2px;
   padding: 0;
   position: relative;
-  cursor: pointer;
 }
 
 .minimap-block {

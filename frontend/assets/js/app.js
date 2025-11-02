@@ -1224,11 +1224,10 @@ function renderMinimap() {
   DOM.minimapBlocks.innerHTML = ''
 
   // Calculer la hauteur totale du document pour les proportions
-  const editorSection = document.getElementById('editorSection')
-  if (!editorSection) return
-
-  const totalDocHeight = editorSection.scrollHeight
+  const totalDocHeight = document.documentElement.scrollHeight
   const minimapHeight = DOM.minimapBlocks.offsetHeight || 500 // Hauteur disponible pour les blocs
+
+  if (totalDocHeight === 0 || minimapHeight === 0) return
 
   AppState.blocks.forEach(block => {
     const blockRow = document.getElementById(`block-row-${block.index}`)
@@ -1259,9 +1258,6 @@ function renderMinimap() {
 
   // Ajouter un indicateur de viewport
   addViewportIndicator()
-
-  // Ajouter un gestionnaire de clic sur toute la minimap
-  DOM.minimapBlocks.addEventListener('click', handleMinimapClick)
 }
 
 /**
@@ -1427,13 +1423,13 @@ function updateViewportIndicator() {
   const indicator = DOM.minimapBlocks.querySelector('.minimap-viewport-indicator')
   if (!indicator) return
 
-  const editorSection = document.getElementById('editorSection')
-  if (!editorSection) return
-
-  const totalDocHeight = editorSection.scrollHeight
+  // Utiliser les dimensions du document complet pour la précision
+  const totalDocHeight = document.documentElement.scrollHeight
   const minimapHeight = DOM.minimapBlocks.offsetHeight
 
-  // Calculer la position et la hauteur proportionnelles
+  if (totalDocHeight === 0 || minimapHeight === 0) return
+
+  // Calculer la position et la hauteur proportionnelles basées sur le scroll réel
   const scrollRatio = window.scrollY / totalDocHeight
   const viewportRatio = window.innerHeight / totalDocHeight
 
@@ -1442,34 +1438,6 @@ function updateViewportIndicator() {
 
   indicator.style.top = `${indicatorTop}px`
   indicator.style.height = `${indicatorHeight}px`
-}
-
-/**
- * Gère le clic sur la minimap pour naviguer
- */
-function handleMinimapClick(event) {
-  if (!DOM.minimapBlocks) return
-
-  // Ne pas traiter si on a cliqué sur un bloc (déjà géré)
-  if (event.target.classList.contains('minimap-block')) return
-
-  const editorSection = document.getElementById('editorSection')
-  if (!editorSection) return
-
-  // Calculer la position relative du clic dans la minimap
-  const minimapRect = DOM.minimapBlocks.getBoundingClientRect()
-  const clickY = event.clientY - minimapRect.top
-  const clickRatio = clickY / minimapRect.height
-
-  // Calculer la position de scroll correspondante
-  const totalDocHeight = editorSection.scrollHeight
-  const targetScrollY = clickRatio * totalDocHeight - (window.innerHeight / 2)
-
-  // Scroller vers cette position
-  window.scrollTo({
-    top: Math.max(0, targetScrollY),
-    behavior: 'smooth'
-  })
 }
 
 // Throttle pour éviter trop d'appels lors du scroll
