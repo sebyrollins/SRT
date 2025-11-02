@@ -1242,38 +1242,67 @@ function rebuildMinimap() {
 
   // Récupérer les dimensions
   const minimapHeight = DOM.minimapBlocks.offsetHeight
-  const documentHeight = document.documentElement.scrollHeight
 
-  if (minimapHeight === 0 || documentHeight === 0) return
+  if (minimapHeight === 0) return
 
-  console.log(`[Minimap] Container height: ${minimapHeight}px, Document height: ${documentHeight}px`)
+  console.log(`[Minimap] Container height: ${minimapHeight}px`)
   console.log(`[Minimap] Total blocks: ${AppState.blocks.length}`)
 
-  // Créer UN bloc minimap par bloc de données
-  AppState.blocks.forEach((block, index) => {
+  // Première passe : calculer la somme totale des hauteurs réelles des blocs
+  let totalBlocksHeight = 0
+  const blocksData = []
+
+  AppState.blocks.forEach((block) => {
     const blockRow = document.getElementById(`block-row-${block.index}`)
     if (!blockRow) {
       console.warn(`[Minimap] Block row not found for block #${block.index}`)
       return
     }
 
-    // Calculer la hauteur proportionnelle simple
+    const blockClass = getBlockMinimapClass(block)
+    const isHidden = blockClass === 'minimap-hidden'
     const blockHeight = blockRow.offsetHeight
-    const heightRatio = blockHeight / documentHeight
-    const minimapBlockHeight = Math.max(2, heightRatio * minimapHeight)
 
-    // Créer le bloc minimap
+    if (!isHidden) {
+      totalBlocksHeight += blockHeight
+    }
+
+    blocksData.push({
+      block,
+      blockClass,
+      isHidden,
+      blockHeight
+    })
+  })
+
+  console.log(`[Minimap] Total blocks height: ${totalBlocksHeight}px`)
+
+  // Calculer l'espace pour les marges
+  const visibleBlocksCount = blocksData.filter(d => !d.isHidden).length
+  const totalMarginsHeight = Math.max(0, (visibleBlocksCount - 1) * 1)
+  const availableHeight = minimapHeight - totalMarginsHeight
+
+  console.log(`[Minimap] Available height for blocks: ${availableHeight}px (${visibleBlocksCount} visible blocks)`)
+
+  // Deuxième passe : créer les blocs avec distribution uniforme
+  blocksData.forEach(({ block, blockClass, isHidden, blockHeight }) => {
     const minimapBlock = document.createElement('div')
     minimapBlock.className = 'minimap-block'
     minimapBlock.dataset.blockIndex = block.index
     minimapBlock.dataset.blockLabel = `Bloc #${block.index}`
-    minimapBlock.style.height = `${minimapBlockHeight}px`
-    minimapBlock.style.flexShrink = '0'
-    minimapBlock.style.marginBottom = '1px' // Petit espace entre les blocs
-
-    // Déterminer la couleur
-    const blockClass = getBlockMinimapClass(block)
     minimapBlock.classList.add(blockClass)
+
+    if (!isHidden && totalBlocksHeight > 0) {
+      // Distribuer proportionnellement sur la hauteur disponible
+      const heightRatio = blockHeight / totalBlocksHeight
+      const minimapBlockHeight = Math.max(2, heightRatio * availableHeight)
+      minimapBlock.style.height = `${minimapBlockHeight}px`
+    } else {
+      minimapBlock.style.height = '0px'
+    }
+
+    minimapBlock.style.flexShrink = '0'
+    minimapBlock.style.marginBottom = '1px'
 
     // Clic pour naviguer
     minimapBlock.addEventListener('click', () => {
@@ -1284,9 +1313,6 @@ function rebuildMinimap() {
   })
 
   console.log(`[Minimap] Created ${DOM.minimapBlocks.children.length} minimap blocks`)
-
-  // Ajouter l'indicateur de viewport
-  addViewportIndicator()
 }
 
 /**
@@ -1347,9 +1373,6 @@ function updateMinimap() {
     const blockClass = getBlockMinimapClass(block)
     minimapBlock.classList.add(blockClass)
   })
-
-  // Mettre à jour l'indicateur de viewport
-  updateViewportIndicator()
 }
 
 /**
@@ -1418,55 +1441,6 @@ function updateMinimapCurrentPosition() {
       minimapBlock.classList.add('minimap-current')
     }
   }
-
-  // Mettre à jour l'indicateur de viewport
-  updateViewportIndicator()
-}
-
-/**
- * Ajoute un indicateur de viewport à la minimap
- */
-function addViewportIndicator() {
-  if (!DOM.minimapBlocks) return
-
-  // Supprimer l'ancien indicateur s'il existe
-  const oldIndicator = DOM.minimapBlocks.querySelector('.minimap-viewport-indicator')
-  if (oldIndicator) {
-    oldIndicator.remove()
-  }
-
-  // Créer le nouvel indicateur
-  const indicator = document.createElement('div')
-  indicator.className = 'minimap-viewport-indicator'
-  DOM.minimapBlocks.appendChild(indicator)
-
-  updateViewportIndicator()
-}
-
-/**
- * Met à jour la position et la taille de l'indicateur de viewport
- */
-function updateViewportIndicator() {
-  if (!DOM.minimapBlocks) return
-
-  const indicator = DOM.minimapBlocks.querySelector('.minimap-viewport-indicator')
-  if (!indicator) return
-
-  // Dimensions simples
-  const documentHeight = document.documentElement.scrollHeight
-  const minimapHeight = DOM.minimapBlocks.offsetHeight
-
-  if (documentHeight === 0 || minimapHeight === 0) return
-
-  // Position et taille proportionnelles SIMPLES
-  const scrollRatio = window.scrollY / documentHeight
-  const viewportRatio = window.innerHeight / documentHeight
-
-  const indicatorTop = scrollRatio * minimapHeight
-  const indicatorHeight = Math.max(20, viewportRatio * minimapHeight)
-
-  indicator.style.top = `${indicatorTop}px`
-  indicator.style.height = `${indicatorHeight}px`
 }
 
 // Throttle pour éviter trop d'appels lors du scroll
