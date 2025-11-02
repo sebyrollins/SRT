@@ -1225,77 +1225,57 @@ function handleFilterClick(event) {
 function renderMinimap() {
   if (!DOM.minimapBlocks) return
 
-  DOM.minimapBlocks.innerHTML = ''
-
-  // Attendre que le DOM soit complètement rendu
-  requestAnimationFrame(() => {
-    calculateAndRenderMinimapBlocks()
-  })
+  // Attendre que le DOM soit prêt
+  setTimeout(() => {
+    rebuildMinimap()
+  }, 100)
 }
 
 /**
- * Calcule et rend les blocs de la minimap avec les bonnes proportions
+ * Reconstruit complètement la minimap
  */
-function calculateAndRenderMinimapBlocks() {
+function rebuildMinimap() {
   if (!DOM.minimapBlocks) return
 
-  const minimapContainerHeight = DOM.minimapBlocks.offsetHeight
-  if (minimapContainerHeight === 0) return
+  // Vider la minimap
+  DOM.minimapBlocks.innerHTML = ''
 
-  // Calculer la hauteur totale scrollable du document (référence commune)
-  const totalScrollHeight = document.documentElement.scrollHeight
-  if (totalScrollHeight === 0) return
+  // Récupérer les dimensions
+  const minimapHeight = DOM.minimapBlocks.offsetHeight
+  const documentHeight = document.documentElement.scrollHeight
 
-  // Première passe : collecter les données des blocs
-  const blocksData = []
+  if (minimapHeight === 0 || documentHeight === 0) return
 
-  AppState.blocks.forEach(block => {
+  console.log(`[Minimap] Container height: ${minimapHeight}px, Document height: ${documentHeight}px`)
+  console.log(`[Minimap] Total blocks: ${AppState.blocks.length}`)
+
+  // Créer UN bloc minimap par bloc de données
+  AppState.blocks.forEach((block, index) => {
     const blockRow = document.getElementById(`block-row-${block.index}`)
-    if (!blockRow) return
+    if (!blockRow) {
+      console.warn(`[Minimap] Block row not found for block #${block.index}`)
+      return
+    }
 
-    const blockClass = getBlockMinimapClass(block)
-    const isHidden = blockClass === 'minimap-hidden'
+    // Calculer la hauteur proportionnelle simple
+    const blockHeight = blockRow.offsetHeight
+    const heightRatio = blockHeight / documentHeight
+    const minimapBlockHeight = Math.max(2, heightRatio * minimapHeight)
 
-    // Obtenir la position et hauteur du bloc dans le document
-    const blockRect = blockRow.getBoundingClientRect()
-    const blockTop = window.scrollY + blockRect.top
-    const blockHeight = blockRect.height
-
-    blocksData.push({
-      block,
-      blockClass,
-      isHidden,
-      blockTop,
-      blockHeight
-    })
-  })
-
-  // Calculer le nombre de blocs visibles et les gaps
-  const visibleBlocksCount = blocksData.filter(d => !d.isHidden).length
-  const totalGapsHeight = Math.max(0, (visibleBlocksCount - 1) * 2)
-  const availableHeightForBlocks = minimapContainerHeight - totalGapsHeight
-
-  // Deuxième passe : créer les blocs avec hauteurs proportionnelles au document total
-  blocksData.forEach(({ block, blockClass, isHidden, blockTop, blockHeight }) => {
+    // Créer le bloc minimap
     const minimapBlock = document.createElement('div')
     minimapBlock.className = 'minimap-block'
     minimapBlock.dataset.blockIndex = block.index
     minimapBlock.dataset.blockLabel = `Bloc #${block.index}`
+    minimapBlock.style.height = `${minimapBlockHeight}px`
+    minimapBlock.style.flexShrink = '0'
+    minimapBlock.style.marginBottom = '1px' // Petit espace entre les blocs
+
+    // Déterminer la couleur
+    const blockClass = getBlockMinimapClass(block)
     minimapBlock.classList.add(blockClass)
 
-    if (!isHidden) {
-      // Hauteur proportionnelle basée sur la hauteur totale du document
-      // Pour que le viewport indicator corresponde parfaitement
-      const heightRatio = blockHeight / totalScrollHeight
-      const proportionalHeight = Math.max(3, heightRatio * availableHeightForBlocks)
-      minimapBlock.style.height = `${proportionalHeight}px`
-    } else {
-      minimapBlock.style.height = '0px'
-    }
-
-    minimapBlock.style.flexShrink = '0'
-
-    // Clic pour scroller vers le bloc
+    // Clic pour naviguer
     minimapBlock.addEventListener('click', () => {
       scrollToBlock(block.index)
     })
@@ -1303,7 +1283,9 @@ function calculateAndRenderMinimapBlocks() {
     DOM.minimapBlocks.appendChild(minimapBlock)
   })
 
-  // Ajouter un indicateur de viewport
+  console.log(`[Minimap] Created ${DOM.minimapBlocks.children.length} minimap blocks`)
+
+  // Ajouter l'indicateur de viewport
   addViewportIndicator()
 }
 
@@ -1470,32 +1452,18 @@ function updateViewportIndicator() {
   const indicator = DOM.minimapBlocks.querySelector('.minimap-viewport-indicator')
   if (!indicator) return
 
-  // Utiliser les dimensions du document complet pour la précision
-  const totalScrollHeight = document.documentElement.scrollHeight
-  const minimapContainerHeight = DOM.minimapBlocks.offsetHeight
+  // Dimensions simples
+  const documentHeight = document.documentElement.scrollHeight
+  const minimapHeight = DOM.minimapBlocks.offsetHeight
 
-  if (totalScrollHeight === 0 || minimapContainerHeight === 0) return
+  if (documentHeight === 0 || minimapHeight === 0) return
 
-  // Calculer les gaps exactement comme dans calculateAndRenderMinimapBlocks
-  // pour que le viewport indicator utilise la même référence
-  let visibleBlocksCount = 0
-  AppState.blocks.forEach(block => {
-    const blockClass = getBlockMinimapClass(block)
-    if (blockClass !== 'minimap-hidden') {
-      visibleBlocksCount++
-    }
-  })
+  // Position et taille proportionnelles SIMPLES
+  const scrollRatio = window.scrollY / documentHeight
+  const viewportRatio = window.innerHeight / documentHeight
 
-  const totalGapsHeight = Math.max(0, (visibleBlocksCount - 1) * 2)
-  const availableHeightForBlocks = minimapContainerHeight - totalGapsHeight
-
-  // Calculer la position et la hauteur proportionnelles basées sur le scroll réel
-  // en utilisant availableHeightForBlocks (comme les blocs)
-  const scrollRatio = window.scrollY / totalScrollHeight
-  const viewportRatio = window.innerHeight / totalScrollHeight
-
-  const indicatorTop = scrollRatio * availableHeightForBlocks
-  const indicatorHeight = Math.max(20, viewportRatio * availableHeightForBlocks)
+  const indicatorTop = scrollRatio * minimapHeight
+  const indicatorHeight = Math.max(20, viewportRatio * minimapHeight)
 
   indicator.style.top = `${indicatorTop}px`
   indicator.style.height = `${indicatorHeight}px`
@@ -1518,8 +1486,9 @@ function onResizeThrottled() {
   if (resizeTimeout) return
 
   resizeTimeout = setTimeout(() => {
-    // Recalculer complètement la minimap avec les nouvelles dimensions
-    calculateAndRenderMinimapBlocks()
+    console.log('[Minimap] Window resized, rebuilding minimap')
+    // Reconstruire complètement la minimap avec les nouvelles dimensions
+    rebuildMinimap()
     resizeTimeout = null
   }, 200)
 }
