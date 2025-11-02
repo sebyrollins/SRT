@@ -1225,28 +1225,60 @@ function renderMinimap() {
 
   // Calculer la hauteur totale du document pour les proportions
   const totalDocHeight = document.documentElement.scrollHeight
-  const minimapHeight = DOM.minimapBlocks.offsetHeight || 500 // Hauteur disponible pour les blocs
+  const minimapContainerHeight = DOM.minimapBlocks.offsetHeight || 500
 
-  if (totalDocHeight === 0 || minimapHeight === 0) return
+  if (totalDocHeight === 0 || minimapContainerHeight === 0) return
+
+  // Première passe : compter les blocs visibles et calculer leurs hauteurs relatives
+  const blocksData = []
+  let totalRelativeHeight = 0
 
   AppState.blocks.forEach(block => {
     const blockRow = document.getElementById(`block-row-${block.index}`)
     if (!blockRow) return
 
-    const blockHeight = blockRow.offsetHeight
-    // Calculer la hauteur proportionnelle pour la minimap
-    const proportionalHeight = Math.max(3, (blockHeight / totalDocHeight) * minimapHeight)
+    const blockClass = getBlockMinimapClass(block)
 
+    // Ne pas compter les blocs cachés dans le calcul
+    if (blockClass === 'minimap-hidden') {
+      blocksData.push({ block, blockRow, blockClass, height: 0, isHidden: true })
+      return
+    }
+
+    const blockHeight = blockRow.offsetHeight
+    totalRelativeHeight += blockHeight
+
+    blocksData.push({
+      block,
+      blockRow,
+      blockClass,
+      relativeHeight: blockHeight,
+      isHidden: false
+    })
+  })
+
+  // Calculer le nombre de blocs visibles pour les gaps
+  const visibleBlocksCount = blocksData.filter(d => !d.isHidden).length
+  const totalGapsHeight = Math.max(0, (visibleBlocksCount - 1) * 2) // 2px de gap entre chaque bloc visible
+  const availableHeightForBlocks = minimapContainerHeight - totalGapsHeight
+
+  // Deuxième passe : créer les blocs avec les hauteurs proportionnelles ajustées
+  blocksData.forEach(({ block, blockRow, blockClass, relativeHeight, isHidden }) => {
     const minimapBlock = document.createElement('div')
     minimapBlock.className = 'minimap-block'
     minimapBlock.dataset.blockIndex = block.index
     minimapBlock.dataset.blockLabel = `Bloc #${block.index}`
-    minimapBlock.style.height = `${proportionalHeight}px`
-    minimapBlock.style.flexShrink = '0'
-
-    // Déterminer la classe selon l'état
-    const blockClass = getBlockMinimapClass(block)
     minimapBlock.classList.add(blockClass)
+
+    if (!isHidden && totalRelativeHeight > 0) {
+      // Calculer la hauteur proportionnelle en tenant compte des gaps
+      const proportionalHeight = Math.max(3, (relativeHeight / totalRelativeHeight) * availableHeightForBlocks)
+      minimapBlock.style.height = `${proportionalHeight}px`
+    } else {
+      minimapBlock.style.height = '0px'
+    }
+
+    minimapBlock.style.flexShrink = '0'
 
     // Clic pour scroller vers le bloc
     minimapBlock.addEventListener('click', () => {
