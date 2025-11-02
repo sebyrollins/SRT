@@ -597,12 +597,22 @@ function renderBlocksTable() {
 
       const emptyMessage = hasHiddenMinorCorrections ? 'Aucune correction majeure' : 'Aucune correction'
 
-      validationCell.innerHTML = `
-        <div class="validation-empty">
-          <span class="validation-empty-icon">✓</span>
-          <span class="validation-empty-text">${emptyMessage}</span>
-        </div>
+      const emptyDiv = document.createElement('div')
+      emptyDiv.className = 'validation-empty'
+      emptyDiv.innerHTML = `
+        <span class="validation-empty-icon">✓</span>
+        <span class="validation-empty-text">${emptyMessage}</span>
       `
+
+      // Ajouter un bouton "Modifier" pour permettre l'édition manuelle
+      const editBtn = document.createElement('button')
+      editBtn.className = 'btn-icon-only btn-icon-edit validation-empty-edit'
+      editBtn.innerHTML = '✏️'
+      editBtn.title = 'Modifier le texte'
+      editBtn.onclick = () => editBlockText(block.index)
+      emptyDiv.appendChild(editBtn)
+
+      validationCell.appendChild(emptyDiv)
     } else {
       // Afficher les corrections visibles
       block.corrections.forEach((correction, corrIndex) => {
@@ -748,6 +758,122 @@ function findNextUnvalidatedBlock(currentBlockIndex) {
   }
 
   return null // Aucun bloc non validé trouvé
+}
+
+/**
+ * Édite le texte complet d'un bloc sans corrections
+ */
+function editBlockText(blockIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block) return
+
+  // Afficher le modal
+  const modal = document.getElementById('editModal')
+  const modalOriginal = document.getElementById('modalOriginal')
+  const modalSuggestion = document.getElementById('modalSuggestion')
+  const modalInput = document.getElementById('modalInput')
+  const modalSaveBtn = document.getElementById('modalSaveBtn')
+  const modalCancelBtn = document.getElementById('modalCancelBtn')
+  const modalCloseBtn = document.getElementById('modalCloseBtn')
+  const modalOverlay = document.getElementById('modalOverlay')
+  const modalRestoreBtn = document.getElementById('modalRestoreBtn')
+  const modalRestoreOriginalBtn = document.getElementById('modalRestoreOriginalBtn')
+
+  // Remplir le modal
+  modalOriginal.textContent = block.original
+  modalSuggestion.textContent = block.corrected
+  modalInput.value = block.corrected
+  modal.style.display = 'flex'
+  modalInput.focus()
+  modalInput.select()
+
+  // Fonction pour restaurer l'original
+  const restoreOriginal = () => {
+    modalInput.value = block.original
+    modalInput.focus()
+    modalInput.select()
+  }
+
+  // Fonction pour restaurer le corrigé
+  const restoreCorrected = () => {
+    modalInput.value = block.corrected
+    modalInput.focus()
+    modalInput.select()
+  }
+
+  // Fonction pour fermer le modal
+  const closeModal = () => {
+    modal.style.display = 'none'
+    modalSaveBtn.onclick = null
+    modalCancelBtn.onclick = null
+    modalCloseBtn.onclick = null
+    modalOverlay.onclick = null
+    modalRestoreBtn.onclick = null
+    modalRestoreOriginalBtn.onclick = null
+    modalInput.onkeydown = null
+  }
+
+  // Fonction pour sauvegarder
+  const saveEdit = () => {
+    const newValue = modalInput.value.trim()
+
+    if (newValue && newValue !== block.original) {
+      // Le texte a changé, créer une correction de type "doubt"
+      const oldCorrected = block.corrected
+      block.corrected = newValue
+
+      // Créer une correction manuelle couvrant tout le texte
+      if (!block.corrections) {
+        block.corrections = []
+      }
+
+      // Créer une nouvelle correction de type doubt
+      const newCorrection = {
+        type: 'doubt',
+        original: block.original,
+        corrected: newValue,
+        reason: 'Modifié manuellement',
+        position: 0,
+        originalSuggestion: oldCorrected,
+        originalType: 'doubt',
+        originalReason: 'Modifié manuellement'
+      }
+
+      block.corrections.push(newCorrection)
+
+      // Valider automatiquement cette correction
+      const correctionId = `${block.index}-${block.corrections.length - 1}`
+      AppState.validatedCorrections.add(correctionId)
+
+      // Mettre à jour les stats
+      const stats = SRTParser.calculateStats(AppState.blocks)
+      updateStats(stats)
+
+      // Re-render
+      renderBlocksTable()
+      updateMinimap()
+    }
+
+    closeModal()
+  }
+
+  // Événements
+  modalSaveBtn.onclick = saveEdit
+  modalCancelBtn.onclick = closeModal
+  modalCloseBtn.onclick = closeModal
+  modalOverlay.onclick = closeModal
+  modalRestoreOriginalBtn.onclick = restoreOriginal
+  modalRestoreBtn.onclick = restoreCorrected
+
+  // Enter pour sauvegarder, Escape pour annuler
+  modalInput.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      saveEdit()
+    } else if (e.key === 'Escape') {
+      closeModal()
+    }
+  }
 }
 
 /**
