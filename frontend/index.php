@@ -264,7 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                     </div>
                     <div class="modal-field">
                         <label class="modal-label">Votre correction :</label>
-                        <textarea class="modal-input" id="modalInput" rows="6"></textarea>
+                        <textarea class="modal-input" id="modalInput" rows="3"></textarea>
                         <div class="modal-buttons-row">
                             <button class="btn-restore-original" id="modalRestoreOriginalBtn" title="Restaurer le texte original avec l'erreur">
                                 ↶ Restaurer l'original

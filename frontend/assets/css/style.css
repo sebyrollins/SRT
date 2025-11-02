@@ -1521,7 +1521,7 @@ body {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
-  max-width: 500px;
+  max-width: 670px;
   width: 90%;
   max-height: 90vh;
   overflow: hidden;

@@ -799,8 +799,9 @@ function editBlockText(blockIndex) {
   }
 
   // Remplir le modal avec respect des sauts de ligne
-  modalOriginal.innerHTML = block.original.replace(/\n/g, '<br>')
-  modalSuggestion.innerHTML = block.corrected.replace(/\n/g, '<br>')
+  // Utiliser escapeHtml pour préserver les caractères spéciaux (apostrophes, etc.)
+  modalOriginal.innerHTML = SRTParser.escapeHtml(block.original).replace(/\n/g, '<br>')
+  modalSuggestion.innerHTML = SRTParser.escapeHtml(block.corrected).replace(/\n/g, '<br>')
   modalInput.value = block.corrected
   modal.style.display = 'flex'
   modalInput.focus()
@@ -939,9 +940,9 @@ function editCorrection(blockIndex, corrIndex) {
   }
 
   // Remplir le modal - la suggestion reste TOUJOURS la suggestion originale
-  // Utiliser innerHTML pour supporter les sauts de ligne
-  modalOriginal.innerHTML = correction.original.replace(/\n/g, '<br>')
-  modalSuggestion.innerHTML = correction.originalSuggestion.replace(/\n/g, '<br>')
+  // Utiliser escapeHtml pour préserver les caractères spéciaux (apostrophes, etc.)
+  modalOriginal.innerHTML = SRTParser.escapeHtml(correction.original).replace(/\n/g, '<br>')
+  modalSuggestion.innerHTML = SRTParser.escapeHtml(correction.originalSuggestion).replace(/\n/g, '<br>')
   modalInput.value = correction.corrected
   modal.style.display = 'flex'
   modalInput.focus()
