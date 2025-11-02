@@ -1596,6 +1596,13 @@ body {
   font-size: 0.9375rem;
 }
 
+.modal-value-multiline {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
 .modal-input {
   width: 100%;
   padding: var(--spacing-sm);
@@ -1605,6 +1612,9 @@ body {
   font-family: var(--font-mono);
   color: var(--color-text-primary);
   transition: border-color 0.2s ease;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
 }
 
 .modal-input:focus {

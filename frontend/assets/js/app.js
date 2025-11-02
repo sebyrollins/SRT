@@ -771,6 +771,7 @@ function editBlockText(blockIndex) {
   const modal = document.getElementById('editModal')
   const modalOriginal = document.getElementById('modalOriginal')
   const modalSuggestion = document.getElementById('modalSuggestion')
+  const modalSuggestionField = document.getElementById('modalSuggestionField')
   const modalInput = document.getElementById('modalInput')
   const modalSaveBtn = document.getElementById('modalSaveBtn')
   const modalCancelBtn = document.getElementById('modalCancelBtn')
@@ -779,31 +780,41 @@ function editBlockText(blockIndex) {
   const modalRestoreBtn = document.getElementById('modalRestoreBtn')
   const modalRestoreOriginalBtn = document.getElementById('modalRestoreOriginalBtn')
 
-  // Remplir le modal
-  modalOriginal.textContent = block.original
-  modalSuggestion.textContent = block.corrected
+  // Cacher la section "Suggestion de correction" pour l'édition de bloc entier
+  if (modalSuggestionField) {
+    modalSuggestionField.style.display = 'none'
+  }
+
+  // Remplir le modal avec respect des sauts de ligne
+  modalOriginal.innerHTML = block.original.replace(/\n/g, '<br>')
+  modalSuggestion.innerHTML = block.corrected.replace(/\n/g, '<br>')
   modalInput.value = block.corrected
   modal.style.display = 'flex'
   modalInput.focus()
-  modalInput.select()
+  // Pour textarea, on sélectionne tout à la fin
+  modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
 
   // Fonction pour restaurer l'original
   const restoreOriginal = () => {
     modalInput.value = block.original
     modalInput.focus()
-    modalInput.select()
+    modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
   }
 
   // Fonction pour restaurer le corrigé
   const restoreCorrected = () => {
     modalInput.value = block.corrected
     modalInput.focus()
-    modalInput.select()
+    modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
   }
 
   // Fonction pour fermer le modal
   const closeModal = () => {
     modal.style.display = 'none'
+    // Réafficher le champ de suggestion pour les prochaines ouvertures (editCorrection)
+    if (modalSuggestionField) {
+      modalSuggestionField.style.display = 'block'
+    }
     modalSaveBtn.onclick = null
     modalCancelBtn.onclick = null
     modalCloseBtn.onclick = null
@@ -865,9 +876,9 @@ function editBlockText(blockIndex) {
   modalRestoreOriginalBtn.onclick = restoreOriginal
   modalRestoreBtn.onclick = restoreCorrected
 
-  // Enter pour sauvegarder, Escape pour annuler
+  // Pour textarea multiligne : Ctrl+Enter pour sauvegarder, Escape pour annuler
   modalInput.onkeydown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       saveEdit()
     } else if (e.key === 'Escape') {
@@ -900,6 +911,7 @@ function editCorrection(blockIndex, corrIndex) {
   const modal = document.getElementById('editModal')
   const modalOriginal = document.getElementById('modalOriginal')
   const modalSuggestion = document.getElementById('modalSuggestion')
+  const modalSuggestionField = document.getElementById('modalSuggestionField')
   const modalInput = document.getElementById('modalInput')
   const modalSaveBtn = document.getElementById('modalSaveBtn')
   const modalCancelBtn = document.getElementById('modalCancelBtn')
@@ -908,26 +920,32 @@ function editCorrection(blockIndex, corrIndex) {
   const modalRestoreBtn = document.getElementById('modalRestoreBtn')
   const modalRestoreOriginalBtn = document.getElementById('modalRestoreOriginalBtn')
 
+  // Afficher la section "Suggestion de correction" pour l'édition de correction individuelle
+  if (modalSuggestionField) {
+    modalSuggestionField.style.display = 'block'
+  }
+
   // Remplir le modal - la suggestion reste TOUJOURS la suggestion originale
-  modalOriginal.textContent = correction.original
-  modalSuggestion.textContent = correction.originalSuggestion
+  // Utiliser innerHTML pour supporter les sauts de ligne
+  modalOriginal.innerHTML = correction.original.replace(/\n/g, '<br>')
+  modalSuggestion.innerHTML = correction.originalSuggestion.replace(/\n/g, '<br>')
   modalInput.value = correction.corrected
   modal.style.display = 'flex'
   modalInput.focus()
-  modalInput.select()
+  modalInput.setSelectionRange(0, modalInput.value.length)
 
   // Fonction pour restaurer l'original (avec la faute)
   const restoreOriginal = () => {
     modalInput.value = correction.original
     modalInput.focus()
-    modalInput.select()
+    modalInput.setSelectionRange(0, modalInput.value.length)
   }
 
   // Fonction pour restaurer la suggestion
   const restoreSuggestion = () => {
     modalInput.value = correction.originalSuggestion
     modalInput.focus()
-    modalInput.select()
+    modalInput.setSelectionRange(0, modalInput.value.length)
   }
 
   // Fonction pour fermer le modal

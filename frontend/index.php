@@ -256,15 +256,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                 <div class="modal-body">
                     <div class="modal-field">
                         <label class="modal-label">Texte original :</label>
-                        <div class="modal-value" id="modalOriginal"></div>
+                        <div class="modal-value modal-value-multiline" id="modalOriginal"></div>
                     </div>
-                    <div class="modal-field">
+                    <div class="modal-field" id="modalSuggestionField">
                         <label class="modal-label">Suggestion de correction :</label>
-                        <div class="modal-value" id="modalSuggestion"></div>
+                        <div class="modal-value modal-value-multiline" id="modalSuggestion"></div>
                     </div>
                     <div class="modal-field">
                         <label class="modal-label">Votre correction :</label>
-                        <input type="text" class="modal-input" id="modalInput" />
+                        <textarea class="modal-input" id="modalInput" rows="6"></textarea>
                         <div class="modal-buttons-row">
                             <button class="btn-restore-original" id="modalRestoreOriginalBtn" title="Restaurer le texte original avec l'erreur">
                                 ↶ Restaurer l'original
