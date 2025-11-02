@@ -1,0 +1,17 @@
+name = "srt-corrector-worker"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Variables d'environnement
+# La clé ANTHROPIC_API_KEY doit être définie dans le dashboard Cloudflare
+# Workers & Pages > srt-corrector-worker > Settings > Variables
+
+# Pour déployer :
+# 1. Installer Wrangler: npm install -g wrangler
+# 2. Se connecter: wrangler login
+# 3. Publier: wrangler publish
+# 4. Ajouter la variable ANTHROPIC_API_KEY dans le dashboard Cloudflare
+
+# Limites
+[limits]
+cpu_ms = 600000  # 10 minutes max pour Workers Paid

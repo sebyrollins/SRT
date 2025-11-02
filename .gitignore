@@ -1,0 +1,34 @@
+# Logs
+logs/
+*.log
+
+# Fichiers temporaires
+tmp/
+temp/
+*.tmp
+
+# Config locale
+frontend/lib/config.local.php
+
+# Node modules (pour Wrangler)
+node_modules/
+.wrangler/
+
+# Cloudflare
+.dev.vars
+wrangler.toml.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup
+*.bak
+*.backup

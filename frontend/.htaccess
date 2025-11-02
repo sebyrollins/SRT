@@ -1,0 +1,32 @@
+# Configuration pour SRT Corrector Pro - PHP 8.4
+
+# ===== UTF-8 Encoding =====
+AddDefaultCharset UTF-8
+
+# ===== Security =====
+# Désactiver l'indexation des répertoires
+Options -Indexes
+
+# Protéger les fichiers cachés
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# ===== CORS Configuration =====
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+# ===== Compression =====
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ===== Cache =====
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>
