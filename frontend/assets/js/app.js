@@ -243,6 +243,9 @@ async function processUploadedFile(content, filename) {
     // Arrêter la progression fictive
     clearInterval(progressInterval)
 
+    // Transformer les apostrophes droites en apostrophes typographiques courbées
+    convertStraightApostrophesToCurly(correctedBlocks)
+
     // Nettoyer les corrections fantômes (où original === corrected)
     cleanPhantomCorrections(correctedBlocks)
 
@@ -303,6 +306,29 @@ async function processUploadedFile(content, filename) {
     alert(`Erreur : ${error.message}`)
     showSection('upload')
   }
+}
+
+/**
+ * Convertit les apostrophes droites (') en apostrophes typographiques courbées (')
+ * dans block.corrected et correction.corrected
+ */
+function convertStraightApostrophesToCurly(blocks) {
+  blocks.forEach(block => {
+    // Transformer block.corrected
+    if (block.corrected) {
+      block.corrected = block.corrected.replace(/'/g, '\u2019')
+    }
+
+    // Transformer correction.corrected pour toutes les corrections
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach(correction => {
+        if (correction.corrected) {
+          correction.corrected = correction.corrected.replace(/'/g, '\u2019')
+        }
+      })
+    }
+  })
+  console.log('[Typography] Apostrophes droites converties en apostrophes typographiques courbées')
 }
 
 /**
