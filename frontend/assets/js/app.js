@@ -213,11 +213,11 @@ async function processUploadedFile(content, filename) {
   let estimatedTimeMs
 
   if (fileSizeKB < 50) {
-    estimatedTimeMs = 25000  // 25 secondes pour petits fichiers (2x plus lent)
+    estimatedTimeMs = 35000  // 35 secondes pour petits fichiers (légèrement plus lent)
   } else if (fileSizeKB < 200) {
-    estimatedTimeMs = 50000  // 50 secondes pour fichiers moyens (2x plus lent)
+    estimatedTimeMs = 65000  // 65 secondes pour fichiers moyens (légèrement plus lent)
   } else {
-    estimatedTimeMs = 75000  // 75 secondes pour gros fichiers (2x plus lent)
+    estimatedTimeMs = 95000  // 95 secondes pour gros fichiers (légèrement plus lent)
   }
 
   // Progression fictive fluide jusqu'à 80%
@@ -244,13 +244,6 @@ async function processUploadedFile(content, filename) {
     // Arrêter la progression fictive
     clearInterval(progressInterval)
 
-    // Progression ralentie de 80% à 90% (2x plus lent)
-    updateProgress(80, 'Traitement des résultats...')
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    updateProgress(85, 'Traitement des résultats...')
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
     // Nettoyer les corrections fantômes (où original === corrected)
     cleanPhantomCorrections(correctedBlocks)
 
@@ -269,15 +262,41 @@ async function processUploadedFile(content, filename) {
       }
     })
 
-    updateProgress(95, 'Finalisation...')
-    await new Promise(resolve => setTimeout(resolve, 200))
+    // Progression ralentie et fluide de 80% à 100% (moitié de la vitesse)
+    const finalProgressDuration = 4000  // 4 secondes pour 80-100% (2x plus lent que avant)
+    const finalProgressSteps = 20  // 20 étapes pour une progression fluide
+    const finalProgressIncrement = 20 / finalProgressSteps  // 20% divisé en petites étapes
+    const finalProgressInterval = finalProgressDuration / finalProgressSteps
 
-    // Afficher l'éditeur
+    let finalProgress = 80
+    const messages = [
+      { threshold: 80, text: 'Traitement des résultats...' },
+      { threshold: 90, text: 'Finalisation...' },
+      { threshold: 98, text: 'Terminé !' }
+    ]
+
+    for (let i = 0; i < finalProgressSteps; i++) {
+      finalProgress += finalProgressIncrement
+      const roundedProgress = Math.min(Math.round(finalProgress), 100)
+
+      // Trouver le message approprié
+      let message = messages[0].text
+      for (const msg of messages) {
+        if (roundedProgress >= msg.threshold) {
+          message = msg.text
+        }
+      }
+
+      updateProgress(roundedProgress, message)
+      await new Promise(resolve => setTimeout(resolve, finalProgressInterval))
+    }
+
+    // S'assurer qu'on affiche bien 100%
     updateProgress(100, 'Terminé !')
 
     setTimeout(() => {
       showEditor()
-    }, 500)
+    }, 300)
 
   } catch (error) {
     console.error('Erreur lors du traitement:', error)
