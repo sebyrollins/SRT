@@ -1374,8 +1374,7 @@ function rebuildMinimap() {
   console.log(`[Minimap] Container height: ${minimapHeight}px`)
   console.log(`[Minimap] Total blocks: ${AppState.blocks.length}`)
 
-  // Première passe : calculer la somme totale des hauteurs réelles des blocs
-  let totalBlocksHeight = 0
+  // Première passe : collecter les données des blocs
   const blocksData = []
 
   AppState.blocks.forEach((block) => {
@@ -1387,48 +1386,54 @@ function rebuildMinimap() {
 
     const blockClass = getBlockMinimapClass(block)
     const isHidden = blockClass === 'minimap-hidden'
-    const blockHeight = blockRow.offsetHeight
-
-    if (!isHidden) {
-      totalBlocksHeight += blockHeight
-    }
 
     blocksData.push({
       block,
       blockClass,
-      isHidden,
-      blockHeight
+      isHidden
     })
   })
 
-  console.log(`[Minimap] Total blocks height: ${totalBlocksHeight}px`)
-
-  // Calculer l'espace pour les marges
+  // Compter les blocs visibles
   const visibleBlocksCount = blocksData.filter(d => !d.isHidden).length
-  const totalMarginsHeight = Math.max(0, (visibleBlocksCount - 1) * 1)
-  const availableHeight = minimapHeight - totalMarginsHeight
 
-  console.log(`[Minimap] Available height for blocks: ${availableHeight}px (${visibleBlocksCount} visible blocks)`)
+  if (visibleBlocksCount === 0) return
 
-  // Deuxième passe : créer les blocs avec distribution uniforme
-  blocksData.forEach(({ block, blockClass, isHidden, blockHeight }) => {
+  // Déterminer le gap entre les blocs : plus il y a de blocs, plus le gap est réduit
+  let gap = 3 // Gap par défaut : 3px
+  if (visibleBlocksCount > 100) {
+    gap = 1 // Beaucoup de blocs : gap de 1px
+  } else if (visibleBlocksCount > 50) {
+    gap = 2 // Pas mal de blocs : gap de 2px
+  }
+
+  // Calculer l'espace total pour les gaps
+  const totalGapsHeight = Math.max(0, (visibleBlocksCount - 1) * gap)
+
+  // Calculer la hauteur disponible pour les blocs
+  const availableHeightForBlocks = minimapHeight - totalGapsHeight
+
+  // Hauteur uniforme pour chaque bloc (minimum 3px)
+  const uniformBlockHeight = Math.max(3, availableHeightForBlocks / visibleBlocksCount)
+
+  console.log(`[Minimap] ${visibleBlocksCount} visible blocks, gap: ${gap}px, uniform height: ${uniformBlockHeight.toFixed(1)}px`)
+
+  // Deuxième passe : créer les blocs avec taille uniforme
+  blocksData.forEach(({ block, blockClass, isHidden }) => {
     const minimapBlock = document.createElement('div')
     minimapBlock.className = 'minimap-block'
     minimapBlock.dataset.blockIndex = block.index
     minimapBlock.dataset.blockLabel = `Bloc #${block.index}`
     minimapBlock.classList.add(blockClass)
 
-    if (!isHidden && totalBlocksHeight > 0) {
-      // Distribuer proportionnellement sur la hauteur disponible
-      const heightRatio = blockHeight / totalBlocksHeight
-      const minimapBlockHeight = Math.max(2, heightRatio * availableHeight)
-      minimapBlock.style.height = `${minimapBlockHeight}px`
+    if (!isHidden) {
+      minimapBlock.style.height = `${uniformBlockHeight}px`
     } else {
       minimapBlock.style.height = '0px'
     }
 
     minimapBlock.style.flexShrink = '0'
-    minimapBlock.style.marginBottom = '1px'
+    minimapBlock.style.marginBottom = `${gap}px`
 
     // Clic pour naviguer
     minimapBlock.addEventListener('click', () => {
