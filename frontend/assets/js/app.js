@@ -563,10 +563,22 @@ function renderBlocksTable() {
     }
 
     if (visibleCorrections === 0) {
+      // Vérifier s'il y a des corrections mineures validées (cachées)
+      let hasHiddenMinorCorrections = false
+      if (block.corrections && block.corrections.length > 0) {
+        hasHiddenMinorCorrections = block.corrections.some((correction, corrIndex) => {
+          const correctionId = `${block.index}-${corrIndex}`
+          const isValidated = AppState.validatedCorrections.has(correctionId)
+          return correction.type === 'minor' && isValidated && AppState.activeFilter !== 'minor'
+        })
+      }
+
+      const emptyMessage = hasHiddenMinorCorrections ? 'Aucune correction majeure' : 'Aucune correction'
+
       validationCell.innerHTML = `
         <div class="validation-empty">
           <span class="validation-empty-icon">✓</span>
-          <span class="validation-empty-text">Aucune correction</span>
+          <span class="validation-empty-text">${emptyMessage}</span>
         </div>
       `
     } else {
