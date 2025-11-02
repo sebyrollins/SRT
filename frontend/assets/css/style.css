@@ -1692,11 +1692,14 @@ body {
   flex-direction: column;
   gap: 2px;
   padding: 0;
+  position: relative;
+  cursor: pointer;
 }
 
 .minimap-block {
   width: 100%;
-  height: 6px;
+  min-height: 3px;
+  /* height est maintenant définie dynamiquement via JS */
   border-radius: 1px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -1777,6 +1780,20 @@ body {
 
 .minimap-block:hover::after {
   opacity: 1;
+}
+
+/* Indicateur de viewport (zone visible) */
+.minimap-viewport-indicator {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  background: rgba(79, 70, 229, 0.2);
+  border: 2px solid rgba(79, 70, 229, 0.6);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 10;
+  transition: top 0.15s ease, height 0.15s ease;
+  box-shadow: 0 0 8px rgba(79, 70, 229, 0.3);
 }
 
 /* Minimap toujours visible, même sur petits écrans */

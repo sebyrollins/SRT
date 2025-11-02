@@ -1223,11 +1223,27 @@ function renderMinimap() {
 
   DOM.minimapBlocks.innerHTML = ''
 
+  // Calculer la hauteur totale du document pour les proportions
+  const editorSection = document.getElementById('editorSection')
+  if (!editorSection) return
+
+  const totalDocHeight = editorSection.scrollHeight
+  const minimapHeight = DOM.minimapBlocks.offsetHeight || 500 // Hauteur disponible pour les blocs
+
   AppState.blocks.forEach(block => {
+    const blockRow = document.getElementById(`block-row-${block.index}`)
+    if (!blockRow) return
+
+    const blockHeight = blockRow.offsetHeight
+    // Calculer la hauteur proportionnelle pour la minimap
+    const proportionalHeight = Math.max(3, (blockHeight / totalDocHeight) * minimapHeight)
+
     const minimapBlock = document.createElement('div')
     minimapBlock.className = 'minimap-block'
     minimapBlock.dataset.blockIndex = block.index
     minimapBlock.dataset.blockLabel = `Bloc #${block.index}`
+    minimapBlock.style.height = `${proportionalHeight}px`
+    minimapBlock.style.flexShrink = '0'
 
     // Déterminer la classe selon l'état
     const blockClass = getBlockMinimapClass(block)
@@ -1240,6 +1256,12 @@ function renderMinimap() {
 
     DOM.minimapBlocks.appendChild(minimapBlock)
   })
+
+  // Ajouter un indicateur de viewport
+  addViewportIndicator()
+
+  // Ajouter un gestionnaire de clic sur toute la minimap
+  DOM.minimapBlocks.addEventListener('click', handleMinimapClick)
 }
 
 /**
@@ -1300,6 +1322,9 @@ function updateMinimap() {
     const blockClass = getBlockMinimapClass(block)
     minimapBlock.classList.add(blockClass)
   })
+
+  // Mettre à jour l'indicateur de viewport
+  updateViewportIndicator()
 }
 
 /**
@@ -1368,6 +1393,83 @@ function updateMinimapCurrentPosition() {
       minimapBlock.classList.add('minimap-current')
     }
   }
+
+  // Mettre à jour l'indicateur de viewport
+  updateViewportIndicator()
+}
+
+/**
+ * Ajoute un indicateur de viewport à la minimap
+ */
+function addViewportIndicator() {
+  if (!DOM.minimapBlocks) return
+
+  // Supprimer l'ancien indicateur s'il existe
+  const oldIndicator = DOM.minimapBlocks.querySelector('.minimap-viewport-indicator')
+  if (oldIndicator) {
+    oldIndicator.remove()
+  }
+
+  // Créer le nouvel indicateur
+  const indicator = document.createElement('div')
+  indicator.className = 'minimap-viewport-indicator'
+  DOM.minimapBlocks.appendChild(indicator)
+
+  updateViewportIndicator()
+}
+
+/**
+ * Met à jour la position et la taille de l'indicateur de viewport
+ */
+function updateViewportIndicator() {
+  if (!DOM.minimapBlocks) return
+
+  const indicator = DOM.minimapBlocks.querySelector('.minimap-viewport-indicator')
+  if (!indicator) return
+
+  const editorSection = document.getElementById('editorSection')
+  if (!editorSection) return
+
+  const totalDocHeight = editorSection.scrollHeight
+  const minimapHeight = DOM.minimapBlocks.offsetHeight
+
+  // Calculer la position et la hauteur proportionnelles
+  const scrollRatio = window.scrollY / totalDocHeight
+  const viewportRatio = window.innerHeight / totalDocHeight
+
+  const indicatorTop = scrollRatio * minimapHeight
+  const indicatorHeight = Math.max(20, viewportRatio * minimapHeight)
+
+  indicator.style.top = `${indicatorTop}px`
+  indicator.style.height = `${indicatorHeight}px`
+}
+
+/**
+ * Gère le clic sur la minimap pour naviguer
+ */
+function handleMinimapClick(event) {
+  if (!DOM.minimapBlocks) return
+
+  // Ne pas traiter si on a cliqué sur un bloc (déjà géré)
+  if (event.target.classList.contains('minimap-block')) return
+
+  const editorSection = document.getElementById('editorSection')
+  if (!editorSection) return
+
+  // Calculer la position relative du clic dans la minimap
+  const minimapRect = DOM.minimapBlocks.getBoundingClientRect()
+  const clickY = event.clientY - minimapRect.top
+  const clickRatio = clickY / minimapRect.height
+
+  // Calculer la position de scroll correspondante
+  const totalDocHeight = editorSection.scrollHeight
+  const targetScrollY = clickRatio * totalDocHeight - (window.innerHeight / 2)
+
+  // Scroller vers cette position
+  window.scrollTo({
+    top: Math.max(0, targetScrollY),
+    behavior: 'smooth'
+  })
 }
 
 // Throttle pour éviter trop d'appels lors du scroll
