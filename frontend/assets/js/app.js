@@ -803,6 +803,13 @@ function editBlockText(blockIndex) {
   modalOriginal.textContent = block.original
   modalSuggestion.textContent = block.corrected
   modalInput.value = block.corrected
+
+  // Debug : afficher les codes des caractères pour vérifier les apostrophes
+  console.log('[editBlockText] Original:', block.original)
+  console.log('[editBlockText] Original codes:', Array.from(block.original).map(c => `${c}=${c.charCodeAt(0)}`).join(' '))
+  console.log('[editBlockText] Corrected:', block.corrected)
+  console.log('[editBlockText] Corrected codes:', Array.from(block.corrected).map(c => `${c}=${c.charCodeAt(0)}`).join(' '))
+
   modal.style.display = 'flex'
   modalInput.focus()
   // Pour textarea, on sélectionne tout à la fin
@@ -841,19 +848,49 @@ function editBlockText(blockIndex) {
   // Fonction pour sauvegarder
   const saveEdit = () => {
     const newValue = modalInput.value.trim()
+    const oldCorrected = block.corrected
 
-    if (newValue && newValue !== block.original) {
-      // Le texte a changé, créer une correction de type "doubt"
-      const oldCorrected = block.corrected
-      block.corrected = newValue
+    // Cas 1 : Aucun changement par rapport à la suggestion de Claude actuelle
+    if (newValue === oldCorrected) {
+      closeModal()
+      return
+    }
 
-      // Créer une correction manuelle couvrant tout le texte
-      if (!block.corrections) {
-        block.corrections = []
-      }
+    // Cas 2 : Retour au texte original (annuler toutes les corrections)
+    if (newValue === block.original) {
+      // Supprimer toutes les corrections de ce bloc
+      const oldCorrections = block.corrections ? [...block.corrections] : []
+      block.corrections = []
+      block.corrected = block.original
 
-      // Créer une nouvelle correction de type doubt
-      const newCorrection = {
+      // Supprimer toutes les validations de ce bloc
+      oldCorrections.forEach((_, idx) => {
+        const correctionId = `${block.index}-${idx}`
+        AppState.validatedCorrections.delete(correctionId)
+      })
+
+      // Mettre à jour les stats
+      const stats = SRTParser.calculateStats(AppState.blocks)
+      updateStats(stats)
+
+      // Re-render
+      renderBlocksTable()
+      updateMinimap()
+      closeModal()
+      return
+    }
+
+    // Cas 3 : Modification du texte (différent de l'original et de la suggestion)
+    if (newValue && newValue !== block.original && newValue !== oldCorrected) {
+      // Supprimer toutes les anciennes corrections de ce bloc
+      const oldCorrections = block.corrections ? [...block.corrections] : []
+      oldCorrections.forEach((_, idx) => {
+        const correctionId = `${block.index}-${idx}`
+        AppState.validatedCorrections.delete(correctionId)
+      })
+
+      // Remplacer par UNE SEULE correction "doubt"
+      block.corrections = [{
         type: 'doubt',
         original: block.original,
         corrected: newValue,
@@ -862,13 +899,12 @@ function editBlockText(blockIndex) {
         originalSuggestion: oldCorrected,
         originalType: 'doubt',
         originalReason: 'Modifié manuellement'
-      }
+      }]
 
-      block.corrections.push(newCorrection)
+      block.corrected = newValue
 
       // Valider automatiquement cette correction
-      const correctionId = `${block.index}-${block.corrections.length - 1}`
-      AppState.validatedCorrections.add(correctionId)
+      AppState.validatedCorrections.add(`${block.index}-0`)
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)

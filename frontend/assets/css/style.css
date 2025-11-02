@@ -1595,11 +1595,11 @@ body {
   font-family: var(--font-mono);
   font-size: 1rem;
   letter-spacing: 0.02em;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .modal-value-multiline {
-  white-space: pre-wrap;
-  word-wrap: break-word;
   max-height: 150px;
   overflow-y: auto;
 }
