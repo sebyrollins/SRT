@@ -614,6 +614,11 @@ function renderBlocksTable() {
 
       validationCell.appendChild(emptyDiv)
     } else {
+      // Vérifier si toutes les corrections du bloc sont validées
+      const allCorrectionsValidated = block.corrections.every((c, idx) =>
+        AppState.validatedCorrections.has(`${block.index}-${idx}`)
+      )
+
       // Afficher les corrections visibles
       block.corrections.forEach((correction, corrIndex) => {
           const correctionId = `${block.index}-${corrIndex}`
@@ -651,12 +656,20 @@ function renderBlocksTable() {
           const actionsEl = document.createElement('div')
           actionsEl.className = 'validation-actions'
 
-          // Bouton Modifier : toujours affiché (icon-only)
+          // Bouton Modifier : comportement dépend si toutes les corrections sont validées
           const editBtn = document.createElement('button')
           editBtn.className = 'btn-icon-only btn-icon-edit'
           editBtn.innerHTML = '✏️'
           editBtn.title = 'Modifier'
-          editBtn.onclick = () => editCorrection(block.index, corrIndex)
+          // Si toutes les corrections sont validées → éditer le bloc entier
+          // Sinon → éditer la correction spécifique
+          editBtn.onclick = () => {
+            if (allCorrectionsValidated) {
+              editBlockText(block.index)
+            } else {
+              editCorrection(block.index, corrIndex)
+            }
+          }
 
           if (!isValidated) {
             // Boutons Valider et Rejeter : seulement si NON validé (icon-only)

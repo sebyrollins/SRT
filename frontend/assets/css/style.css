@@ -1593,7 +1593,8 @@ body {
   border-radius: var(--radius-sm);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
-  font-size: 0.9375rem;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
 }
 
 .modal-value-multiline {
@@ -1608,13 +1609,14 @@ body {
   padding: var(--spacing-sm);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-family: var(--font-mono);
   color: var(--color-text-primary);
   transition: border-color 0.2s ease;
   resize: vertical;
   min-height: 120px;
   line-height: 1.5;
+  letter-spacing: 0.02em;
 }
 
 .modal-input:focus {
