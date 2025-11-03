@@ -157,8 +157,6 @@ function parseSRTBlocks(srtContent) {
  * Correction avec Claude Sonnet 4
  */
 async function correctWithClaude(blocks) {
-  const prompt = buildPrompt(blocks)
-
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -170,9 +168,16 @@ async function correctWithClaude(blocks) {
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 32000,
       temperature: 0,
+      system: [
+        {
+          type: "text",
+          text: buildSystemPrompt(),
+          cache_control: { type: "ephemeral" }
+        }
+      ],
       messages: [{
         role: 'user',
-        content: prompt
+        content: buildUserPrompt(blocks)
       }]
     })
   })
@@ -244,11 +249,10 @@ async function correctWithClaude(blocks) {
 }
 
 /**
- * Construction du prompt pour Claude
+ * System prompt (partie cachée avec Prompt Caching)
+ * Contient toutes les règles constantes
  */
-function buildPrompt(blocks) {
-  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
-
+function buildSystemPrompt() {
   return `Tu es un correcteur professionnel français expert et secrétaire de rédaction.
 
 MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
@@ -314,6 +318,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * Conjugaison incorrecte (Il à pris → Il a pris)
   * Majuscules institutions définies (le gouvernement → le Gouvernement)
   * Majuscules début de phrase SEULEMENT après . ! ? (PAS après virgule ou retour à la ligne)
+  * Majuscules EN TROP après virgule : corriger en minuscule (", Mesdames" → ", mesdames")
   * Ponctuation manquante ou incorrecte
 
 - "doubt" : corrections avec ambiguïté possible
@@ -343,9 +348,17 @@ RÈGLES STRICTES :
 8. Ne crée JAMAIS de correction où "original" et "corrected" sont identiques caractère par caractère
 9. VÉRIFIE TOUJOURS que les corrections ne se chevauchent PAS (positions différentes sans overlap)
 
-TEXTE À CORRIGER :
-
-${blocksText}
-
 Retourne uniquement le JSON, rien d'autre.`
+}
+
+/**
+ * User prompt (partie variable)
+ * Contient uniquement les blocs SRT à corriger
+ */
+function buildUserPrompt(blocks) {
+  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
+
+  return `TEXTE À CORRIGER :
+
+${blocksText}`
 }
