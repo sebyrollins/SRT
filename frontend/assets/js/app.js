@@ -252,18 +252,6 @@ async function processUploadedFile(content, filename) {
     // Sauvegarder les blocs
     AppState.blocks = correctedBlocks
 
-    // Auto-valider toutes les corrections mineures par défaut
-    AppState.blocks.forEach(block => {
-      if (block.corrections && block.corrections.length > 0) {
-        block.corrections.forEach((correction, corrIndex) => {
-          if (correction.type === 'minor') {
-            const correctionId = `${block.index}-${corrIndex}`
-            AppState.validatedCorrections.add(correctionId)
-          }
-        })
-      }
-    })
-
     // Progression ralentie et fluide de 80% à 100% (moitié de la vitesse)
     const finalProgressDuration = 4000  // 4 secondes pour 80-100% (2x plus lent que avant)
     const finalProgressSteps = 20  // 20 étapes pour une progression fluide
@@ -639,29 +627,11 @@ function renderBlocksTable() {
     // Compter les corrections visibles (en tenant compte du filtre des mineures validées)
     let visibleCorrections = 0
     if (block.corrections && block.corrections.length > 0) {
-      visibleCorrections = block.corrections.filter((correction, corrIndex) => {
-        const correctionId = `${block.index}-${corrIndex}`
-        const isValidated = AppState.validatedCorrections.has(correctionId)
-        // Masquer les corrections mineures validées sauf si le filtre 'minor' est actif
-        if (correction.type === 'minor' && isValidated && AppState.activeFilter !== 'minor') {
-          return false
-        }
-        return true
-      }).length
+      visibleCorrections = block.corrections.length
     }
 
     if (visibleCorrections === 0) {
-      // Vérifier s'il y a des corrections mineures validées (cachées)
-      let hasHiddenMinorCorrections = false
-      if (block.corrections && block.corrections.length > 0) {
-        hasHiddenMinorCorrections = block.corrections.some((correction, corrIndex) => {
-          const correctionId = `${block.index}-${corrIndex}`
-          const isValidated = AppState.validatedCorrections.has(correctionId)
-          return correction.type === 'minor' && isValidated && AppState.activeFilter !== 'minor'
-        })
-      }
-
-      const emptyMessage = hasHiddenMinorCorrections ? 'Aucune correction majeure' : 'Aucune correction'
+      const emptyMessage = 'Aucune correction'
 
       const emptyDiv = document.createElement('div')
       emptyDiv.className = 'validation-empty'
@@ -681,11 +651,6 @@ function renderBlocksTable() {
       block.corrections.forEach((correction, corrIndex) => {
           const correctionId = `${block.index}-${corrIndex}`
           const isValidated = AppState.validatedCorrections.has(correctionId)
-
-          // Masquer les corrections mineures validées sauf si le filtre 'minor' est actif
-          if (correction.type === 'minor' && isValidated && AppState.activeFilter !== 'minor') {
-            return // Ne pas afficher cette correction
-          }
 
           const cardEl = document.createElement('div')
           cardEl.className = `validation-card validation-${correction.type}`
