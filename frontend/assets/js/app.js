@@ -587,7 +587,7 @@ function renderBlocksTable() {
     `
 
     // Corrigé (gras si validé ou pas de correction, fond vert si non validé avec corrections)
-    const hasNoCorrections = !block.corrections || block.corrections.length === 0
+    // hasNoCorrections déjà déclaré ligne 549
     const shouldBeBold = hasNoCorrections || allValidated
     const correctedEl = document.createElement('div')
     correctedEl.className = `block-section block-corrected ${shouldBeBold ? 'block-validated' : 'block-unvalidated'}`
