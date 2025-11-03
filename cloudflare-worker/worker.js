@@ -274,8 +274,8 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
   * Espaces insécables pour les milliers : 10 000 (SAUF années : 2024)
   * Guillemets français « » avec espaces insécables
   * Points de suspension … (caractère unique)
-
   * Locutions figées : "c'est-à-dire" (2 tirets), "rendez-vous", "peut-être", "au-delà", "lui-même" (avec tirets)
+  * Inversions sujet-verbe : trait d'union obligatoire (pensez vous → pensez-vous, avez vous → avez-vous, est ce → est-ce)
 
 IMPORTANT : Retourne UNIQUEMENT un JSON valide (pas de markdown, pas de \`\`\`json) avec cette structure EXACTE :
 
@@ -309,7 +309,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * Tirets manquants (rendez vous → rendez-vous, c est à dire → c'est-à-dire, au delà → au-delà)
+  * Tirets manquants : locutions (rendez vous → rendez-vous, c est à dire → c'est-à-dire, au delà → au-delà) ET inversions (pensez vous → pensez-vous)
   * Apostrophes MANQUANTES pour élision (c est → c'est, l eau → l'eau)
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
