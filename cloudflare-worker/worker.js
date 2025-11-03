@@ -307,7 +307,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * Tirets manquants (rendez vous → rendez-vous, pensez vous → pensez-vous, avant première → avant-première)
+  * Tirets manquants : inversions verbe-sujet (questions), noms composés courants, locutions figées
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "c est" → "c'est", "l eau" → "l'eau")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
