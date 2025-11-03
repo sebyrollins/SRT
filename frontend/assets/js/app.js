@@ -650,14 +650,6 @@ function renderBlocksTable() {
         <span class="validation-empty-text">${emptyMessage}</span>
       `
 
-      // Ajouter un bouton "Modifier" pour permettre l'édition manuelle
-      const editBtn = document.createElement('button')
-      editBtn.className = 'btn-icon-only btn-icon-edit validation-empty-edit'
-      editBtn.innerHTML = '✏️'
-      editBtn.title = 'Modifier le texte'
-      editBtn.onclick = () => editBlockText(block.index)
-      emptyDiv.appendChild(editBtn)
-
       validationCell.appendChild(emptyDiv)
     } else {
       // Vérifier si toutes les corrections du bloc sont validées
