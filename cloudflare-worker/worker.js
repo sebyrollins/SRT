@@ -307,7 +307,8 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * Tirets manquants (rendez vous → rendez-vous)
+  * Tirets manquants (rendez vous → rendez-vous, c'est à dire → c'est-à-dire)
+  * IMPORTANT : "c'est-à-dire" nécessite DEUX traits d'union (c'est à dire → c'est-à-dire, c'est à-dire → c'est-à-dire)
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "c est" → "c'est", "l eau" → "l'eau")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
