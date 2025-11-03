@@ -269,7 +269,7 @@ Retourne uniquement le JSON, rien d'autre.`
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 32000,
+      max_tokens: 64000,
       temperature: 0,
       messages: [{
         role: 'user',
