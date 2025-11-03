@@ -513,35 +513,37 @@ function renderBlocksTable() {
       }
     }
 
-    // === LIGNE DE HEADER (s'étend sur 2 colonnes) ===
+    // === LIGNE DE HEADER (2 cellules pour les 2 colonnes) ===
     const headerRow = document.createElement('tr')
     headerRow.className = 'block-header-row'
-    const headerCell = document.createElement('td')
-    headerCell.className = 'block-header'
-    headerCell.colSpan = 2
 
-    // Pour les blocs validés, ajouter le bouton Modifier dans le header
+    // Cellule gauche : numéro + timecode
+    const headerCellLeft = document.createElement('td')
+    headerCellLeft.className = 'block-header block-header-left'
+    headerCellLeft.innerHTML = `
+      <span class="block-index">Bloc #${block.index}</span>
+      <span class="block-timecode">${block.timecode}</span>
+    `
+
+    // Cellule droite : bouton Modifier (seulement si toutes corrections validées)
+    const headerCellRight = document.createElement('td')
+    headerCellRight.className = 'block-header block-header-right'
+
     if (allValidated && block.corrections && block.corrections.length > 0) {
-      headerCell.innerHTML = `
-        <span class="block-index">Bloc #${block.index}</span>
-        <span class="block-timecode">${block.timecode}</span>
-        <button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️ Modifier</button>
+      headerCellRight.innerHTML = `
+        <button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>
       `
       // Ajouter l'événement au bouton après insertion dans le DOM
       setTimeout(() => {
-        const editBtn = headerCell.querySelector('.btn-header-edit')
+        const editBtn = headerCellRight.querySelector('.btn-header-edit')
         if (editBtn) {
           editBtn.onclick = () => editBlockText(block.index)
         }
       }, 0)
-    } else {
-      headerCell.innerHTML = `
-        <span class="block-index">Bloc #${block.index}</span>
-        <span class="block-timecode">${block.timecode}</span>
-      `
     }
 
-    headerRow.appendChild(headerCell)
+    headerRow.appendChild(headerCellLeft)
+    headerRow.appendChild(headerCellRight)
 
     // === LIGNE DE CONTENU ===
     const row = document.createElement('tr')
