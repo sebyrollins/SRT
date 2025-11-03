@@ -180,7 +180,6 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
       * Exemple : "l'Autorité de régulation des communications électroniques"
       * Exemple : "l'Organisation mondiale de la santé"
   * Espaces insécables avant : ; ! ? (espace fine)
-  * Apostrophes typographiques ' (pas ')
   * Espaces insécables pour les milliers : 10 000 (SAUF années : 2024)
   * Guillemets français « » avec espaces insécables
   * Points de suspension … (caractère unique)
@@ -208,7 +207,6 @@ IMPORTANT : Retourne UNIQUEMENT un JSON valide (pas de markdown, pas de \`\`\`js
 
 CATÉGORISATION PROFESSIONNELLE (très important) :
 - "minor" : corrections typographiques et cosmétiques
-  * Apostrophes droites → courbes : remplacer ' par ' (ex: "l'eau" → "l'eau")
   * Guillemets droits → guillemets français : remplacer " par « » (ex: "bonjour" → « bonjour »)
   * Trois points → points de suspension : remplacer ... par … (ex: "et..." → "et…")
   * Espaces doubles difficiles à voir

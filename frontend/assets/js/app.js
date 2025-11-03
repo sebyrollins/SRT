@@ -312,23 +312,39 @@ async function processUploadedFile(content, filename) {
  * Convertit les apostrophes droites (') en apostrophes typographiques courbées (')
  * dans block.corrected et correction.corrected
  */
+/**
+ * Convertit un texte en remplaçant apostrophes droites (') par courbes (')
+ * SAUF les apostrophes doubles ('') qui sont préservées
+ */
+function convertApostrophes(text) {
+  if (!text) return text
+  // Protéger les doubles apostrophes avec un placeholder temporaire
+  const placeholder = '\uFFFF' // Caractère Unicode privé jamais utilisé
+  return text
+    .replace(/''/g, placeholder)  // Protéger ''
+    .replace(/'/g, '\u2019')      // Convertir ' simple
+    .replace(new RegExp(placeholder, 'g'), "''") // Restaurer ''
+}
+
+/**
+ * Convertit les apostrophes droites (') en apostrophes courbes (')
+ * SAUF les apostrophes doubles ('') qui sont préservées
+ */
 function convertStraightApostrophesToCurly(blocks) {
   blocks.forEach(block => {
-    // Transformer block.corrected
-    if (block.corrected) {
-      block.corrected = block.corrected.replace(/'/g, '\u2019')
-    }
+    // Transformer block.original et block.corrected
+    block.original = convertApostrophes(block.original)
+    block.corrected = convertApostrophes(block.corrected)
 
-    // Transformer correction.corrected pour toutes les corrections
+    // Transformer correction.original et correction.corrected pour toutes les corrections
     if (block.corrections && block.corrections.length > 0) {
       block.corrections.forEach(correction => {
-        if (correction.corrected) {
-          correction.corrected = correction.corrected.replace(/'/g, '\u2019')
-        }
+        correction.original = convertApostrophes(correction.original)
+        correction.corrected = convertApostrophes(correction.corrected)
       })
     }
   })
-  console.log('[Typography] Apostrophes droites converties en apostrophes typographiques courbées')
+  console.log('[Typography] Apostrophes droites converties en apostrophes courbes (sauf apostrophes doubles)')
 }
 
 /**
@@ -885,7 +901,7 @@ function editBlockText(blockIndex) {
 
   // Fonction pour sauvegarder
   const saveEdit = () => {
-    const newValue = modalInput.value.trim()
+    const newValue = convertApostrophes(modalInput.value.trim())
     const oldCorrected = block.corrected
 
     // Cas 1 : Aucun changement par rapport à la suggestion de Claude actuelle
@@ -1050,7 +1066,7 @@ function editCorrection(blockIndex, corrIndex) {
 
   // Fonction pour sauvegarder
   const saveEdit = () => {
-    const newValue = modalInput.value.trim()
+    const newValue = convertApostrophes(modalInput.value.trim())
 
     // Permettre d'enregistrer même si égal à l'original (pour pouvoir restaurer l'original comme modification en doute)
     if (newValue) {
