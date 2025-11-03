@@ -157,100 +157,9 @@ function parseSRTBlocks(srtContent) {
  * Correction avec Claude Sonnet 4
  */
 async function correctWithClaude(blocks) {
-  const systemPrompt = buildSystemPrompt()
-  const userPrompt = buildUserPrompt(blocks)
+  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 32000,
-      temperature: 0,
-      system: systemPrompt,
-      messages: [{
-        role: 'user',
-        content: userPrompt
-      }]
-    })
-  })
-
-  if (!response.ok) {
-    const errorData = await response.text()
-    throw new Error(`Erreur API Claude: ${response.status} - ${errorData}`)
-  }
-
-  const result = await response.json()
-  let content = result.content[0].text
-
-  // Nettoyer la réponse (enlever les balises markdown si présentes)
-  // Claude Sonnet 4.5 retourne parfois ```json ... ``` au lieu de JSON pur
-  content = content.trim()
-  if (content.startsWith('```json')) {
-    content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '')
-  } else if (content.startsWith('```')) {
-    content = content.replace(/^```\s*/, '').replace(/\s*```$/, '')
-  }
-
-  // Parse la réponse JSON de Claude
-  try {
-    const parsed = JSON.parse(content.trim())
-    const correctedBlocks = parsed.blocks || []
-
-    // Réinjecter les timecodes et valider les corrections
-    return correctedBlocks.map(correctedBlock => {
-      const originalBlock = blocks.find(b => b.index === correctedBlock.index)
-
-      // Valider les corrections de ce bloc
-      if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
-        const validatedCorrections = correctedBlock.corrections.filter(correction => {
-          // Vérifier que la position et la longueur sont valides
-          const startPos = correction.position
-          const endPos = startPos + correction.original.length
-          const blockText = originalBlock ? originalBlock.text : correctedBlock.original
-
-          if (!blockText || startPos < 0 || endPos > blockText.length) {
-            console.warn(`Bloc ${correctedBlock.index}: Position invalide ${startPos}-${endPos} (texte length: ${blockText?.length})`)
-            return false
-          }
-
-          // Vérifier que le texte à cette position correspond à correction.original
-          const actualText = blockText.substring(startPos, endPos)
-          if (actualText !== correction.original) {
-            console.warn(`Bloc ${correctedBlock.index}: Texte ne correspond pas à position ${startPos}-${endPos}`)
-            console.warn(`  Attendu: "${correction.original}"`)
-            console.warn(`  Trouvé: "${actualText}"`)
-            return false
-          }
-
-          return true
-        })
-
-        correctedBlock.corrections = validatedCorrections
-      }
-
-      return {
-        ...correctedBlock,
-        timecode: originalBlock ? originalBlock.timecode : 'undefined'
-      }
-    })
-  } catch (e) {
-    console.error('Erreur parsing réponse Claude:', e)
-    console.error('Contenu reçu:', content)
-    throw new Error('Format de réponse invalide')
-  }
-}
-
-/**
- * System prompt (partie cachée avec Prompt Caching)
- * Contient toutes les règles constantes
- */
-function buildSystemPrompt() {
-  return `Tu es un correcteur professionnel français expert et secrétaire de rédaction.
+  const prompt = `Tu es un correcteur professionnel français expert et secrétaire de rédaction.
 
 MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
 - Orthographe, grammaire, conjugaison, ponctuation
@@ -345,17 +254,92 @@ RÈGLES STRICTES :
 8. Ne crée JAMAIS de correction où "original" et "corrected" sont identiques caractère par caractère
 9. VÉRIFIE TOUJOURS que les corrections ne se chevauchent PAS (positions différentes sans overlap)
 
+TEXTE À CORRIGER :
+
+${blocksText}
+
 Retourne uniquement le JSON, rien d'autre.`
-}
 
-/**
- * User prompt (partie variable)
- * Contient uniquement les blocs SRT à corriger
- */
-function buildUserPrompt(blocks) {
-  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 32000,
+      temperature: 0,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    })
+  })
 
-  return `TEXTE À CORRIGER :
+  if (!response.ok) {
+    const errorData = await response.text()
+    throw new Error(`Erreur API Claude: ${response.status} - ${errorData}`)
+  }
 
-${blocksText}`
+  const result = await response.json()
+  let content = result.content[0].text
+
+  // Nettoyer la réponse (enlever les balises markdown si présentes)
+  // Claude Sonnet 4.5 retourne parfois ```json ... ``` au lieu de JSON pur
+  content = content.trim()
+  if (content.startsWith('```json')) {
+    content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+  } else if (content.startsWith('```')) {
+    content = content.replace(/^```\s*/, '').replace(/\s*```$/, '')
+  }
+
+  // Parse la réponse JSON de Claude
+  try {
+    const parsed = JSON.parse(content.trim())
+    const correctedBlocks = parsed.blocks || []
+
+    // Réinjecter les timecodes et valider les corrections
+    return correctedBlocks.map(correctedBlock => {
+      const originalBlock = blocks.find(b => b.index === correctedBlock.index)
+
+      // Valider les corrections de ce bloc
+      if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
+        const validatedCorrections = correctedBlock.corrections.filter(correction => {
+          // Vérifier que la position et la longueur sont valides
+          const startPos = correction.position
+          const endPos = startPos + correction.original.length
+          const blockText = originalBlock ? originalBlock.text : correctedBlock.original
+
+          if (!blockText || startPos < 0 || endPos > blockText.length) {
+            console.warn(`Bloc ${correctedBlock.index}: Position invalide ${startPos}-${endPos} (texte length: ${blockText?.length})`)
+            return false
+          }
+
+          // Vérifier que le texte à cette position correspond à correction.original
+          const actualText = blockText.substring(startPos, endPos)
+          if (actualText !== correction.original) {
+            console.warn(`Bloc ${correctedBlock.index}: Texte ne correspond pas à position ${startPos}-${endPos}`)
+            console.warn(`  Attendu: "${correction.original}"`)
+            console.warn(`  Trouvé: "${actualText}"`)
+            return false
+          }
+
+          return true
+        })
+
+        correctedBlock.corrections = validatedCorrections
+      }
+
+      return {
+        ...correctedBlock,
+        timecode: originalBlock ? originalBlock.timecode : 'undefined'
+      }
+    })
+  } catch (e) {
+    console.error('Erreur parsing réponse Claude:', e)
+    console.error('Contenu reçu:', content)
+    throw new Error('Format de réponse invalide')
+  }
 }
