@@ -157,6 +157,9 @@ function parseSRTBlocks(srtContent) {
  * Correction avec Claude Sonnet 4
  */
 async function correctWithClaude(blocks) {
+  const systemPrompt = buildSystemPrompt()
+  const userPrompt = buildUserPrompt(blocks)
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -168,16 +171,10 @@ async function correctWithClaude(blocks) {
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 32000,
       temperature: 0,
-      system: [
-        {
-          type: "text",
-          text: buildSystemPrompt(),
-          cache_control: { type: "ephemeral" }
-        }
-      ],
+      system: systemPrompt,
       messages: [{
         role: 'user',
-        content: buildUserPrompt(blocks)
+        content: userPrompt
       }]
     })
   })
