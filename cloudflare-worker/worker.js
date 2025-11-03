@@ -275,6 +275,13 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
   * Guillemets français « » avec espaces insécables
   * Points de suspension … (caractère unique)
 
+- LOCUTIONS FIGÉES (IMPORTANT - traiter comme UN SEUL BLOC) :
+  * "c'est-à-dire" : TOUJOURS avec DEUX traits d'union (jamais "c'est à dire", "c'est à-dire" ou "c est à dire")
+  * "rendez-vous" : TOUJOURS avec trait d'union
+  * "peut-être" : TOUJOURS avec trait d'union (quand = adverbe de doute)
+  * "au-dessus", "au-dessous", "au-delà" : TOUJOURS avec trait d'union
+  * Quand tu détectes ces locutions mal écrites, crée UNE SEULE correction pour toute l'expression
+
 IMPORTANT : Retourne UNIQUEMENT un JSON valide (pas de markdown, pas de \`\`\`json) avec cette structure EXACTE :
 
 {
@@ -307,8 +314,8 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * Tirets manquants (rendez vous → rendez-vous, c'est à dire → c'est-à-dire)
-  * IMPORTANT : "c'est-à-dire" nécessite DEUX traits d'union (c'est à dire → c'est-à-dire, c'est à-dire → c'est-à-dire)
+  * Locutions figées mal écrites (voir section LOCUTIONS FIGÉES ci-dessus)
+  * Tirets manquants dans les mots composés
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "c est" → "c'est", "l eau" → "l'eau")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
@@ -343,6 +350,10 @@ RÈGLES STRICTES :
    - Exemple: original="l'eau" corrected="l'eau" (apostrophe droite → courbe)
 8. Ne crée JAMAIS de correction où "original" et "corrected" sont identiques caractère par caractère
 9. VÉRIFIE TOUJOURS que les corrections ne se chevauchent PAS (positions différentes sans overlap)
+10. LOCUTIONS FIGÉES : traite-les comme UNE SEULE correction globale
+   - Exemple CORRECT : "c est à dire" → UNE correction : original="c est à dire", corrected="c'est-à-dire"
+   - Exemple INCORRECT : "c est" → "c'est" ET "à dire" → "à-dire" (NE FAIS PAS ça, crée UNE SEULE correction)
+   - Cela s'applique à toutes les locutions figées : "rendez vous" → "rendez-vous" (en une fois)
 
 TEXTE À CORRIGER :
 
