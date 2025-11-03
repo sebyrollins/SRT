@@ -228,6 +228,10 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * Ponctuation manquante ou incorrecte
 
 - "doubt" : corrections avec ambiguïté possible
+  * Accord genre participe passé 1ère personne avec être/paraître/sembler/devenir/rester
+    - "je suis venu" → "je suis venue" (reason: "Si femme qui parle : venue")
+    - "je suis venue" → "je suis venu" (reason: "Si homme qui parle : venu")
+    - Même logique pour : allé(e), resté(e), devenu(e), parti(e), arrivé(e), etc.
   * Choix stylistiques subjectifs
   * Contexte ambigu nécessitant interprétation
   * Plusieurs interprétations possibles
