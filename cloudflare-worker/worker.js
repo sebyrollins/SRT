@@ -274,8 +274,6 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
   * Espaces insécables pour les milliers : 10 000 (SAUF années : 2024)
   * Guillemets français « » avec espaces insécables
   * Points de suspension … (caractère unique)
-  * Locutions figées : "c'est-à-dire" (2 tirets), "rendez-vous", "peut-être", "au-delà", "lui-même" (avec tirets)
-  * Inversions sujet-verbe : trait d'union obligatoire (pensez vous → pensez-vous, avez vous → avez-vous, est ce → est-ce)
 
 IMPORTANT : Retourne UNIQUEMENT un JSON valide (pas de markdown, pas de \`\`\`json) avec cette structure EXACTE :
 
@@ -309,8 +307,8 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * Tirets manquants : locutions (rendez vous → rendez-vous, c est à dire → c'est-à-dire, au delà → au-delà) ET inversions (pensez vous → pensez-vous)
-  * Apostrophes MANQUANTES pour élision (c est → c'est, l eau → l'eau)
+  * Tirets manquants (rendez vous → rendez-vous, pensez vous → pensez-vous, avant première → avant-première)
+  * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "c est" → "c'est", "l eau" → "l'eau")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
   * Conjugaison incorrecte (Il à pris → Il a pris)
@@ -344,7 +342,6 @@ RÈGLES STRICTES :
    - Exemple: original="l'eau" corrected="l'eau" (apostrophe droite → courbe)
 8. Ne crée JAMAIS de correction où "original" et "corrected" sont identiques caractère par caractère
 9. VÉRIFIE TOUJOURS que les corrections ne se chevauchent PAS (positions différentes sans overlap)
-10. Pour les locutions figées (c'est-à-dire, rendez-vous, peut-être, au-delà, lui-même), traite l'expression complète comme UNE correction au lieu de plusieurs corrections séparées
 
 TEXTE À CORRIGER :
 
