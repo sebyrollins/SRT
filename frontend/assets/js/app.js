@@ -519,10 +519,28 @@ function renderBlocksTable() {
     const headerCell = document.createElement('td')
     headerCell.className = 'block-header'
     headerCell.colSpan = 2
-    headerCell.innerHTML = `
-      <span class="block-index">Bloc #${block.index}</span>
-      <span class="block-timecode">${block.timecode}</span>
-    `
+
+    // Pour les blocs validés, ajouter le bouton Modifier dans le header
+    if (allValidated && block.corrections && block.corrections.length > 0) {
+      headerCell.innerHTML = `
+        <span class="block-index">Bloc #${block.index}</span>
+        <span class="block-timecode">${block.timecode}</span>
+        <button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️ Modifier</button>
+      `
+      // Ajouter l'événement au bouton après insertion dans le DOM
+      setTimeout(() => {
+        const editBtn = headerCell.querySelector('.btn-header-edit')
+        if (editBtn) {
+          editBtn.onclick = () => editBlockText(block.index)
+        }
+      }, 0)
+    } else {
+      headerCell.innerHTML = `
+        <span class="block-index">Bloc #${block.index}</span>
+        <span class="block-timecode">${block.timecode}</span>
+      `
+    }
+
     headerRow.appendChild(headerCell)
 
     // === LIGNE DE CONTENU ===
@@ -682,28 +700,19 @@ function renderBlocksTable() {
           const actionsEl = document.createElement('div')
           actionsEl.className = 'validation-actions'
 
-          // Bouton Modifier : comportement dépend si toutes les corrections sont validées
-          const editBtn = document.createElement('button')
-          editBtn.className = 'btn-icon-only btn-icon-edit'
-          editBtn.innerHTML = '✏️'
-          editBtn.title = 'Modifier'
-          // Si toutes les corrections sont validées → éditer le bloc entier
-          // Sinon → éditer la correction spécifique
-          editBtn.onclick = () => {
-            if (allCorrectionsValidated) {
-              editBlockText(block.index)
-            } else {
-              editCorrection(block.index, corrIndex)
-            }
-          }
-
           if (!isValidated) {
-            // Boutons Valider et Rejeter : seulement si NON validé (icon-only)
+            // Boutons Valider, Modifier et Rejeter : seulement si NON validé
             const validateBtn = document.createElement('button')
             validateBtn.className = 'btn-icon-only btn-icon-validate'
             validateBtn.innerHTML = '✓'
             validateBtn.title = 'Valider'
             validateBtn.onclick = () => validateSingleCorrection(block.index, corrIndex)
+
+            const editBtn = document.createElement('button')
+            editBtn.className = 'btn-icon-only btn-icon-edit'
+            editBtn.innerHTML = '✏️'
+            editBtn.title = 'Modifier'
+            editBtn.onclick = () => editCorrection(block.index, corrIndex)
 
             const rejectBtn = document.createElement('button')
             rejectBtn.className = 'btn-icon-only btn-icon-reject'
@@ -714,14 +723,23 @@ function renderBlocksTable() {
             actionsEl.appendChild(validateBtn)
             actionsEl.appendChild(editBtn)
             actionsEl.appendChild(rejectBtn)
-          } else {
-            // Si validé : seulement le bouton Modifier
+          }
+          // Si validé et toutes les corrections validées : pas de bouton ici (il est dans le header)
+          // Si validé mais pas toutes validées : ajouter quand même le bouton Modifier
+          else if (!allCorrectionsValidated) {
+            const editBtn = document.createElement('button')
+            editBtn.className = 'btn-icon-only btn-icon-edit'
+            editBtn.innerHTML = '✏️'
+            editBtn.title = 'Modifier'
+            editBtn.onclick = () => editCorrection(block.index, corrIndex)
             actionsEl.appendChild(editBtn)
           }
 
-          // Ajouter les actions dans le header (sous le badge)
-          const headerEl = cardEl.querySelector('.validation-header')
-          headerEl.appendChild(actionsEl)
+          // Ajouter les actions dans le header (sous le badge) seulement si non vide
+          if (actionsEl.children.length > 0) {
+            const headerEl = cardEl.querySelector('.validation-header')
+            headerEl.appendChild(actionsEl)
+          }
 
           validationCell.appendChild(cardEl)
         })
