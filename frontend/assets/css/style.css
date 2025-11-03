@@ -1198,12 +1198,14 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-sm);
+  width: 66.66%;
 }
 
 .cell-validation {
   padding: var(--spacing-sm);
   vertical-align: top;
   border-right: 1px solid var(--color-border);
+  width: 33.34%;
 }
 
 .cell-validation {
@@ -1230,23 +1232,21 @@ body {
   vertical-align: middle;
 }
 
+/* Cellule gauche du header : numéro + timecode */
 .block-header-left {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   width: 66.66%;
 }
 
+/* Cellule droite du header : bouton Modifier */
 .block-header-right {
-  display: flex;
-  justify-content: center;
-  align-items: center;
   width: 33.34%;
+  text-align: center;
 }
 
 .block-index {
   font-weight: 600;
   color: var(--color-text-primary);
+  margin-right: var(--spacing-md);
 }
 
 .block-timecode {
