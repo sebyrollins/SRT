@@ -1220,25 +1220,28 @@ body {
   border-bottom: 1px solid var(--color-border);
 }
 
-/* Header de bloc (td) */
+/* Header de bloc (td) - fond gris sur les deux cellules */
 .block-header {
   padding: var(--spacing-sm);
   padding-bottom: 0.375rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  background: #f5f5f5;
+  background: #f5f5f5 !important;
+  vertical-align: middle;
 }
 
 .block-header-left {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 66.66%;
 }
 
 .block-header-right {
   display: flex;
   justify-content: center;
   align-items: center;
+  width: 33.34%;
 }
 
 .block-index {
