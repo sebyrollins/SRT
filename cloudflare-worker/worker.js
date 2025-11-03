@@ -180,7 +180,7 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
       * Exemple : "l'Autorité de régulation des communications électroniques"
       * Exemple : "l'Organisation mondiale de la santé"
   * Espaces insécables avant : ; ! ? (espace fine)
-  * Espaces insécables pour les milliers : 10 000 (SAUF années : 2024)
+  * Espaces insécables pour les milliers : 10 000, 1 000e, 2 500e (SAUF années : 2024)
   * Guillemets français « » avec espaces insécables
   * Points de suspension … (caractère unique)
 
@@ -209,6 +209,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
 - "minor" : corrections typographiques et cosmétiques
   * Guillemets droits → guillemets français : remplacer " par « » (ex: "bonjour" → « bonjour »)
   * Trois points → points de suspension : remplacer ... par … (ex: "et..." → "et…")
+  * Espaces insécables pour milliers : 10000 → 10 000, 1000e → 1 000e (SAUF années : 2024, 1789)
   * Espaces doubles difficiles à voir
   * Espaces insécables avant ponctuation (: ; ! ?)
   * Micro-ajustements typographiques subtils
@@ -219,6 +220,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "c est" → "c'est", "l eau" → "l'eau")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
+  * Accord des adjectifs en genre et nombre (ils sont beau → ils sont beaux, elle est grand → elle est grande)
   * Conjugaison incorrecte (Il à pris → Il a pris)
   * Majuscules institutions définies (le gouvernement → le Gouvernement)
   * Majuscules début de phrase SEULEMENT après . ! ? (PAS après virgule ou retour à la ligne)
