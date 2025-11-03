@@ -541,11 +541,15 @@ function renderBlocksTable() {
       <span class="block-timecode">${block.timecode}</span>
     `
 
-    // Cellule droite : bouton Modifier (seulement si toutes corrections validées)
+    // Cellule droite : bouton Modifier
+    // Afficher si : toutes corrections validées OU aucune correction
     const headerCellRight = document.createElement('td')
     headerCellRight.className = 'block-header block-header-right'
 
-    if (allValidated && block.corrections && block.corrections.length > 0) {
+    const hasNoCorrections = !block.corrections || block.corrections.length === 0
+    const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
+
+    if (shouldShowEditButton) {
       headerCellRight.innerHTML = `
         <button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>
       `
