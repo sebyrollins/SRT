@@ -313,7 +313,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * Accord sujet-verbe (ils à fait → ils ont fait)
   * Conjugaison incorrecte (Il à pris → Il a pris)
   * Majuscules institutions définies (le gouvernement → le Gouvernement)
-  * Majuscules début de phrase
+  * Majuscules début de phrase SEULEMENT après . ! ? (PAS après virgule ou retour à la ligne)
   * Ponctuation manquante ou incorrecte
 
 - "doubt" : corrections avec ambiguïté possible
