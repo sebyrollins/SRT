@@ -168,7 +168,7 @@ async function correctWithClaude(blocks) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 16000,
+      max_tokens: 32000,
       temperature: 0,
       messages: [{
         role: 'user',
