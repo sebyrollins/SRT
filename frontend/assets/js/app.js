@@ -509,18 +509,26 @@ function renderBlocksTable() {
 
     // Déterminer le type de correction dominant pour la classe CSS
     // Les blocs où TOUTES les corrections sont validées n'ont PAS de fond coloré
-    // Priorité : majeur > doute > mineur
+    // Priorité basée sur les corrections NON validées : majeur > doute > mineur
     let rowClass = 'row-no-correction'
     if (block.corrections && block.corrections.length > 0 && !allValidated) {
-      const hasDoubt = block.corrections.some(c => c.type === 'doubt')
-      const hasMajor = block.corrections.some(c => c.type === 'major')
-      const hasMinor = block.corrections.some(c => c.type === 'minor')
+      // Vérifier quelles corrections ne sont PAS validées
+      const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
+        c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+      )
+      const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
+        c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+      )
+      const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
+        c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+      )
 
-      if (hasMajor) {
+      // Appliquer la couleur selon la priorité des corrections non validées
+      if (hasUnvalidatedMajor) {
         rowClass = 'row-has-major'
-      } else if (hasDoubt) {
+      } else if (hasUnvalidatedDoubt) {
         rowClass = 'row-has-doubt'
-      } else if (hasMinor) {
+      } else if (hasUnvalidatedMinor) {
         rowClass = 'row-has-minor'
       }
     }
@@ -1722,16 +1730,26 @@ function getBlockMinimapClass(block) {
   }
 
   // Non validées : déterminer le type dominant
-  // Priorité : majeur > doute > mineur
-  const hasMajor = block.corrections.some(c => c.type === 'major')
-  const hasDoubt = block.corrections.some(c => c.type === 'doubt')
+  // Priorité basée sur les corrections NON validées : majeur > doute > mineur
+  const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
+    c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+  )
+  const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
+    c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+  )
+  const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
+    c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+  )
 
-  if (hasMajor) {
+  if (hasUnvalidatedMajor) {
     return 'minimap-major'
-  } else if (hasDoubt) {
+  } else if (hasUnvalidatedDoubt) {
     return 'minimap-doubt'
-  } else {
+  } else if (hasUnvalidatedMinor) {
     return 'minimap-minor'
+  } else {
+    // Normalement on ne devrait pas arriver ici car allValidated aurait dû être true
+    return 'minimap-validated'
   }
 }
 
