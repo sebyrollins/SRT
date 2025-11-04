@@ -156,10 +156,12 @@ function parseSRTBlocks(srtContent) {
 /**
  * Correction avec Claude Sonnet 4
  */
-async function correctWithClaude(blocks) {
-  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
-
-  const prompt = `Tu es un correcteur professionnel français expert et secrétaire de rédaction.
+/**
+ * Construit le system prompt (partie cachée avec Prompt Caching)
+ * Contient toutes les règles de correction
+ */
+function buildSystemPrompt() {
+  return `Tu es un correcteur professionnel français expert et secrétaire de rédaction.
 
 MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
 - Orthographe, grammaire, conjugaison, ponctuation
@@ -258,12 +260,24 @@ RÈGLES STRICTES :
 8. Ne crée JAMAIS de correction où "original" et "corrected" sont identiques caractère par caractère
 9. VÉRIFIE TOUJOURS que les corrections ne se chevauchent PAS (positions différentes sans overlap)
 
-TEXTE À CORRIGER :
-
-${blocksText}
-
 Retourne uniquement le JSON, rien d'autre.`
+}
 
+/**
+ * Construit le user prompt (partie variable)
+ * Contient uniquement les blocs SRT à corriger
+ */
+function buildUserPrompt(blocks) {
+  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
+  return `TEXTE À CORRIGER :
+
+${blocksText}`
+}
+
+/**
+ * Correction avec Claude Sonnet 4 + Prompt Caching
+ */
+async function correctWithClaude(blocks) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -275,9 +289,16 @@ Retourne uniquement le JSON, rien d'autre.`
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 64000,
       temperature: 0,
+      system: [
+        {
+          type: "text",
+          text: buildSystemPrompt(),
+          cache_control: { type: "ephemeral" }
+        }
+      ],
       messages: [{
         role: 'user',
-        content: prompt
+        content: buildUserPrompt(blocks)
       }]
     })
   })
