@@ -476,6 +476,17 @@ body {
   color: white;
 }
 
+.stat-filter.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.stat-filter.disabled:hover {
+  background: transparent;
+  transform: none;
+}
+
 .stat-label {
   display: block;
   font-size: 0.75rem;
@@ -601,11 +612,22 @@ body {
   border-radius: var(--radius-md);
 }
 
+.progress-gauge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
 .progress-gauge-label {
   font-size: 0.875rem;
   color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-xs);
-  text-align: center;
+}
+
+.progress-gauge-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
 .progress-gauge-bar {
@@ -613,7 +635,6 @@ body {
   background: var(--color-border);
   border-radius: 12px;
   overflow: hidden;
-  margin-bottom: var(--spacing-xs);
 }
 
 .progress-gauge-fill {
@@ -621,13 +642,6 @@ body {
   background: linear-gradient(90deg, var(--color-success) 0%, #4caf50 100%);
   transition: width 0.3s ease;
   border-radius: 12px;
-}
-
-.progress-gauge-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  text-align: center;
 }
 
 /* Utility Buttons (SRT, TXT, NEW) */

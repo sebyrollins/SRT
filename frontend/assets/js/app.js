@@ -1503,6 +1503,37 @@ function updateStats(stats) {
   if (DOM.statMajor) DOM.statMajor.textContent = stats.major
   if (DOM.statDoubt) DOM.statDoubt.textContent = stats.doubt
 
+  // Activer/désactiver les boutons de filtre selon les compteurs
+  document.querySelectorAll('.stat-filter').forEach(filterBtn => {
+    const filterType = filterBtn.dataset.filter
+    let count = 0
+
+    switch(filterType) {
+      case 'all':
+        count = stats.total
+        break
+      case 'minor':
+        count = stats.minor
+        break
+      case 'major':
+        count = stats.major
+        break
+      case 'doubt':
+        count = stats.doubt
+        break
+    }
+
+    if (count === 0) {
+      filterBtn.classList.add('disabled')
+      filterBtn.style.pointerEvents = 'none'
+      filterBtn.style.opacity = '0.5'
+    } else {
+      filterBtn.classList.remove('disabled')
+      filterBtn.style.pointerEvents = 'auto'
+      filterBtn.style.opacity = '1'
+    }
+  })
+
   // Calculer la progression (combien de corrections validées)
   const totalCorrections = stats.total
   const validatedCount = AppState.validatedCorrections.size

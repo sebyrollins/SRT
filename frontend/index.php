@@ -156,9 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                                 <span class="btn-icon">✓</span>
                                 Valider tout
                             </button>
-                            <button class="btn-stat btn-stat-outline" id="resetStateBtn" title="Réinitialiser l'état initial (après upload)">
+                            <button class="btn-stat btn-stat-outline btn-icon-only" id="resetStateBtn" title="Réinitialiser l'état initial (après upload)">
                                 <span class="btn-icon">↺</span>
-                                Réinitialiser
                             </button>
                         </div>
                         <div class="stat-item stat-minor">
@@ -194,13 +193,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                     </div>
 
                     <div class="progress-gauge-container">
-                        <div class="progress-gauge">
-                            <div class="progress-gauge-label">Progression</div>
-                            <div class="progress-gauge-bar">
-                                <div class="progress-gauge-fill" id="progressGaugeFill" style="width: 0%"></div>
-                            </div>
-                            <div class="progress-gauge-value" id="progressGaugeValue">0%</div>
-                        </div>
                         <div class="utility-buttons">
                             <button class="btn-utility" id="downloadSrtBtn" title="Télécharger le fichier SRT corrigé">
                                 <span class="btn-icon">⬇</span>
@@ -214,6 +206,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                                 <span class="btn-icon">↻</span>
                                 NEW
                             </button>
+                        </div>
+                        <div class="progress-gauge">
+                            <div class="progress-gauge-header">
+                                <div class="progress-gauge-label">Progression</div>
+                                <div class="progress-gauge-value" id="progressGaugeValue">0%</div>
+                            </div>
+                            <div class="progress-gauge-bar">
+                                <div class="progress-gauge-fill" id="progressGaugeFill" style="width: 0%"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
