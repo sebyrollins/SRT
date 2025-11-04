@@ -755,6 +755,18 @@ function validateSingleCorrection(blockIndex, corrIndex) {
   const correctionId = `${blockIndex}-${corrIndex}`
   AppState.validatedCorrections.add(correctionId)
 
+  // Trouver le bloc et la correction
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (block && block.corrections && block.corrections[corrIndex]) {
+    const correction = block.corrections[corrIndex]
+
+    // Appliquer la correction au texte du bloc
+    // Remplacer le texte original par le texte corrigé
+    if (block.corrected.includes(correction.original)) {
+      block.corrected = block.corrected.replace(correction.original, correction.corrected)
+    }
+  }
+
   // Mettre à jour les stats et la jauge
   const stats = SRTParser.calculateStats(AppState.blocks)
   updateStats(stats)
