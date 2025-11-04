@@ -1226,6 +1226,12 @@ function resetBlockToInitialState(blockIndex) {
     const correctionId = `${blockIndex}-${corrIndex}`
     AppState.validatedCorrections.delete(correctionId)
 
+    // Restaurer la suggestion originale si elle a été modifiée ou rejetée
+    if (correction.hasOwnProperty('originalSuggestion')) {
+      correction.corrected = correction.originalSuggestion
+      delete correction.originalSuggestion
+    }
+
     // Restaurer le type original si modifié
     if (correction.hasOwnProperty('originalType')) {
       correction.type = correction.originalType
@@ -1237,6 +1243,28 @@ function resetBlockToInitialState(blockIndex) {
       delete correction.originalReason
     }
   })
+
+  // Reconstruire block.corrected en appliquant toutes les corrections restaurées
+  // On trie les corrections par position pour les appliquer dans l'ordre
+  const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
+  let correctedText = block.original
+  let offset = 0
+
+  sortedCorrections.forEach(correction => {
+    const startPos = correction.position + offset
+    const endPos = startPos + correction.original.length
+
+    // Vérifier que la position est valide
+    if (correctedText.substring(startPos, endPos) === correction.original) {
+      // Remplacer l'original par le corrigé
+      correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
+
+      // Ajuster l'offset pour les prochaines corrections
+      offset += correction.corrected.length - correction.original.length
+    }
+  })
+
+  block.corrected = correctedText
 
   // Mettre à jour les stats et la jauge
   const stats = SRTParser.calculateStats(AppState.blocks)
@@ -1259,6 +1287,12 @@ function resetToInitialState() {
   AppState.blocks.forEach(block => {
     if (block.corrections && block.corrections.length > 0) {
       block.corrections.forEach((correction, corrIndex) => {
+        // Restaurer la suggestion originale si elle a été modifiée ou rejetée
+        if (correction.hasOwnProperty('originalSuggestion')) {
+          correction.corrected = correction.originalSuggestion
+          delete correction.originalSuggestion
+        }
+
         // Si le type a été modifié, le restaurer
         if (correction.hasOwnProperty('originalType')) {
           correction.type = correction.originalType
@@ -1270,6 +1304,27 @@ function resetToInitialState() {
           delete correction.originalReason
         }
       })
+
+      // Reconstruire block.corrected en appliquant toutes les corrections restaurées
+      const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
+      let correctedText = block.original
+      let offset = 0
+
+      sortedCorrections.forEach(correction => {
+        const startPos = correction.position + offset
+        const endPos = startPos + correction.original.length
+
+        // Vérifier que la position est valide
+        if (correctedText.substring(startPos, endPos) === correction.original) {
+          // Remplacer l'original par le corrigé
+          correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
+
+          // Ajuster l'offset pour les prochaines corrections
+          offset += correction.corrected.length - correction.original.length
+        }
+      })
+
+      block.corrected = correctedText
     }
   })
 
