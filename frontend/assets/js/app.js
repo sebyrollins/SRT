@@ -832,6 +832,11 @@ function editBlockText(blockIndex) {
   const block = AppState.blocks.find(b => b.index === blockIndex)
   if (!block) return
 
+  // Sauvegarder la suggestion originale de Claude si pas déjà fait
+  if (!block.hasOwnProperty('originalCorrected')) {
+    block.originalCorrected = block.corrected
+  }
+
   // Afficher le modal
   const modal = document.getElementById('editModal')
   const modalOriginal = document.getElementById('modalOriginal')
@@ -874,9 +879,13 @@ function editBlockText(blockIndex) {
     modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
   }
 
-  // Fonction pour restaurer le corrigé
+  // Fonction pour restaurer la suggestion originale de Claude
   const restoreCorrected = () => {
-    modalInput.value = block.corrected
+    // Utiliser originalCorrected si disponible (suggestion initiale de Claude), sinon corrected (valeur actuelle)
+    const correctedToRestore = block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined
+      ? block.originalCorrected
+      : block.corrected
+    modalInput.value = correctedToRestore
     modalInput.focus()
     modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
   }
