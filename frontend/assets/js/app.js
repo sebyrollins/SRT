@@ -252,6 +252,13 @@ async function processUploadedFile(content, filename) {
     // Sauvegarder les blocs
     AppState.blocks = correctedBlocks
 
+    // Sauvegarder la suggestion originale de Claude pour chaque bloc (avant toute modification)
+    AppState.blocks.forEach(block => {
+      if (!block.hasOwnProperty('originalCorrected')) {
+        block.originalCorrected = block.corrected
+      }
+    })
+
     // Progression ralentie et fluide de 80% à 100% (moitié de la vitesse)
     const finalProgressDuration = 4000  // 4 secondes pour 80-100% (2x plus lent que avant)
     const finalProgressSteps = 20  // 20 étapes pour une progression fluide
