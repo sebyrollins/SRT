@@ -529,23 +529,40 @@ function renderBlocksTable() {
       <span class="block-timecode">${block.timecode}</span>
     `
 
-    // Cellule droite : bouton Modifier
+    // Cellule droite : bouton Modifier et Réinitialiser
     // Afficher si : toutes corrections validées OU aucune correction
     const headerCellRight = document.createElement('td')
     headerCellRight.className = 'block-header block-header-right'
 
     const hasNoCorrections = !block.corrections || block.corrections.length === 0
     const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
+    const hasCorrections = block.corrections && block.corrections.length > 0
+
+    // Container pour les boutons
+    const buttonsHtml = []
 
     if (shouldShowEditButton) {
-      headerCellRight.innerHTML = `
-        <button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>
-      `
-      // Ajouter l'événement au bouton après insertion dans le DOM
+      buttonsHtml.push(`<button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>`)
+    }
+
+    // Bouton réinitialiser : afficher seulement s'il y a des corrections
+    if (hasCorrections) {
+      buttonsHtml.push(`<button class="btn-header-reset" data-block-index="${block.index}" title="Réinitialiser ce bloc">⟲</button>`)
+    }
+
+    if (buttonsHtml.length > 0) {
+      headerCellRight.innerHTML = `<div class="block-header-buttons">${buttonsHtml.join('')}</div>`
+
+      // Ajouter les événements aux boutons après insertion dans le DOM
       setTimeout(() => {
         const editBtn = headerCellRight.querySelector('.btn-header-edit')
         if (editBtn) {
           editBtn.onclick = () => editBlockText(block.index)
+        }
+
+        const resetBtn = headerCellRight.querySelector('.btn-header-reset')
+        if (resetBtn) {
+          resetBtn.onclick = () => resetBlockToInitialState(block.index)
         }
       }, 0)
     }
@@ -1154,6 +1171,43 @@ function validateCorrections(type) {
         AppState.validatedCorrections.add(correctionId)
       }
     })
+  })
+
+  // Mettre à jour les stats et la jauge
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
+
+  // Re-render pour mettre à jour l'affichage
+  renderBlocksTable()
+  updateMinimap()
+}
+
+/**
+ * Réinitialise un bloc spécifique à son état initial
+ * Supprime toutes les validations et restaure les types originaux pour ce bloc
+ */
+function resetBlockToInitialState(blockIndex) {
+  // Trouver le bloc
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || block.corrections.length === 0) {
+    return
+  }
+
+  // Supprimer toutes les validations pour ce bloc
+  block.corrections.forEach((correction, corrIndex) => {
+    const correctionId = `${blockIndex}-${corrIndex}`
+    AppState.validatedCorrections.delete(correctionId)
+
+    // Restaurer le type original si modifié
+    if (correction.hasOwnProperty('originalType')) {
+      correction.type = correction.originalType
+      delete correction.originalType
+    }
+    // Restaurer la raison originale si elle existe
+    if (correction.hasOwnProperty('originalReason')) {
+      correction.reason = correction.originalReason
+      delete correction.originalReason
+    }
   })
 
   // Mettre à jour les stats et la jauge
