@@ -91,8 +91,8 @@ function analyzeChunkComplexity(blocks) {
 }
 
 /**
- * Traitement du contenu SRT avec Claude (système hybride intelligent)
- * Utilise Haiku (rapide) pour cas simples, Sonnet (qualité) pour cas complexes
+ * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
+ * Utilise Sonnet pour garantir la qualité maximale sur toutes les règles
  */
 async function processSRT(srtContent) {
   // Parse les blocs SRT
@@ -108,16 +108,12 @@ async function processSRT(srtContent) {
   }
 
   // Traitement PARALLÈLE de tous les chunks pour accélérer le traitement
-  // Système HYBRIDE : Haiku pour cas simples, Sonnet pour cas complexes
-  console.log(`[processSRT] Processing ${chunks.length} chunks in parallel with hybrid model selection...`)
+  // SONNET UNIQUEMENT pour garantir le respect de toutes les règles de correction
+  console.log(`[processSRT] Processing ${chunks.length} chunks in parallel with Sonnet...`)
   const startTime = Date.now()
 
   const correctedChunks = await Promise.all(
-    chunks.map(chunk => {
-      const modelType = analyzeChunkComplexity(chunk)
-      console.log(`[processSRT] Chunk with ${chunk.length} blocks → using ${modelType}`)
-      return correctWithClaude(chunk, modelType)
-    })
+    chunks.map(chunk => correctWithClaude(chunk, 'sonnet'))
   )
 
   const endTime = Date.now()
