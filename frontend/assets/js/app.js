@@ -960,6 +960,45 @@ function editBlockText(blockIndex) {
       return
     }
 
+    // Cas 2.5 : Retour à la suggestion originale de Claude → Restaurer l'état initial
+    if (block.hasOwnProperty('originalCorrected') && newValue === block.originalCorrected) {
+      // C'est la suggestion originale de Claude, restaurer les corrections originales
+      // Dévalider toutes les corrections et restaurer leurs propriétés originales
+      if (block.corrections && block.corrections.length > 0) {
+        block.corrections.forEach((correction, idx) => {
+          const correctionId = `${block.index}-${idx}`
+          AppState.validatedCorrections.delete(correctionId)
+
+          // Restaurer les types et raisons originaux si modifiés
+          if (correction.hasOwnProperty('originalSuggestion')) {
+            correction.corrected = correction.originalSuggestion
+            delete correction.originalSuggestion
+          }
+          if (correction.hasOwnProperty('originalType')) {
+            correction.type = correction.originalType
+            delete correction.originalType
+          }
+          if (correction.hasOwnProperty('originalReason')) {
+            correction.reason = correction.originalReason
+            delete correction.originalReason
+          }
+        })
+      }
+
+      // Restaurer le texte corrigé de Claude
+      block.corrected = block.originalCorrected
+
+      // Mettre à jour les stats
+      const stats = SRTParser.calculateStats(AppState.blocks)
+      updateStats(stats)
+
+      // Re-render
+      renderBlocksTable()
+      updateMinimap()
+      closeModal()
+      return
+    }
+
     // Cas 3 : Modification du texte (différent de l'original et de la suggestion)
     if (newValue && newValue !== block.original && newValue !== oldCorrected) {
       // Supprimer toutes les anciennes corrections de ce bloc
