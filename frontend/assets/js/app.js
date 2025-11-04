@@ -509,16 +509,17 @@ function renderBlocksTable() {
 
     // Déterminer le type de correction dominant pour la classe CSS
     // Les blocs où TOUTES les corrections sont validées n'ont PAS de fond coloré
+    // Priorité : majeur > doute > mineur
     let rowClass = 'row-no-correction'
     if (block.corrections && block.corrections.length > 0 && !allValidated) {
       const hasDoubt = block.corrections.some(c => c.type === 'doubt')
       const hasMajor = block.corrections.some(c => c.type === 'major')
       const hasMinor = block.corrections.some(c => c.type === 'minor')
 
-      if (hasDoubt) {
-        rowClass = 'row-has-doubt'
-      } else if (hasMajor) {
+      if (hasMajor) {
         rowClass = 'row-has-major'
+      } else if (hasDoubt) {
+        rowClass = 'row-has-doubt'
       } else if (hasMinor) {
         rowClass = 'row-has-minor'
       }
@@ -1703,14 +1704,17 @@ function getBlockMinimapClass(block) {
   }
 
   // Si toutes validées, vérifier le type pour la couleur
+  // Priorité : majeur > doute > mineur
   if (allValidated) {
+    const hasMajor = block.corrections.some(c => c.type === 'major')
     const hasDoubt = block.corrections.some(c => c.type === 'doubt')
     const hasMinor = block.corrections.some(c => c.type === 'minor')
 
-    if (hasDoubt) {
+    if (hasMajor) {
+      return 'minimap-validated'
+    } else if (hasDoubt) {
       return 'minimap-validated-doubt'
-    } else if (hasMinor && !block.corrections.some(c => c.type === 'major')) {
-      // Corrections mineures validées → afficher aussi dans la minimap
+    } else if (hasMinor) {
       return 'minimap-validated-minor'
     } else {
       return 'minimap-validated'
@@ -1718,13 +1722,14 @@ function getBlockMinimapClass(block) {
   }
 
   // Non validées : déterminer le type dominant
-  const hasDoubt = block.corrections.some(c => c.type === 'doubt')
+  // Priorité : majeur > doute > mineur
   const hasMajor = block.corrections.some(c => c.type === 'major')
+  const hasDoubt = block.corrections.some(c => c.type === 'doubt')
 
-  if (hasDoubt) {
-    return 'minimap-doubt'
-  } else if (hasMajor) {
+  if (hasMajor) {
     return 'minimap-major'
+  } else if (hasDoubt) {
+    return 'minimap-doubt'
   } else {
     return 'minimap-minor'
   }
