@@ -1030,7 +1030,14 @@ function editCorrection(blockIndex, corrIndex) {
   // Remplir le modal avec textContent pour préserver les apostrophes et caractères spéciaux
   // white-space: pre-wrap dans le CSS gère les sauts de ligne
   modalOriginal.textContent = correction.original
-  modalSuggestion.textContent = correction.originalSuggestion
+
+  // Afficher la suggestion originale de Claude (sauvegardée avant toute modification)
+  // Si originalSuggestion existe, l'utiliser, sinon utiliser corrected
+  const suggestionToShow = correction.hasOwnProperty('originalSuggestion') && correction.originalSuggestion !== undefined
+    ? correction.originalSuggestion
+    : correction.corrected
+  modalSuggestion.textContent = suggestionToShow
+
   modalInput.value = correction.corrected
   modal.style.display = 'flex'
   modalInput.focus()
@@ -1043,9 +1050,13 @@ function editCorrection(blockIndex, corrIndex) {
     modalInput.setSelectionRange(0, modalInput.value.length)
   }
 
-  // Fonction pour restaurer la suggestion
+  // Fonction pour restaurer la suggestion originale de Claude
   const restoreSuggestion = () => {
-    modalInput.value = correction.originalSuggestion
+    // Utiliser originalSuggestion si disponible, sinon corrected
+    const suggestionToRestore = correction.hasOwnProperty('originalSuggestion') && correction.originalSuggestion !== undefined
+      ? correction.originalSuggestion
+      : correction.corrected
+    modalInput.value = suggestionToRestore
     modalInput.focus()
     modalInput.setSelectionRange(0, modalInput.value.length)
   }
