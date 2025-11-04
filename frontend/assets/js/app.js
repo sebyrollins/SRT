@@ -1191,18 +1191,6 @@ function resetToInitialState() {
     }
   })
 
-  // Re-valider automatiquement les corrections mineures (comme au chargement initial)
-  AppState.blocks.forEach(block => {
-    if (block.corrections && block.corrections.length > 0) {
-      block.corrections.forEach((correction, corrIndex) => {
-        if (correction.type === 'minor') {
-          const correctionId = `${block.index}-${corrIndex}`
-          AppState.validatedCorrections.add(correctionId)
-        }
-      })
-    }
-  })
-
   // Réinitialiser le filtre actif
   AppState.activeFilter = null
   document.querySelectorAll('.stat-filter').forEach(btn => {
