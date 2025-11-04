@@ -1074,9 +1074,12 @@ function editCorrection(blockIndex, corrIndex) {
         console.log(`  Nouveau: "${newValue}" (codes: ${Array.from(newValue).map(c => c.charCodeAt(0)).join(',')})`)
         console.log(`  Suggestion: "${correction.originalSuggestion}" (codes: ${Array.from(correction.originalSuggestion).map(c => c.charCodeAt(0)).join(',')})`)
 
-        // Sauvegarder le type original si pas déjà fait
+        // Sauvegarder le type et la raison originale si pas déjà fait
         if (!correction.hasOwnProperty('originalType')) {
           correction.originalType = correction.type
+        }
+        if (!correction.hasOwnProperty('originalReason')) {
+          correction.originalReason = correction.reason
         }
         // Passer SEULEMENT cette correction en doute
         correction.type = 'doubt'
@@ -1132,10 +1135,11 @@ function rejectCorrection(blockIndex, corrIndex) {
   const correction = block.corrections[corrIndex]
   if (!correction) return
 
-  // Sauvegarder la suggestion originale si pas déjà fait
+  // Sauvegarder la suggestion originale, le type et la raison si pas déjà fait
   if (!correction.hasOwnProperty('originalSuggestion')) {
     correction.originalSuggestion = correction.corrected
     correction.originalType = correction.type
+    correction.originalReason = correction.reason
   }
 
   // Convertir en doute
