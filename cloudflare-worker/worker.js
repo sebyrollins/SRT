@@ -181,7 +181,8 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
       * Exemple : "l'Agence nationale de la cohésion des territoires" (PAS "de la Cohésion")
       * Exemple : "l'Autorité de régulation des communications électroniques"
       * Exemple : "l'Organisation mondiale de la santé"
-  * Espaces insécables avant : ; ! ? (espace fine)
+  * Espaces insécables avant : ; ! ? UNIQUEMENT si complètement absents (ex: "Bonjour?" → "Bonjour ?")
+  * NE PAS corriger si espace déjà présent (ex: "Bonjour ?" est correct, ne pas modifier)
   * Espaces insécables pour les milliers : 10 000, 1 000e, 2 500e (SAUF années : 2024)
   * Guillemets français « » avec espaces insécables
   * Points de suspension … (caractère unique)
@@ -213,7 +214,7 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * Trois points → points de suspension : remplacer ... par … (ex: "et..." → "et…")
   * Espaces insécables pour milliers : 10000 → 10 000, 1000e → 1 000e (SAUF années : 2024, 1789)
   * Espaces doubles difficiles à voir
-  * Espaces insécables avant ponctuation (: ; ! ?)
+  * Espaces insécables avant : ; ! ? UNIQUEMENT si absents (ex: "Bonjour?" → "Bonjour ?", mais "Bonjour ?" déjà correct)
   * Micro-ajustements typographiques subtils
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
