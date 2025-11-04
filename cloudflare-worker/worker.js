@@ -219,8 +219,15 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * Tirets manquants : inversions verbe-sujet (questions), noms composés courants, locutions figées
-  * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "c est" → "c'est", "l eau" → "l'eau")
+  * Locutions figées complètes (TOUTE la locution en UNE SEULE correction) :
+    - "c est a dire" → "c'est-à-dire" (apostrophe + 2 tirets, PAS d'espace avant les tirets)
+    - "c'est a dire" → "c'est-à-dire" (2 tirets, PAS d'espace avant les tirets)
+    - "C est a dire" → "C'est-à-dire" (apostrophe + 2 tirets, PAS d'espace avant les tirets)
+    - "au dela" → "au-delà"
+    - "vis a vis" → "vis-à-vis"
+    - "peut etre" → "peut-être"
+  * Tirets manquants : inversions verbe-sujet (questions), noms composés courants
+  * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "l eau" → "l'eau", "d accord" → "d'accord")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
   * Accord des adjectifs en genre et nombre (ils sont beau → ils sont beaux, elle est grand → elle est grande)
