@@ -933,18 +933,21 @@ function editBlockText(blockIndex) {
       return
     }
 
-    // Cas 2 : Retour au texte original (annuler toutes les corrections)
+    // Cas 2 : Retour au texte original → Dévalider les corrections (ne pas les supprimer)
     if (newValue === block.original) {
-      // Supprimer toutes les corrections de ce bloc
-      const oldCorrections = block.corrections ? [...block.corrections] : []
-      block.corrections = []
-      block.corrected = block.original
+      // Dévalider toutes les corrections de ce bloc (mais les garder)
+      if (block.corrections && block.corrections.length > 0) {
+        block.corrections.forEach((_, idx) => {
+          const correctionId = `${block.index}-${idx}`
+          AppState.validatedCorrections.delete(correctionId)
+        })
+      }
 
-      // Supprimer toutes les validations de ce bloc
-      oldCorrections.forEach((_, idx) => {
-        const correctionId = `${block.index}-${idx}`
-        AppState.validatedCorrections.delete(correctionId)
-      })
+      // Restaurer le texte corrigé original de Claude (pas l'original avec fautes)
+      // Cela remet le bloc dans l'état initial : corrections présentes mais non validées
+      if (block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined) {
+        block.corrected = block.originalCorrected
+      }
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
