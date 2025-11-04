@@ -1139,6 +1139,7 @@ function editCorrection(blockIndex, corrIndex) {
 
 /**
  * Rejette une correction et la convertit en doute validé
+ * Garde le texte original (n'applique pas la correction)
  */
 function rejectCorrection(blockIndex, corrIndex) {
   const block = AppState.blocks.find(b => b.index === blockIndex)
@@ -1153,6 +1154,17 @@ function rejectCorrection(blockIndex, corrIndex) {
     correction.originalType = correction.type
     correction.originalReason = correction.reason
   }
+
+  // Mettre à jour le texte du bloc pour garder l'original (défaire la correction)
+  // block.corrected contient déjà toutes les corrections appliquées par Claude
+  // On veut remplacer la suggestion par l'original
+  if (block.corrected.includes(correction.originalSuggestion)) {
+    block.corrected = block.corrected.replace(correction.originalSuggestion, correction.original)
+  }
+
+  // Mettre à jour la correction pour indiquer qu'on garde l'original
+  correction.corrected = correction.original
+  correction.reason = 'Rejeté (texte original conservé)'
 
   // Convertir en doute
   correction.type = 'doubt'
