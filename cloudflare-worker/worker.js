@@ -68,28 +68,63 @@ async function handleRequest(request) {
 }
 
 /**
- * Traitement du contenu SRT avec Claude
+ * Analyse la complexité d'un chunk pour choisir le meilleur modèle
+ * @param {Array} blocks - Blocs SRT à analyser
+ * @returns {string} - 'haiku' (rapide) ou 'sonnet' (qualité)
+ */
+function analyzeChunkComplexity(blocks) {
+  // Critères de complexité qui nécessitent Sonnet :
+  // 1. Blocs très longs (> 150 caractères) = grammaire complexe probable
+  // 2. Nombreux dialogues/guillemets = contexte complexe
+  // 3. Texte avec beaucoup de ponctuation = phrases longues
+
+  const textSample = blocks.map(b => b.text).join(' ')
+  const avgLength = textSample.length / blocks.length
+  const hasComplexPunctuation = (textSample.match(/[;:,]/g) || []).length > blocks.length * 2
+  const hasDialogues = (textSample.match(/[«»"]/g) || []).length > 4
+
+  // Si complexe → Sonnet (qualité), sinon → Haiku (vitesse)
+  if (avgLength > 150 || hasComplexPunctuation || hasDialogues) {
+    return 'sonnet'
+  }
+  return 'haiku'
+}
+
+/**
+ * Traitement du contenu SRT avec Claude (système hybride intelligent)
+ * Utilise Haiku (rapide) pour cas simples, Sonnet (qualité) pour cas complexes
  */
 async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
   // Si le contenu est trop volumineux, on découpe par chunks
-  const maxBlocksPerChunk = 50 // ~3000-4000 tokens par chunk
+  // Augmenté de 50 à 70 blocs pour réduire le nombre d'appels API
+  const maxBlocksPerChunk = 70
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
     chunks.push(blocks.slice(i, i + maxBlocksPerChunk))
   }
 
-  // Traitement de chaque chunk
-  const correctedChunks = []
-  for (const chunk of chunks) {
-    const corrected = await correctWithClaude(chunk)
-    correctedChunks.push(...corrected)
-  }
+  // Traitement PARALLÈLE de tous les chunks pour accélérer le traitement
+  // Système HYBRIDE : Haiku pour cas simples, Sonnet pour cas complexes
+  console.log(`[processSRT] Processing ${chunks.length} chunks in parallel with hybrid model selection...`)
+  const startTime = Date.now()
 
-  return correctedChunks
+  const correctedChunks = await Promise.all(
+    chunks.map(chunk => {
+      const modelType = analyzeChunkComplexity(chunk)
+      console.log(`[processSRT] Chunk with ${chunk.length} blocks → using ${modelType}`)
+      return correctWithClaude(chunk, modelType)
+    })
+  )
+
+  const endTime = Date.now()
+  console.log(`[processSRT] All chunks processed in ${endTime - startTime}ms`)
+
+  // Flatten les résultats
+  return correctedChunks.flat()
 }
 
 /**
@@ -283,9 +318,27 @@ ${blocksText}`
 }
 
 /**
- * Correction avec Claude Sonnet 4 + Prompt Caching
+ * Correction avec Claude + Prompt Caching
+ * @param {Array} blocks - Blocs SRT à corriger
+ * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
  */
-async function correctWithClaude(blocks) {
+async function correctWithClaude(blocks, modelType = 'sonnet') {
+  // Choisir le modèle selon le type
+  const modelConfig = {
+    sonnet: {
+      name: 'claude-sonnet-4-5-20250929',
+      maxTokens: 64000
+    },
+    haiku: {
+      name: 'claude-haiku-4-5',
+      maxTokens: 64000
+    }
+  }
+
+  const config = modelConfig[modelType] || modelConfig.sonnet
+
+  console.log(`[correctWithClaude] Using model: ${config.name} for ${blocks.length} blocks`)
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -294,8 +347,8 @@ async function correctWithClaude(blocks) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 64000,
+      model: config.name,
+      max_tokens: config.maxTokens,
       temperature: 0,
       system: [
         {
