@@ -960,14 +960,13 @@ function editBlockText(blockIndex) {
       return
     }
 
-    // Cas 2.5 : Retour à la suggestion originale de Claude → Restaurer l'état initial
+    // Cas 2.5 : Retour à la suggestion originale de Claude → Restaurer et valider
     if (block.hasOwnProperty('originalCorrected') && newValue === block.originalCorrected) {
       // C'est la suggestion originale de Claude, restaurer les corrections originales
-      // Dévalider toutes les corrections et restaurer leurs propriétés originales
+      // Valider toutes les corrections et restaurer leurs propriétés originales
       if (block.corrections && block.corrections.length > 0) {
         block.corrections.forEach((correction, idx) => {
           const correctionId = `${block.index}-${idx}`
-          AppState.validatedCorrections.delete(correctionId)
 
           // Restaurer les types et raisons originaux si modifiés
           if (correction.hasOwnProperty('originalSuggestion')) {
@@ -982,6 +981,9 @@ function editBlockText(blockIndex) {
             correction.reason = correction.originalReason
             delete correction.originalReason
           }
+
+          // VALIDER la correction
+          AppState.validatedCorrections.add(correctionId)
         })
       }
 
