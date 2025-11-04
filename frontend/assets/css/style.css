@@ -1234,9 +1234,9 @@ body {
 .block-header-left {
 }
 
-/* Cellule droite du header : bouton Modifier */
+/* Cellule droite du header : boutons Modifier et Réinitialiser */
 .block-header-right {
-  text-align: center;
+  text-align: left;
 }
 
 .block-index {
@@ -1254,7 +1254,7 @@ body {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 /* Bouton Modifier dans le header (pour blocs validés) - icône seule, dégradé de gris */
