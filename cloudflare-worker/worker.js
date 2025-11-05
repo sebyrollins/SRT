@@ -99,9 +99,9 @@ async function processSRT(srtContent) {
   const blocks = parseSRTBlocks(srtContent)
 
   // CHUNK SIZE OPTIMISÉ pour qualité maximale sur règles spécifiques
-  // Réduit de 70 à 40 blocs pour garantir que Claude applique bien les règles de tirets
-  // Chunks plus petits = meilleure concentration sur les règles ULTRA PRIORITAIRES
-  const maxBlocksPerChunk = 40
+  // Réduit à 25 blocs - tests montrent que 40 blocs trop grand pour fichiers longs
+  // Chunks très petits = Claude applique TOUJOURS les règles ULTRA PRIORITAIRES
+  const maxBlocksPerChunk = 25
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
@@ -200,32 +200,15 @@ MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
 - Typographie française professionnelle
 
 ═══════════════════════════════════════════════════════════════════
-⚠️  RÈGLES ULTRA PRIORITAIRES - À APPLIQUER EN PREMIER ⚠️
+⚠️  RÈGLES ABSOLUES - TOUJOURS APPLIQUER SANS EXCEPTION ⚠️
 ═══════════════════════════════════════════════════════════════════
 
-1. INVERSIONS VERBE-SUJET DANS QUESTIONS (OBLIGATOIRE - TOUJOURS CORRIGER) :
-   • "pensez vous" → "pensez-vous"
-   • "qu'en pensez vous" → "qu'en pensez-vous"
-   • "qu'en pensez vous ?" → "qu'en pensez-vous ?"
-   • "Qu'en pensez vous ?" → "Qu'en pensez-vous ?"
-   • "allez vous" → "allez-vous"
-   • "avez vous" → "avez-vous"
-   • "faites vous" → "faites-vous"
-   • "dites vous" → "dites-vous"
-   ➜ RÈGLE : TOUT verbe suivi de "vous", "tu", "il", "elle", "on" dans une question = TIRET OBLIGATOIRE
+TIRETS OBLIGATOIRES :
+• Inversions questions : "pensez vous" → "pensez-vous", "qu'en pensez vous ?" → "qu'en pensez-vous ?"
+• Noms composés : "avant première" → "avant-première", "au delà" → "au-delà", "rendez vous" → "rendez-vous"
+• Locutions : "c'est a dire" → "c'est-à-dire", "peut etre" → "peut-être"
 
-2. NOMS COMPOSÉS COURANTS (OBLIGATOIRE - TOUJOURS CORRIGER) :
-   • "avant première" → "avant-première"
-   • "rendez vous" → "rendez-vous"
-   • "week end" → "week-end"
-   • "arc en ciel" → "arc-en-ciel"
-   • "au delà" → "au-delà"
-   • "vis a vis" → "vis-à-vis"
-
-3. LOCUTIONS FIGÉES (OBLIGATOIRE - TOUJOURS CORRIGER EN UNE SEULE CORRECTION) :
-   • "c est a dire" → "c'est-à-dire"
-   • "c'est a dire" → "c'est-à-dire"
-   • "peut etre" → "peut-être"
+RÈGLE GÉNÉRALE : Verbe + (vous/tu/il/elle/on) dans question = TIRET. Nom composé = TIRET.
 
 ═══════════════════════════════════════════════════════════════════
 
