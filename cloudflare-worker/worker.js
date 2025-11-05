@@ -250,6 +250,23 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
+  * PRIORITÉ ABSOLUE - Tirets manquants pour inversions verbe-sujet dans questions (TOUJOURS corriger) :
+    - "pensez vous" → "pensez-vous" (inversion question)
+    - "allez vous" → "allez-vous" (inversion question)
+    - "avez vous" → "avez-vous" (inversion question)
+    - "pouvez vous" → "pouvez-vous" (inversion question)
+    - "savez vous" → "savez-vous" (inversion question)
+    - "qu'en pensez vous" → "qu'en pensez-vous" (inversion question)
+    - "comment allez vous" → "comment allez-vous" (inversion question)
+    - "que faites vous" → "que faites-vous" (inversion question)
+    - "pourquoi dites vous" → "pourquoi dites-vous" (inversion question)
+    - RÈGLE : Toute inversion verbe-sujet dans une question DOIT avoir un tiret
+  * PRIORITÉ ABSOLUE - Tirets manquants pour noms composés courants (TOUJOURS corriger) :
+    - "avant première" → "avant-première"
+    - "week end" → "week-end"
+    - "rendez vous" → "rendez-vous"
+    - "arc en ciel" → "arc-en-ciel"
+    - "chef d'oeuvre" → "chef-d'œuvre"
   * Locutions figées complètes (TOUTE la locution en UNE SEULE correction) :
     - "c est a dire" → "c'est-à-dire" (apostrophe + 2 tirets, PAS d'espace avant les tirets)
     - "c'est a dire" → "c'est-à-dire" (2 tirets, PAS d'espace avant les tirets)
@@ -257,20 +274,6 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
     - "au dela" → "au-delà"
     - "vis a vis" → "vis-à-vis"
     - "peut etre" → "peut-être"
-  * Tirets manquants pour inversions verbe-sujet dans questions :
-    - "pensez vous" → "pensez-vous"
-    - "allez vous" → "allez-vous"
-    - "avez vous" → "avez-vous"
-    - "pouvez vous" → "pouvez-vous"
-    - "savez vous" → "savez-vous"
-    - "qu'en pensez vous" → "qu'en pensez-vous"
-    - "comment allez vous" → "comment allez-vous"
-  * Tirets manquants pour noms composés courants :
-    - "avant première" → "avant-première"
-    - "week end" → "week-end"
-    - "rendez vous" → "rendez-vous"
-    - "arc en ciel" → "arc-en-ciel"
-    - "chef d'oeuvre" → "chef-d'œuvre"
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "l eau" → "l'eau", "d accord" → "d'accord")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
