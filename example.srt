@@ -51,3 +51,8 @@ d'organiser un rendez vous urgent.
 00:00:31,500 --> 00:00:34,000
 C est a dire que nous devons
 préparer le dossier maintenant.
+
+12
+00:00:34,500 --> 00:00:37,000
+À dire vrai, je ne suis pas
+entièrement convaincu.

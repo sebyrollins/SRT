@@ -308,13 +308,14 @@ RÈGLES À APPLIQUER :
    • "arc en ciel" → "arc-en-ciel"
    Important : "rendez vous" DOIT avoir un tiret même dans "d'organiser un rendez vous"
 
-3. TIRETS - Locutions figées (DEUX tirets pour "à-dire") :
+3. TIRETS - Locutions figées :
    • "c'est a dire" → "c'est-à-dire" (DEUX tirets : c'est-à-dire)
    • "C est a dire" → "C'est-à-dire" (DEUX tirets : C'est-à-dire)
-   • "à dire" après "c'est/C'est" → "à-dire" (tiret OBLIGATOIRE)
+   ATTENTION : Tiret UNIQUEMENT pour "c'est-à-dire", PAS pour d'autres expressions :
+   • "à dire vrai" → CORRECT (sans tiret)
+   • "pour ainsi dire" → CORRECT (sans tiret)
    • "peut etre" → "peut-être"
    • "vis a vis" → "vis-à-vis"
-   Important : "à-dire" nécessite toujours le tiret entre "à" et "dire"
 
 4. APOSTROPHES - Élisions manquantes :
    • "l eau" → "l'eau"
