@@ -489,8 +489,15 @@ RÈGLES À APPLIQUER :
 3. ACCORDS PARTICIPES PASSÉS (si contexte clair) :
    • "ils ont fait" → correct
    • "elle est partie" → correct
-   • Si 1ère personne ambigu : type "doubt"
-   Type : "major" ou "doubt"
+
+   AMBIGUÏTÉ DE GENRE (1ère personne + "être") :
+   • "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
+   • "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
+   • Participes concernés : allé(e), resté(e), devenu(e), parti(e), arrivé(e), venu(e), rentré(e), sorti(e), tombé(e), né(e)
+   • Aussi avec : paraître, sembler, devenir, rester ("je suis devenu/devenue", "je suis resté/restée")
+   Type : "doubt" (car genre du locuteur inconnu)
+
+   Autres accords : Type "major"
 
 4. MAJUSCULES INSTITUTIONS :
    • "le gouvernement" → "le Gouvernement" (institution française)
@@ -531,7 +538,7 @@ RÈGLES STRICTES :
 2. "original" = texte exact du fichier
 3. Si aucune correction : corrections = []
 4. N'applique QUE les règles ci-dessus
-5. "doubt" seulement pour accords 1ère personne ambigus
+5. "doubt" seulement pour ambiguïté de genre (1ère pers. + "être" + participe passé)
 
 Retourne uniquement le JSON, rien d'autre.`
 }

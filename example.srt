@@ -36,3 +36,8 @@ C'est tres important.
 00:00:22,500 --> 00:00:25,000
 Nous avons analysé la situation,
 et voici notre conclusion.
+
+9
+00:00:25,500 --> 00:00:28,000
+Je suis venu hier
+pour discuter de ce projet.
