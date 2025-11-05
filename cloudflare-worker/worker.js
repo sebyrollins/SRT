@@ -156,6 +156,7 @@ async function processSRT(srtContent) {
     const correspondingPass1Block = blocksAfterPass1[idx]
     return {
       ...block,
+      original: correspondingPass1Block.original, // IMPORTANT: Garder le vrai original (avant Pass 1)
       corrections: [
         ...(correspondingPass1Block.corrections || []),
         ...(block.corrections || [])
