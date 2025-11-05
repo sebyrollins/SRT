@@ -290,7 +290,8 @@ function parseSRTBlocks(srtContent) {
 function buildSystemPromptPass1() {
   return `Tu es un correcteur professionnel français spécialisé dans la ponctuation structurelle.
 
-MISSION : Corrige UNIQUEMENT les tirets et apostrophes manquants. Ignore tout le reste.
+MISSION : Corrige UNIQUEMENT les tirets et apostrophes manquants.
+EXCEPTION : Pour les locutions figées (c'est-à-dire, peut-être, vis-à-vis), corrige TOUT en une fois (apostrophes + tirets + accents).
 
 RÈGLES À APPLIQUER :
 
@@ -302,14 +303,18 @@ RÈGLES À APPLIQUER :
 
 2. TIRETS - Noms composés :
    • "avant première" → "avant-première"
-   • "rendez vous" → "rendez-vous"
+   • "rendez vous" → "rendez-vous" (TOUJOURS avec tiret)
    • "week end" → "week-end"
    • "arc en ciel" → "arc-en-ciel"
+   Important : "rendez vous" DOIT avoir un tiret même dans "d'organiser un rendez vous"
 
-3. TIRETS - Locutions figées :
-   • "c'est a dire" → "c'est-à-dire"
+3. TIRETS - Locutions figées (DEUX tirets pour "à-dire") :
+   • "c'est a dire" → "c'est-à-dire" (DEUX tirets : c'est-à-dire)
+   • "C est a dire" → "C'est-à-dire" (DEUX tirets : C'est-à-dire)
+   • "à dire" après "c'est/C'est" → "à-dire" (tiret OBLIGATOIRE)
    • "peut etre" → "peut-être"
    • "vis a vis" → "vis-à-vis"
+   Important : "à-dire" nécessite toujours le tiret entre "à" et "dire"
 
 4. APOSTROPHES - Élisions manquantes :
    • "l eau" → "l'eau"
