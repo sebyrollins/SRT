@@ -251,16 +251,21 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
 
 - "major" : corrections professionnelles visibles et certaines
   * PRIORITÉ ABSOLUE - Tirets manquants pour inversions verbe-sujet dans questions (TOUJOURS corriger) :
-    - "pensez vous" → "pensez-vous" (inversion question)
-    - "allez vous" → "allez-vous" (inversion question)
-    - "avez vous" → "avez-vous" (inversion question)
-    - "pouvez vous" → "pouvez-vous" (inversion question)
-    - "savez vous" → "savez-vous" (inversion question)
-    - "qu'en pensez vous" → "qu'en pensez-vous" (inversion question)
-    - "comment allez vous" → "comment allez-vous" (inversion question)
-    - "que faites vous" → "que faites-vous" (inversion question)
-    - "pourquoi dites vous" → "pourquoi dites-vous" (inversion question)
-    - RÈGLE : Toute inversion verbe-sujet dans une question DOIT avoir un tiret
+    - "pensez vous" → "pensez-vous" (inversion question - OBLIGATOIRE)
+    - "pensez vous ?" → "pensez-vous ?" (avec ponctuation - OBLIGATOIRE)
+    - "allez vous" → "allez-vous" (inversion question - OBLIGATOIRE)
+    - "allez vous ?" → "allez-vous ?" (avec ponctuation - OBLIGATOIRE)
+    - "avez vous" → "avez-vous" (inversion question - OBLIGATOIRE)
+    - "pouvez vous" → "pouvez-vous" (inversion question - OBLIGATOIRE)
+    - "savez vous" → "savez-vous" (inversion question - OBLIGATOIRE)
+    - "qu'en pensez vous" → "qu'en pensez-vous" (inversion question - OBLIGATOIRE)
+    - "qu'en pensez vous ?" → "qu'en pensez-vous ?" (avec ponctuation - OBLIGATOIRE)
+    - "Qu'en pensez vous ?" → "Qu'en pensez-vous ?" (avec majuscule et ponctuation - OBLIGATOIRE)
+    - "comment allez vous" → "comment allez-vous" (inversion question - OBLIGATOIRE)
+    - "que faites vous" → "que faites-vous" (inversion question - OBLIGATOIRE)
+    - "pourquoi dites vous" → "pourquoi dites-vous" (inversion question - OBLIGATOIRE)
+    - RÈGLE ABSOLUE : Toute inversion verbe-sujet dans une question DOIT TOUJOURS avoir un tiret entre verbe et pronom
+    - Le tiret est OBLIGATOIRE même si suivi de ? ou ! ou autre ponctuation
   * PRIORITÉ ABSOLUE - Tirets manquants pour noms composés courants (TOUJOURS corriger) :
     - "avant première" → "avant-première"
     - "week end" → "week-end"
