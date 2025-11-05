@@ -100,7 +100,7 @@ async function processSRT(srtContent) {
 
   // CHUNK SIZE OPTIMISÉ pour qualité maximale sur règles spécifiques
   // Réduit à 25 blocs - tests montrent que 40 blocs trop grand pour fichiers longs
-  // Chunks très petits = Claude applique TOUJOURS les règles ULTRA PRIORITAIRES
+  // Chunks très petits = Claude applique TOUJOURS les règles
   const maxBlocksPerChunk = 25
   const chunks = []
 
@@ -108,20 +108,68 @@ async function processSRT(srtContent) {
     chunks.push(blocks.slice(i, i + maxBlocksPerChunk))
   }
 
-  // Traitement PARALLÈLE de tous les chunks pour accélérer le traitement
-  // SONNET UNIQUEMENT pour garantir le respect de toutes les règles de correction
-  console.log(`[processSRT] Processing ${chunks.length} chunks in parallel with Sonnet...`)
+  console.log(`[processSRT] Processing ${blocks.length} blocks in ${chunks.length} chunks with 2-pass system...`)
   const startTime = Date.now()
 
-  const correctedChunks = await Promise.all(
-    chunks.map(chunk => correctWithClaude(chunk, 'sonnet'))
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 1 : Correction des TIRETS uniquement (inversions, noms composés)
+  // ═══════════════════════════════════════════════════════════════
+  console.log(`[processSRT] === PASS 1: Hyphen corrections (${chunks.length} chunks in parallel) ===`)
+  const pass1Start = Date.now()
+
+  const correctedChunksPass1 = await Promise.all(
+    chunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
+  )
+  const blocksAfterPass1 = correctedChunksPass1.flat()
+
+  const pass1End = Date.now()
+  console.log(`[processSRT] Pass 1 completed in ${pass1End - pass1Start}ms`)
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 2 : Toutes les autres corrections (grammaire, orthographe, typo)
+  // ═══════════════════════════════════════════════════════════════
+  console.log(`[processSRT] === PASS 2: All other corrections (${chunks.length} chunks in parallel) ===`)
+  const pass2Start = Date.now()
+
+  // Préparer les blocs pour Pass 2 : le texte "corrected" de Pass 1 devient le point de départ
+  // On garde les corrections de Pass 1 et on ajoutera celles de Pass 2
+  const blocksForPass2 = blocksAfterPass1.map(block => ({
+    index: block.index,
+    timecode: block.timecode,
+    text: block.corrected, // Le texte corrigé de Pass 1 devient le texte de départ pour Pass 2
+    original: block.original, // On garde l'original pour traçabilité
+    correctionsPass1: block.corrections || [] // Sauvegarder les corrections de Pass 1
+  }))
+
+  // Re-découper les blocs pour passe 2
+  const chunksPass2 = []
+  for (let i = 0; i < blocksForPass2.length; i += maxBlocksPerChunk) {
+    chunksPass2.push(blocksForPass2.slice(i, i + maxBlocksPerChunk))
+  }
+
+  const correctedChunksPass2 = await Promise.all(
+    chunksPass2.map(chunk => correctWithClaude(chunk, 'sonnet', 2))
   )
 
-  const endTime = Date.now()
-  console.log(`[processSRT] All chunks processed in ${endTime - startTime}ms`)
+  // Fusionner les corrections des 2 passes
+  const finalBlocks = correctedChunksPass2.flat().map((block, idx) => {
+    const correspondingPass1Block = blocksAfterPass1[idx]
+    return {
+      ...block,
+      corrections: [
+        ...(correspondingPass1Block.corrections || []),
+        ...(block.corrections || [])
+      ]
+    }
+  })
 
-  // Flatten les résultats
-  return correctedChunks.flat()
+  const pass2End = Date.now()
+  console.log(`[processSRT] Pass 2 completed in ${pass2End - pass2Start}ms`)
+
+  const endTime = Date.now()
+  console.log(`[processSRT] Total processing time: ${endTime - startTime}ms (Pass 1: ${pass1End - pass1Start}ms, Pass 2: ${pass2End - pass2Start}ms)`)
+
+  return finalBlocks
 }
 
 /**
@@ -186,33 +234,82 @@ function parseSRTBlocks(srtContent) {
 }
 
 /**
- * Correction avec Claude Sonnet 4
+ * Construit le system prompt PASSE 1 : Tirets uniquement
+ * Prompt ultra-court et focalisé pour 100% de détection des tirets
  */
+function buildSystemPromptPass1() {
+  return `Tu es un correcteur professionnel français spécialisé dans la ponctuation.
+
+MISSION UNIQUE : Détecte et corrige UNIQUEMENT les tirets manquants. Ignore tout le reste.
+
+RÈGLES TIRETS (à appliquer systématiquement) :
+
+1. INVERSIONS VERBE-SUJET dans questions :
+   • "pensez vous" → "pensez-vous"
+   • "qu'en pensez vous" → "qu'en pensez-vous"
+   • "allez vous" → "allez-vous"
+   • "avez vous" → "avez-vous"
+   • Règle : TOUT verbe + (vous/tu/il/elle/on) dans question = TIRET OBLIGATOIRE
+
+2. NOMS COMPOSÉS :
+   • "avant première" → "avant-première"
+   • "au delà" → "au-delà"
+   • "rendez vous" → "rendez-vous"
+   • "week end" → "week-end"
+   • "arc en ciel" → "arc-en-ciel"
+
+3. LOCUTIONS FIGÉES :
+   • "c'est a dire" → "c'est-à-dire"
+   • "c est a dire" → "c'est-à-dire"
+   • "peut etre" → "peut-être"
+   • "vis a vis" → "vis-à-vis"
+
+IMPORTANT :
+- NE corrige QUE les tirets manquants (type: "major")
+- Ignore orthographe, grammaire, majuscules, espaces, guillemets, etc.
+- Si aucun tiret manquant : corrections = []
+
+Retourne UNIQUEMENT un JSON valide (pas de markdown) :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte original exact",
+      "corrected": "texte avec tirets corrigés",
+      "corrections": [
+        {
+          "type": "major",
+          "original": "pensez vous",
+          "corrected": "pensez-vous",
+          "reason": "Tiret inversion question",
+          "position": 15
+        }
+      ]
+    }
+  ]
+}
+
+RÈGLES STRICTES :
+1. Position = index exact (compte de 0) dans le texte original
+2. "original" doit contenir EXACTEMENT le texte du fichier (tel quel)
+3. Si aucune correction : corrections = []
+4. Vérifie : text.substring(position, position + original.length) === original
+
+Retourne uniquement le JSON, rien d'autre.`
+}
+
 /**
- * Construit le system prompt (partie cachée avec Prompt Caching)
- * Contient toutes les règles de correction
+ * Construit le system prompt PASSE 2 : Toutes les autres corrections
+ * Contient toutes les règles sauf les tirets (déjà traités en passe 1)
  */
-function buildSystemPrompt() {
+function buildSystemPromptPass2() {
   return `Tu es un correcteur professionnel français expert et secrétaire de rédaction.
 
-MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
-- Orthographe, grammaire, conjugaison, ponctuation
-- Typographie française professionnelle
+MISSION : Corrige ce texte de sous-titres SRT (les tirets ont déjà été corrigés en passe 1).
 
-═══════════════════════════════════════════════════════════════════
-⚠️  RÈGLES ABSOLUES - TOUJOURS APPLIQUER SANS EXCEPTION ⚠️
-═══════════════════════════════════════════════════════════════════
+NE PAS RECORRIGER LES TIRETS - déjà traités.
 
-TIRETS OBLIGATOIRES :
-• Inversions questions : "pensez vous" → "pensez-vous", "qu'en pensez vous ?" → "qu'en pensez-vous ?"
-• Noms composés : "avant première" → "avant-première", "au delà" → "au-delà", "rendez vous" → "rendez-vous"
-• Locutions : "c'est a dire" → "c'est-à-dire", "peut etre" → "peut-être"
-
-RÈGLE GÉNÉRALE : Verbe + (vous/tu/il/elle/on) dans question = TIRET. Nom composé = TIRET.
-
-═══════════════════════════════════════════════════════════════════
-
-RÈGLES DÉTAILLÉES :
+RÈGLES À APPLIQUER :
 - Typographie française professionnelle :
   * Majuscules pour les institutions DÉFINIES :
     - "le gouvernement" → "le Gouvernement" (quand = institution française actuelle)
@@ -327,7 +424,7 @@ ${blocksText}`
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
  */
-async function correctWithClaude(blocks, modelType = 'sonnet') {
+async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le modèle selon le type
   const modelConfig = {
     sonnet: {
@@ -342,7 +439,10 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
 
   const config = modelConfig[modelType] || modelConfig.sonnet
 
-  console.log(`[correctWithClaude] Using model: ${config.name} for ${blocks.length} blocks`)
+  // Choisir le prompt selon la passe
+  const systemPrompt = pass === 1 ? buildSystemPromptPass1() : buildSystemPromptPass2()
+
+  console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -358,7 +458,7 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
       system: [
         {
           type: "text",
-          text: buildSystemPrompt(),
+          text: systemPrompt,
           cache_control: { type: "ephemeral" }
         }
       ],
