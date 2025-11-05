@@ -98,9 +98,10 @@ async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
-  // Si le contenu est trop volumineux, on découpe par chunks
-  // Augmenté de 50 à 70 blocs pour réduire le nombre d'appels API
-  const maxBlocksPerChunk = 70
+  // CHUNK SIZE OPTIMISÉ pour qualité maximale sur règles spécifiques
+  // Réduit de 70 à 40 blocs pour garantir que Claude applique bien les règles de tirets
+  // Chunks plus petits = meilleure concentration sur les règles ULTRA PRIORITAIRES
+  const maxBlocksPerChunk = 40
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
