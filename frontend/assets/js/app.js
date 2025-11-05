@@ -1428,21 +1428,80 @@ function resetToInitialState() {
 }
 
 /**
- * Télécharge le fichier SRT corrigé
+ * Télécharge le fichier SRT avec uniquement les corrections validées
  */
 function downloadSRT() {
-  const content = SRTParser.generate(AppState.blocks)
+  // Créer une copie des blocs avec seulement les corrections validées appliquées
+  const blocksWithValidatedCorrections = AppState.blocks.map(block => {
+    return {
+      ...block,
+      corrected: buildTextWithValidatedCorrections(block)
+    }
+  })
+
+  const content = SRTParser.generate(blocksWithValidatedCorrections)
   const filename = SRTParser.generateFilename(AppState.originalFilename, '_SR')
   SRTParser.downloadFile(content, filename, 'text/plain')
 }
 
 /**
- * Télécharge le fichier TXT
+ * Télécharge le fichier TXT avec uniquement les corrections validées
  */
 function downloadTXT() {
-  const content = SRTParser.generateTXT(AppState.blocks)
+  // Créer une copie des blocs avec seulement les corrections validées appliquées
+  const blocksWithValidatedCorrections = AppState.blocks.map(block => {
+    return {
+      ...block,
+      corrected: buildTextWithValidatedCorrections(block)
+    }
+  })
+
+  const content = SRTParser.generateTXT(blocksWithValidatedCorrections)
   const filename = SRTParser.generateFilename(AppState.originalFilename, '_SR', 'txt')
   SRTParser.downloadFile(content, filename, 'text/plain')
+}
+
+/**
+ * Construit le texte d'un bloc en n'appliquant que les corrections validées
+ * @param {Object} block - Le bloc à traiter
+ * @returns {string} Texte avec seulement les corrections validées
+ */
+function buildTextWithValidatedCorrections(block) {
+  // Si pas de corrections, retourner l'original
+  if (!block.corrections || block.corrections.length === 0) {
+    return block.original
+  }
+
+  // Filtrer pour ne garder que les corrections validées
+  const validatedCorrections = block.corrections.filter((correction, corrIndex) => {
+    const correctionId = `${block.index}-${corrIndex}`
+    return AppState.validatedCorrections.has(correctionId)
+  })
+
+  // Si aucune correction validée, retourner l'original
+  if (validatedCorrections.length === 0) {
+    return block.original
+  }
+
+  // Trier les corrections par position
+  const sortedCorrections = [...validatedCorrections].sort((a, b) => a.position - b.position)
+
+  // Appliquer les corrections au texte original
+  let result = block.original
+  let offset = 0
+
+  sortedCorrections.forEach(correction => {
+    const startPos = correction.position + offset
+    const endPos = startPos + correction.original.length
+
+    // Vérifier que la correction est bien à la bonne position
+    if (result.substring(startPos, endPos) === correction.original) {
+      result = result.substring(0, startPos) + correction.corrected + result.substring(endPos)
+      offset += correction.corrected.length - correction.original.length
+    }
+  })
+
+  return result
 }
 
 /**
