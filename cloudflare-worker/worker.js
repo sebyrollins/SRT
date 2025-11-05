@@ -196,6 +196,39 @@ function buildSystemPrompt() {
 
 MISSION : Corrige ce texte de sous-titres SRT en respectant scrupuleusement :
 - Orthographe, grammaire, conjugaison, ponctuation
+- Typographie française professionnelle
+
+═══════════════════════════════════════════════════════════════════
+⚠️  RÈGLES ULTRA PRIORITAIRES - À APPLIQUER EN PREMIER ⚠️
+═══════════════════════════════════════════════════════════════════
+
+1. INVERSIONS VERBE-SUJET DANS QUESTIONS (OBLIGATOIRE - TOUJOURS CORRIGER) :
+   • "pensez vous" → "pensez-vous"
+   • "qu'en pensez vous" → "qu'en pensez-vous"
+   • "qu'en pensez vous ?" → "qu'en pensez-vous ?"
+   • "Qu'en pensez vous ?" → "Qu'en pensez-vous ?"
+   • "allez vous" → "allez-vous"
+   • "avez vous" → "avez-vous"
+   • "faites vous" → "faites-vous"
+   • "dites vous" → "dites-vous"
+   ➜ RÈGLE : TOUT verbe suivi de "vous", "tu", "il", "elle", "on" dans une question = TIRET OBLIGATOIRE
+
+2. NOMS COMPOSÉS COURANTS (OBLIGATOIRE - TOUJOURS CORRIGER) :
+   • "avant première" → "avant-première"
+   • "rendez vous" → "rendez-vous"
+   • "week end" → "week-end"
+   • "arc en ciel" → "arc-en-ciel"
+   • "au delà" → "au-delà"
+   • "vis a vis" → "vis-à-vis"
+
+3. LOCUTIONS FIGÉES (OBLIGATOIRE - TOUJOURS CORRIGER EN UNE SEULE CORRECTION) :
+   • "c est a dire" → "c'est-à-dire"
+   • "c'est a dire" → "c'est-à-dire"
+   • "peut etre" → "peut-être"
+
+═══════════════════════════════════════════════════════════════════
+
+RÈGLES DÉTAILLÉES :
 - Typographie française professionnelle :
   * Majuscules pour les institutions DÉFINIES :
     - "le gouvernement" → "le Gouvernement" (quand = institution française actuelle)
