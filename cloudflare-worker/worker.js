@@ -406,6 +406,43 @@ ${blocksText}`
 }
 
 /**
+ * Retry avec exponential backoff pour les erreurs API
+ */
+async function fetchWithRetry(url, options, maxRetries = 4) {
+  const delays = [2000, 4000, 8000, 16000] // 2s, 4s, 8s, 16s
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options)
+
+      // Si erreur 529 (overloaded) ou 429 (rate limit), retry
+      if (response.status === 529 || response.status === 429) {
+        if (attempt < maxRetries) {
+          const delay = delays[attempt]
+          const errorType = response.status === 529 ? 'API overloaded' : 'Rate limit'
+          console.log(`[fetchWithRetry] ${errorType} (${response.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+      }
+
+      return response
+    } catch (error) {
+      // Erreur réseau
+      if (attempt < maxRetries) {
+        const delay = delays[attempt]
+        console.log(`[fetchWithRetry] Network error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new Error('Max retries exceeded')
+}
+
+/**
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
@@ -446,7 +483,7 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
 
   console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
