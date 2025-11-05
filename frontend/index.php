@@ -158,14 +158,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                                     <span class="stat-value" id="statTotal">0</span>
                                 </div>
                             </div>
-                            <div class="stat-buttons-column">
-                                <button class="btn-stat btn-stat-secondary btn-stat-narrow" id="validateAllBtn" title="Valider toutes les corrections">
+                            <div class="stat-buttons-row">
+                                <button class="btn-stat btn-stat-secondary btn-icon-only" id="validateAllBtn" title="Valider toutes les corrections">
                                     <span class="btn-icon">✓</span>
-                                    Valider tout
                                 </button>
-                                <button class="btn-stat btn-stat-outline btn-stat-narrow" id="resetStateBtn" title="Réinitialiser l'état initial (après upload)">
+                                <button class="btn-stat btn-stat-outline btn-icon-only" id="resetStateBtn" title="Réinitialiser l'état initial (après upload)">
                                     <span class="btn-icon">↺</span>
-                                    Réinitialiser
                                 </button>
                             </div>
                         </div>
