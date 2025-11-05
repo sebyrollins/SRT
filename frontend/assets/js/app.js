@@ -25,6 +25,7 @@ const DOM = {
   correctedTextPanel: null,
   validationsPanel: null,
   statsBar: null,
+  statBlocks: null,
   statTotal: null,
   statMinor: null,
   statMajor: null,
@@ -74,6 +75,7 @@ function initDOM() {
   DOM.correctedTextPanel = document.getElementById('correctedTextPanel')
   DOM.validationsPanel = document.getElementById('validationsPanel')
   DOM.statsBar = document.getElementById('statsBar')
+  DOM.statBlocks = document.getElementById('statBlocks')
   DOM.statTotal = document.getElementById('statTotal')
   DOM.statMinor = document.getElementById('statMinor')
   DOM.statMajor = document.getElementById('statMajor')
@@ -1498,6 +1500,15 @@ function updateProgress(percent, text) {
  * Met à jour les statistiques et la jauge de progression
  */
 function updateStats(stats) {
+  // Calculer le nombre de blocs avec corrections
+  let blocksWithCorrections = 0
+  AppState.blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      blocksWithCorrections++
+    }
+  })
+
+  if (DOM.statBlocks) DOM.statBlocks.textContent = blocksWithCorrections
   if (DOM.statTotal) DOM.statTotal.textContent = stats.total
   if (DOM.statMinor) DOM.statMinor.textContent = stats.minor
   if (DOM.statMajor) DOM.statMajor.textContent = stats.major
@@ -1510,7 +1521,7 @@ function updateStats(stats) {
 
     switch(filterType) {
       case 'all':
-        count = stats.total
+        count = blocksWithCorrections  // Utiliser le nombre de blocs au lieu du total de fautes
         break
       case 'minor':
         count = stats.minor

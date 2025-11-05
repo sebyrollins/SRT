@@ -149,16 +149,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                     <div class="stats-group">
                         <div class="stat-item">
                             <div class="stat-filter-zone stat-filter" data-filter="all">
-                                <span class="stat-label">Total</span>
-                                <span class="stat-value" id="statTotal">0</span>
+                                <div class="stat-line">
+                                    <span class="stat-label">Bloc(s)</span>
+                                    <span class="stat-value" id="statBlocks">0</span>
+                                </div>
+                                <div class="stat-line">
+                                    <span class="stat-label">Faute(s)</span>
+                                    <span class="stat-value" id="statTotal">0</span>
+                                </div>
                             </div>
-                            <button class="btn-stat btn-stat-secondary" id="validateAllBtn" title="Valider toutes les corrections">
-                                <span class="btn-icon">✓</span>
-                                Valider tout
-                            </button>
-                            <button class="btn-stat btn-stat-outline btn-icon-only" id="resetStateBtn" title="Réinitialiser l'état initial (après upload)">
-                                <span class="btn-icon">↺</span>
-                            </button>
+                            <div class="stat-buttons-column">
+                                <button class="btn-stat btn-stat-secondary btn-stat-narrow" id="validateAllBtn" title="Valider toutes les corrections">
+                                    <span class="btn-icon">✓</span>
+                                    Valider tout
+                                </button>
+                                <button class="btn-stat btn-stat-outline btn-stat-narrow" id="resetStateBtn" title="Réinitialiser l'état initial (après upload)">
+                                    <span class="btn-icon">↺</span>
+                                    Réinitialiser
+                                </button>
+                            </div>
                         </div>
                         <div class="stat-item stat-minor">
                             <div class="stat-filter-zone stat-filter" data-filter="minor">
