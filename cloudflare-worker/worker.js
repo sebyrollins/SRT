@@ -293,6 +293,8 @@ function buildSystemPromptPass1() {
 MISSION : Corrige UNIQUEMENT les tirets et apostrophes manquants.
 EXCEPTION : Pour les locutions figées (c'est-à-dire, peut-être, vis-à-vis), corrige TOUT en une fois (apostrophes + tirets + accents).
 
+⚠️ CRITIQUE : Tu DOIS détecter TOUS les "rendez vous" et les corriger en "rendez-vous" - c'est une faute majeure.
+
 RÈGLES À APPLIQUER :
 
 1. TIRETS - Inversions verbe-sujet dans questions :
@@ -301,12 +303,20 @@ RÈGLES À APPLIQUER :
    • "avez vous" → "avez-vous"
    • Règle : verbe + (vous/tu/il/elle/on) dans question = TIRET
 
-2. TIRETS - Noms composés :
+2. TIRETS - Noms composés (OBLIGATOIRE) :
+   • "rendez vous" → "rendez-vous" (SYSTÉMATIQUE, dans TOUS les contextes)
    • "avant première" → "avant-première"
-   • "rendez vous" → "rendez-vous" (TOUJOURS avec tiret)
    • "week end" → "week-end"
    • "arc en ciel" → "arc-en-ciel"
-   Important : "rendez vous" DOIT avoir un tiret même dans "d'organiser un rendez vous"
+
+   EXEMPLES OBLIGATOIRES à corriger :
+   • "un rendez vous" → "un rendez-vous"
+   • "des rendez vous" → "des rendez-vous"
+   • "au rendez vous" → "au rendez-vous"
+   • "d'organiser un rendez vous" → "d'organiser un rendez-vous"
+   • "prendre rendez vous" → "prendre rendez-vous"
+
+   IMPORTANT : Le mot "rendez vous" s'écrit TOUJOURS "rendez-vous" avec un tiret, sans exception.
 
 3. TIRETS - Locutions figées :
    • "c'est a dire" → "c'est-à-dire" (DEUX tirets : c'est-à-dire)
@@ -330,15 +340,15 @@ Retourne UNIQUEMENT un JSON valide (pas de markdown) :
   "blocks": [
     {
       "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
+      "original": "Il a pris rendez vous hier.",
+      "corrected": "Il a pris rendez-vous hier.",
       "corrections": [
         {
           "type": "major",
-          "original": "pensez vous",
-          "corrected": "pensez-vous",
-          "reason": "Tiret inversion question",
-          "position": 15
+          "original": "rendez vous",
+          "corrected": "rendez-vous",
+          "reason": "Tiret nom composé",
+          "position": 12
         }
       ]
     }
@@ -350,6 +360,7 @@ RÈGLES STRICTES :
 2. "original" = texte exact du fichier (tel quel)
 3. Si aucune correction : corrections = []
 4. N'applique QUE les règles ci-dessus
+5. SCANNE TOUT LE TEXTE : Vérifie chaque occurrence de "rendez vous", "c'est a dire", "peut etre", etc.
 
 Retourne uniquement le JSON, rien d'autre.`
 }
