@@ -257,7 +257,20 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
     - "au dela" → "au-delà"
     - "vis a vis" → "vis-à-vis"
     - "peut etre" → "peut-être"
-  * Tirets manquants : inversions verbe-sujet (questions), noms composés courants
+  * Tirets manquants pour inversions verbe-sujet dans questions :
+    - "pensez vous" → "pensez-vous"
+    - "allez vous" → "allez-vous"
+    - "avez vous" → "avez-vous"
+    - "pouvez vous" → "pouvez-vous"
+    - "savez vous" → "savez-vous"
+    - "qu'en pensez vous" → "qu'en pensez-vous"
+    - "comment allez vous" → "comment allez-vous"
+  * Tirets manquants pour noms composés courants :
+    - "avant première" → "avant-première"
+    - "week end" → "week-end"
+    - "rendez vous" → "rendez-vous"
+    - "arc en ciel" → "arc-en-ciel"
+    - "chef d'oeuvre" → "chef-d'œuvre"
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "l eau" → "l'eau", "d accord" → "d'accord")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
