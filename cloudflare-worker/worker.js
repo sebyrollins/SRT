@@ -288,276 +288,110 @@ function parseSRTBlocks(srtContent) {
  * PASSE 1 : Ponctuation structurelle (tirets + apostrophes)
  */
 function buildSystemPromptPass1() {
-  return `Tu es un correcteur professionnel français spécialisé dans la ponctuation structurelle.
+  return `Corrige les tirets et apostrophes manquants en français.
 
-MISSION : Corrige UNIQUEMENT les tirets et apostrophes manquants.
-EXCEPTION : Pour les locutions figées (c'est-à-dire, peut-être, vis-à-vis), corrige TOUT en une fois (apostrophes + tirets + accents).
+CORRECTIONS À FAIRE automatiquement :
+• rendez vous → rendez-vous (dans TOUS les contextes)
+• c'est a dire / C est a dire → c'est-à-dire / C'est-à-dire
+• peut etre → peut-être
+• vis a vis → vis-à-vis
+• pensez vous / avez vous / allez vous → pensez-vous / avez-vous / allez-vous
+• c est / c etait → c'est / c'était
+• l eau / l air / l autre → l'eau / l'air / l'autre
+• d accord / d abord → d'accord / d'abord
+• qu il / qu elle → qu'il / qu'elle
+• s il / s ils → s'il / s'ils
 
-⚠️ CRITIQUE : Tu DOIS détecter TOUS les "rendez vous" et les corriger en "rendez-vous" - c'est une faute majeure.
+NE PAS corriger "à dire vrai" (sans tiret) ni "pour ainsi dire" (sans tiret).
 
-RÈGLES À APPLIQUER :
-
-1. TIRETS - Inversions verbe-sujet dans questions :
-   • "pensez vous" → "pensez-vous"
-   • "allez vous" → "allez-vous"
-   • "avez vous" → "avez-vous"
-   • Règle : verbe + (vous/tu/il/elle/on) dans question = TIRET
-
-2. TIRETS - Noms composés (OBLIGATOIRE) :
-   • "rendez vous" → "rendez-vous" (SYSTÉMATIQUE, dans TOUS les contextes)
-   • "avant première" → "avant-première"
-   • "week end" → "week-end"
-   • "arc en ciel" → "arc-en-ciel"
-
-   EXEMPLES OBLIGATOIRES à corriger :
-   • "un rendez vous" → "un rendez-vous"
-   • "des rendez vous" → "des rendez-vous"
-   • "au rendez vous" → "au rendez-vous"
-   • "d'organiser un rendez vous" → "d'organiser un rendez-vous"
-   • "prendre rendez vous" → "prendre rendez-vous"
-
-   IMPORTANT : Le mot "rendez vous" s'écrit TOUJOURS "rendez-vous" avec un tiret, sans exception.
-
-3. TIRETS - Locutions figées :
-   • "c'est a dire" → "c'est-à-dire" (DEUX tirets : c'est-à-dire)
-   • "C est a dire" → "C'est-à-dire" (DEUX tirets : C'est-à-dire)
-   ATTENTION : Tiret UNIQUEMENT pour "c'est-à-dire", PAS pour d'autres expressions :
-   • "à dire vrai" → CORRECT (sans tiret)
-   • "pour ainsi dire" → CORRECT (sans tiret)
-   • "peut etre" → "peut-être"
-   • "vis a vis" → "vis-à-vis"
-
-4. APOSTROPHES - Élisions manquantes :
-   • "l eau" → "l'eau"
-   • "d accord" → "d'accord"
-   • "qu il" → "qu'il"
-   • "s il" → "s'il"
-
-Type de correction : "major"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
+Format JSON uniquement :
 {
-  "blocks": [
-    {
-      "index": 1,
-      "original": "Il a pris rendez vous hier.",
-      "corrected": "Il a pris rendez-vous hier.",
-      "corrections": [
-        {
-          "type": "major",
-          "original": "rendez vous",
-          "corrected": "rendez-vous",
-          "reason": "Tiret nom composé",
-          "position": 12
-        }
-      ]
-    }
-  ]
+  "blocks": [{
+    "index": 1,
+    "original": "texte exact du fichier",
+    "corrected": "texte corrigé",
+    "corrections": [{
+      "type": "major",
+      "original": "rendez vous",
+      "corrected": "rendez-vous",
+      "reason": "Tiret manquant",
+      "position": 12
+    }]
+  }]
 }
 
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0) dans le texte original
-2. "original" = texte exact du fichier (tel quel)
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-5. SCANNE TOUT LE TEXTE : Vérifie chaque occurrence de "rendez vous", "c'est a dire", "peut etre", etc.
-
-Retourne uniquement le JSON, rien d'autre.`
+Position = index exact dans le texte (compte de 0).
+Si aucune correction : corrections = []`
 }
 
 /**
  * PASSE 2 : Typographie française (guillemets, espaces, points de suspension)
  */
 function buildSystemPromptPass2() {
-  return `Tu es un correcteur professionnel français spécialisé en typographie.
+  return `Corrige la typographie française uniquement.
 
-MISSION : Corrige UNIQUEMENT la typographie française. Les tirets/apostrophes sont déjà corrigés.
+CORRECTIONS :
+• "texte" → « texte » (guillemets français)
+• 'texte' → « texte »
+• ... → … (ellipse)
+• Bonjour? → Bonjour ? (espace avant ?, !, ;)
+• 10000 → 10 000 (espace milliers, sauf années : 2024 reste 2024)
 
-RÈGLES À APPLIQUER :
+Type : "minor" pour toutes les corrections.
 
-1. GUILLEMETS : Remplacer guillemets droits par guillemets français
-   • "bonjour" → « bonjour »
-   • 'bonjour' → « bonjour »
-   Type : "minor"
+Format JSON uniquement :
+{"blocks": [{"index": 1, "original": "texte exact", "corrected": "texte corrigé", "corrections": [{"type": "minor", "original": "\"texte\"", "corrected": "« texte »", "reason": "Typographie", "position": 0}]}]}
 
-2. POINTS DE SUSPENSION : Remplacer trois points par caractère unique
-   • "et..." → "et…"
-   • "mais..." → "mais…"
-   Type : "minor"
-
-3. ESPACES INSÉCABLES : Avant : ; ! ?
-   • "Bonjour?" → "Bonjour ?"
-   • "Vraiment!" → "Vraiment !"
-   • SAUF si espace déjà présent ("Bonjour ?" est correct)
-   Type : "minor"
-
-4. ESPACES MILLIERS : Séparateur pour grands nombres
-   • "10000" → "10 000"
-   • "1000e" → "1 000e"
-   • EXCEPTION : années (2024, 1789 restent sans espace)
-   Type : "minor"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "minor",
-          "original": "\"bonjour\"",
-          "corrected": "« bonjour »",
-          "reason": "Guillemets français",
-          "position": 0
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0)
-2. "original" = texte exact du fichier
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-
-Retourne uniquement le JSON, rien d'autre.`
+Position = index exact (compte de 0). Si aucune correction : corrections = []`
 }
 
 /**
  * PASSE 3 : Orthographe lexicale (mots + conjugaison)
  */
 function buildSystemPromptPass3() {
-  return `Tu es un correcteur professionnel français spécialisé en orthographe.
+  return `Corrige l'orthographe et la conjugaison française.
 
-MISSION : Corrige UNIQUEMENT les fautes d'orthographe et de conjugaison de base.
+CORRECTIONS :
+• Fautes de mots (language → langage, developper → développer)
+• Conjugaison (Ils va → Ils vont, Je sait → Je sais)
+• Homophones (à/a, et/est, son/sont, sur/sûr)
 
-RÈGLES À APPLIQUER :
+Type : "major"
 
-1. FAUTES DE MOTS :
-   • "language" → "langage"
-   • "developper" → "développer"
-   • "apartement" → "appartement"
-   Type : "major"
+Format JSON uniquement :
+{"blocks": [{"index": 1, "original": "texte exact", "corrected": "texte corrigé", "corrections": [{"type": "major", "original": "language", "corrected": "langage", "reason": "Orthographe", "position": 5}]}]}
 
-2. CONJUGAISON INCORRECTE :
-   • "Il à pris" → "Il a pris" (auxiliaire avoir)
-   • "Ils va" → "Ils vont"
-   • "Je sait" → "Je sais"
-   Type : "major"
-
-3. HOMOPHONES GRAMMATICAUX :
-   • "à" vs "a" (auxiliaire)
-   • "et" vs "est" (verbe être)
-   • "son" vs "sont"
-   Type : "major"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "major",
-          "original": "language",
-          "corrected": "langage",
-          "reason": "Orthographe",
-          "position": 5
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0)
-2. "original" = texte exact du fichier
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-
-Retourne uniquement le JSON, rien d'autre.`
+Position = index exact (compte de 0). Si aucune correction : corrections = []`
 }
 
 /**
  * PASSE 4 : Grammaire contextuelle (accords + majuscules)
  */
 function buildSystemPromptPass4() {
-  return `Tu es un correcteur professionnel français spécialisé en grammaire.
+  return `Corrige les accords et majuscules en français.
 
-MISSION : Corrige UNIQUEMENT les accords et majuscules. Tout le reste est déjà corrigé.
+CORRECTIONS :
+• Accords sujet-verbe (ils fait → ils font)
+• Accords adjectifs (ils sont beau → ils sont beaux)
+• Accords participes passés si contexte clair
 
-RÈGLES À APPLIQUER :
+AMBIGUÏTÉ DE GENRE (type "doubt") :
+• "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
+• "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
+• Participes : allé(e), resté(e), devenu(e), parti(e), arrivé(e), venu(e), rentré(e), sorti(e), tombé(e), né(e)
+• Verbes : être, paraître, sembler, devenir, rester
 
-1. ACCORDS SUJET-VERBE :
-   • "ils fait" → "ils font"
-   • "nous va" → "nous allons"
-   Type : "major"
+MAJUSCULES :
+• Début de phrase après . ! ?
+• Institutions : le Gouvernement, l'Assemblée nationale, le Sénat
+• PAS après virgule ou retour ligne simple
 
-2. ACCORDS ADJECTIFS :
-   • "ils sont beau" → "ils sont beaux"
-   • "elle est grand" → "elle est grande"
-   Type : "major"
+Type : "major" (sauf "doubt" pour ambiguïté de genre)
 
-3. ACCORDS PARTICIPES PASSÉS (si contexte clair) :
-   • "ils ont fait" → correct
-   • "elle est partie" → correct
+Format JSON uniquement :
+{"blocks": [{"index": 1, "original": "texte exact", "corrected": "texte corrigé", "corrections": [{"type": "major", "original": "ils sont beau", "corrected": "ils sont beaux", "reason": "Accord", "position": 10}]}]}
 
-   AMBIGUÏTÉ DE GENRE (1ère personne + "être") :
-   • "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
-   • "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
-   • Participes concernés : allé(e), resté(e), devenu(e), parti(e), arrivé(e), venu(e), rentré(e), sorti(e), tombé(e), né(e)
-   • Aussi avec : paraître, sembler, devenir, rester ("je suis devenu/devenue", "je suis resté/restée")
-   Type : "doubt" (car genre du locuteur inconnu)
-
-   Autres accords : Type "major"
-
-4. MAJUSCULES INSTITUTIONS :
-   • "le gouvernement" → "le Gouvernement" (institution française)
-   • "l'assemblée nationale" → "l'Assemblée nationale"
-   • "le sénat" → "le Sénat"
-   Règle MINISTÈRES : "ministère" en minuscule, premier mot des secteurs en majuscule
-   • "le ministère de la Transition écologique"
-   Type : "major"
-
-5. MAJUSCULES PHRASES :
-   • Début après . ! ? → majuscule
-   • JAMAIS après virgule ou retour ligne simple
-   • ", Mesdames" → ", mesdames" (corriger majuscule excessive)
-   Type : "major"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "major",
-          "original": "ils sont beau",
-          "corrected": "ils sont beaux",
-          "reason": "Accord adjectif pluriel",
-          "position": 10
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0)
-2. "original" = texte exact du fichier
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-5. "doubt" seulement pour ambiguïté de genre (1ère pers. + "être" + participe passé)
-
-Retourne uniquement le JSON, rien d'autre.`
+Position = index exact (compte de 0). Si aucune correction : corrections = []`
 }
 
 /**
