@@ -283,35 +283,6 @@ CATÉGORISATION PROFESSIONNELLE (très important) :
   * IMPORTANT: Ces corrections sont VISUELLEMENT invisibles mais techniquement différentes
 
 - "major" : corrections professionnelles visibles et certaines
-  * PRIORITÉ ABSOLUE - Tirets manquants pour inversions verbe-sujet dans questions (TOUJOURS corriger) :
-    - "pensez vous" → "pensez-vous" (inversion question - OBLIGATOIRE)
-    - "pensez vous ?" → "pensez-vous ?" (avec ponctuation - OBLIGATOIRE)
-    - "allez vous" → "allez-vous" (inversion question - OBLIGATOIRE)
-    - "allez vous ?" → "allez-vous ?" (avec ponctuation - OBLIGATOIRE)
-    - "avez vous" → "avez-vous" (inversion question - OBLIGATOIRE)
-    - "pouvez vous" → "pouvez-vous" (inversion question - OBLIGATOIRE)
-    - "savez vous" → "savez-vous" (inversion question - OBLIGATOIRE)
-    - "qu'en pensez vous" → "qu'en pensez-vous" (inversion question - OBLIGATOIRE)
-    - "qu'en pensez vous ?" → "qu'en pensez-vous ?" (avec ponctuation - OBLIGATOIRE)
-    - "Qu'en pensez vous ?" → "Qu'en pensez-vous ?" (avec majuscule et ponctuation - OBLIGATOIRE)
-    - "comment allez vous" → "comment allez-vous" (inversion question - OBLIGATOIRE)
-    - "que faites vous" → "que faites-vous" (inversion question - OBLIGATOIRE)
-    - "pourquoi dites vous" → "pourquoi dites-vous" (inversion question - OBLIGATOIRE)
-    - RÈGLE ABSOLUE : Toute inversion verbe-sujet dans une question DOIT TOUJOURS avoir un tiret entre verbe et pronom
-    - Le tiret est OBLIGATOIRE même si suivi de ? ou ! ou autre ponctuation
-  * PRIORITÉ ABSOLUE - Tirets manquants pour noms composés courants (TOUJOURS corriger) :
-    - "avant première" → "avant-première"
-    - "week end" → "week-end"
-    - "rendez vous" → "rendez-vous"
-    - "arc en ciel" → "arc-en-ciel"
-    - "chef d'oeuvre" → "chef-d'œuvre"
-  * Locutions figées complètes (TOUTE la locution en UNE SEULE correction) :
-    - "c est a dire" → "c'est-à-dire" (apostrophe + 2 tirets, PAS d'espace avant les tirets)
-    - "c'est a dire" → "c'est-à-dire" (2 tirets, PAS d'espace avant les tirets)
-    - "C est a dire" → "C'est-à-dire" (apostrophe + 2 tirets, PAS d'espace avant les tirets)
-    - "au dela" → "au-delà"
-    - "vis a vis" → "vis-à-vis"
-    - "peut etre" → "peut-être"
   * Apostrophes MANQUANTES pour élision : AJOUTER une apostrophe (ex: "l eau" → "l'eau", "d accord" → "d'accord")
   * Fautes d'orthographe (language → langage)
   * Accord sujet-verbe (ils à fait → ils ont fait)
