@@ -98,8 +98,9 @@ async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
-  // CHUNK SIZE OPTIMISÉ
-  const maxBlocksPerChunk = 25
+  // CHUNK SIZE : Augmenté pour donner plus de contexte à Claude
+  // Plus de contexte = meilleures corrections (comme quand l'utilisateur envoie tout d'un coup)
+  const maxBlocksPerChunk = 200 // Augmenté de 25 à 200
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
@@ -187,51 +188,37 @@ function parseSRTBlocks(srtContent) {
 }
 
 /**
- * System prompt unique : Correction française complète
+ * System prompt ultra-simple (comme l'utilisateur fait directement)
  */
 function buildSystemPrompt() {
-  return `Corrige toutes les fautes de français.
+  return `Corrige toutes les fautes de français dans ce fichier SRT.
 
-CORRECTIONS À FAIRE :
-• Tirets : rendez vous → rendez-vous, c'est a dire → c'est-à-dire, peut etre → peut-être
-• Apostrophes : c est → c'est, l eau → l'eau, d accord → d'accord, qu il → qu'il
-• Guillemets : "texte" → « texte »
-• Espaces : Bonjour? → Bonjour ? (avant ?, !, ;)
-• Nombres : 10000 → 10 000 (sauf années)
-• Orthographe : language → langage, developper → développer
-• Conjugaison : Ils va → Ils vont
-• Accords : ils sont beau → ils sont beaux, ils fait → ils font
-• Majuscules : début de phrase après . ! ?
-
-EXCEPTIONS :
-• "à dire vrai" reste sans tiret
-• "pour ainsi dire" reste sans tiret
+Règles simples :
+- rendez vous → rendez-vous
+- c'est a dire → c'est-à-dire
+- peut etre → peut-être
+- c est → c'est
+- "texte" → « texte »
+- Bonjour? → Bonjour ?
 
 AMBIGUÏTÉ DE GENRE (type "doubt") :
-Si "je suis venu" : suggérer "venue" (reason: "Si femme qui parle : venue")
-Si "je suis venue" : suggérer "venu" (reason: "Si homme qui parle : venu")
-Participes concernés : allé(e), resté(e), devenu(e), parti(e), arrivé(e), venu(e), rentré(e), sorti(e), tombé(e), né(e)
+- "je suis venu" peut être "je suis venue" (si femme qui parle)
 
-TYPES :
-• "major" : tirets, apostrophes, orthographe, conjugaison, accords
-• "minor" : guillemets, espaces, nombres
-• "doubt" : ambiguïté de genre uniquement
-
-Format JSON :
+Retourne le JSON suivant :
 {"blocks": [{"index": 1, "original": "texte exact", "corrected": "texte corrigé", "corrections": [{"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant", "position": 12}]}]}
 
-Position = index exact (compte de 0). Si aucune correction : corrections = []`
+Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)`
 }
 
 /**
- * Construit le user prompt (partie variable)
- * Contient uniquement les blocs SRT à corriger
+ * Construit le user prompt au format SRT natif (comme l'utilisateur fait)
  */
 function buildUserPrompt(blocks) {
-  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
-  return `TEXTE À CORRIGER :
+  // Garder le format SRT original avec timecodes
+  const srtText = blocks.map(b => `${b.index}\n${b.timecode}\n${b.text}`).join('\n\n')
+  return `Corrige ce fichier SRT :
 
-${blocksText}`
+${srtText}`
 }
 
 /**
