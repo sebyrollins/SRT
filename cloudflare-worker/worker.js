@@ -226,8 +226,31 @@ Exemples de corrections :
 AMBIGUÏTÉ DE GENRE (type "doubt") :
 - "je suis venu" peut être "je suis venue" (si femme qui parle)
 
-Retourne un JSON simple :
-{"blocks": [{"index": 1, "original": "texte exact du bloc", "corrected": "texte corrigé du bloc", "corrections": [{"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}]}]}
+Format de réponse JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte EXACT du bloc (non modifié)",
+      "corrected": "texte du bloc avec TOUTES les corrections APPLIQUÉES",
+      "corrections": [
+        {"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}
+      ]
+    }
+  ]
+}
+
+IMPORTANT:
+- "original" = texte tel quel, sans rien changer
+- "corrected" = texte avec TOUTES les fautes corrigées (appliquer toutes les corrections)
+- "corrections" = liste des corrections individuelles
+
+Exemple concret:
+Si le texte est "Je suis allé au rendez vous hier"
+Alors:
+- "original": "Je suis allé au rendez vous hier"
+- "corrected": "Je suis allé au rendez-vous hier"  (avec le tiret appliqué!)
+- "corrections": [{"original": "rendez vous", "corrected": "rendez-vous", ...}]
 
 Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)
 Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
