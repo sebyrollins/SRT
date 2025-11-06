@@ -210,6 +210,18 @@ function parseSRTBlocks(srtContent) {
 }
 
 /**
+ * Nettoie les annotations entre parenthèses du texte
+ * Exemple : "je salue (accord neutre)" → "je salue"
+ */
+function cleanAnnotations(text) {
+  if (!text) return text
+
+  // Supprimer les annotations entre parenthèses à la fin du texte
+  // Pattern: texte suivi optionnellement d'un espace puis (annotation)
+  return text.replace(/\s*\([^)]*\)\s*$/g, '').trim()
+}
+
+/**
  * Applique les corrections au texte original
  * Si Claude n'a pas appliqué les corrections dans le champ "corrected", on le fait nous-mêmes
  */
@@ -442,6 +454,12 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
         // Juste s'assurer que les champs essentiels existent
         validatedCorrections = correctedBlock.corrections.filter(correction => {
           return correction.original && correction.corrected && correction.reason && correction.type
+        }).map(correction => {
+          // Nettoyer les annotations dans les corrections individuelles
+          return {
+            ...correction,
+            corrected: cleanAnnotations(correction.corrected)
+          }
         })
       }
 
@@ -450,7 +468,7 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
 
       // Appliquer les corrections nous-mêmes si Claude ne l'a pas fait
       // On compare correctedBlock.corrected avec originalText
-      let correctedText = correctedBlock.corrected || originalText
+      let correctedText = cleanAnnotations(correctedBlock.corrected || originalText)
 
       // Si le texte corrigé est identique à l'original mais qu'il y a des corrections,
       // alors Claude n'a pas appliqué les corrections → on les applique nous-mêmes
