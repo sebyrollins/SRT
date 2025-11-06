@@ -259,6 +259,10 @@ async function processUploadedFile(content, filename) {
       if (!block.hasOwnProperty('originalCorrected')) {
         block.originalCorrected = block.corrected
       }
+      // Sauvegarder si le bloc avait des corrections à l'origine (avant toute modification manuelle)
+      if (!block.hasOwnProperty('hadOriginalCorrections')) {
+        block.hadOriginalCorrections = block.corrections && block.corrections.length > 0
+      }
     })
 
     // Progression ralentie et fluide de 80% à 100% (moitié de la vitesse)
@@ -1275,6 +1279,30 @@ function resetBlockToInitialState(blockIndex) {
     return
   }
 
+  // CAS SPÉCIAL : Si le bloc n'avait pas de corrections à l'origine,
+  // supprimer toutes les corrections créées manuellement
+  if (block.hadOriginalCorrections === false) {
+    // Supprimer toutes les validations
+    block.corrections.forEach((_, corrIndex) => {
+      const correctionId = `${blockIndex}-${corrIndex}`
+      AppState.validatedCorrections.delete(correctionId)
+    })
+
+    // Supprimer toutes les corrections et restaurer le texte original
+    block.corrections = []
+    block.corrected = block.original
+
+    // Mettre à jour les stats et la jauge
+    const stats = SRTParser.calculateStats(AppState.blocks)
+    updateStats(stats)
+
+    // Re-render pour mettre à jour l'affichage
+    renderBlocksTable()
+    updateMinimap()
+    return
+  }
+
+  // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
   // Supprimer toutes les validations pour ce bloc
   block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
@@ -1340,6 +1368,15 @@ function resetToInitialState() {
   // Restaurer les types originaux et supprimer les modifications
   AppState.blocks.forEach(block => {
     if (block.corrections && block.corrections.length > 0) {
+      // CAS SPÉCIAL : Si le bloc n'avait pas de corrections à l'origine,
+      // supprimer toutes les corrections créées manuellement
+      if (block.hadOriginalCorrections === false) {
+        block.corrections = []
+        block.corrected = block.original
+        return // Passer au bloc suivant
+      }
+
+      // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
       block.corrections.forEach((correction, corrIndex) => {
         // Restaurer la suggestion originale si elle a été modifiée ou rejetée
         if (correction.hasOwnProperty('originalSuggestion')) {
