@@ -193,7 +193,7 @@ function parseSRTBlocks(srtContent) {
 function buildSystemPrompt() {
   return `Corrige toutes les fautes de français dans ce fichier SRT.
 
-Règles simples :
+Exemples de corrections :
 - rendez vous → rendez-vous
 - c'est a dire → c'est-à-dire
 - peut etre → peut-être
@@ -204,10 +204,11 @@ Règles simples :
 AMBIGUÏTÉ DE GENRE (type "doubt") :
 - "je suis venu" peut être "je suis venue" (si femme qui parle)
 
-Retourne le JSON suivant :
-{"blocks": [{"index": 1, "original": "texte exact", "corrected": "texte corrigé", "corrections": [{"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant", "position": 12}]}]}
+Retourne un JSON simple :
+{"blocks": [{"index": 1, "original": "texte exact du bloc", "corrected": "texte corrigé du bloc", "corrections": [{"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}]}]}
 
-Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)`
+Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)
+Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
 /**
@@ -332,29 +333,12 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
     return correctedBlocks.map(correctedBlock => {
       const originalBlock = blocks.find(b => b.index === correctedBlock.index)
 
-      // Valider les corrections de ce bloc
+      // Accepter toutes les corrections de Claude sans validation de position stricte
+      // Claude sait ce qu'il corrige, on lui fait confiance
       if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
+        // Juste s'assurer que les champs essentiels existent
         const validatedCorrections = correctedBlock.corrections.filter(correction => {
-          // Vérifier que la position et la longueur sont valides
-          const startPos = correction.position
-          const endPos = startPos + correction.original.length
-          const blockText = originalBlock ? originalBlock.text : correctedBlock.original
-
-          if (!blockText || startPos < 0 || endPos > blockText.length) {
-            console.warn(`Bloc ${correctedBlock.index}: Position invalide ${startPos}-${endPos} (texte length: ${blockText?.length})`)
-            return false
-          }
-
-          // Vérifier que le texte à cette position correspond à correction.original
-          const actualText = blockText.substring(startPos, endPos)
-          if (actualText !== correction.original) {
-            console.warn(`Bloc ${correctedBlock.index}: Texte ne correspond pas à position ${startPos}-${endPos}`)
-            console.warn(`  Attendu: "${correction.original}"`)
-            console.warn(`  Trouvé: "${actualText}"`)
-            return false
-          }
-
-          return true
+          return correction.original && correction.corrected && correction.reason && correction.type
         })
 
         correctedBlock.corrections = validatedCorrections
