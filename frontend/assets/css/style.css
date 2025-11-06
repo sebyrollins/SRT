@@ -1346,6 +1346,30 @@ body {
   opacity: 1;
 }
 
+/* Bouton Valider tout dans le header - style de validation (vert) */
+.btn-header-validate-all {
+  padding: 0.35rem 0.65rem;
+  background: var(--color-success);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
+}
+
+.btn-header-validate-all:hover {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(16, 185, 129, 0.4);
+}
+
 /* Sections Original et Corrigé */
 .block-section {
   padding: 0.375rem;

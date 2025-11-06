@@ -574,7 +574,7 @@ function renderBlocksTable() {
 
     // Bouton "Valider tout" : afficher si 2+ corrections non validées
     if (unvalidatedCorrectionsCount >= 2) {
-      buttonsHtml.push(`<button class="btn-header-validate-all" data-block-index="${block.index}" title="Valider toutes les corrections de ce bloc">✓ Tout</button>`)
+      buttonsHtml.push(`<button class="btn-header-validate-all" data-block-index="${block.index}" title="Valider toutes les corrections de ce bloc"><span>✓</span><span>tout</span></button>`)
     }
 
     if (shouldShowEditButton) {
