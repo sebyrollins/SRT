@@ -615,37 +615,9 @@ function renderBlocksTable() {
     const correctedEl = document.createElement('div')
     correctedEl.className = `block-section block-corrected ${shouldBeBold ? 'block-validated' : 'block-unvalidated'}`
 
-    // Appliquer toutes les corrections au texte original pour obtenir le vrai texte corrigé
-    let finalCorrectedText = block.original
-    if (block.corrections && block.corrections.length > 0) {
-      // Trier les corrections par position décroissante pour ne pas décaler les positions
-      const sortedCorrections = [...block.corrections].sort((a, b) => b.position - a.position)
-      sortedCorrections.forEach(correction => {
-        const startPos = correction.position
-        const endPos = startPos + correction.original.length
-
-        // Validation stricte : vérifier que la portion de texte correspond vraiment à correction.original
-        if (startPos >= 0 && endPos <= finalCorrectedText.length) {
-          const actualTextAtPosition = finalCorrectedText.substring(startPos, endPos)
-
-          // Si le texte ne correspond pas, log l'erreur et skip cette correction
-          if (actualTextAtPosition !== correction.original) {
-            console.error(`Bloc #${block.index}: Position de correction invalide!`)
-            console.error(`  Position: ${startPos}-${endPos}`)
-            console.error(`  Attendu: "${correction.original}"`)
-            console.error(`  Trouvé: "${actualTextAtPosition}"`)
-            console.error(`  Texte complet: "${finalCorrectedText}"`)
-            // NE PAS appliquer cette correction invalide
-            return
-          }
-
-          // Appliquer la correction
-          finalCorrectedText = finalCorrectedText.substring(0, startPos) +
-                              correction.corrected +
-                              finalCorrectedText.substring(endPos)
-        }
-      })
-    }
+    // Utiliser block.corrected directement du worker (qui a déjà appliqué les corrections)
+    // Plus besoin de réappliquer les corrections avec les positions ici
+    const finalCorrectedText = block.corrected || block.original
 
     correctedEl.innerHTML = `
       <div class="block-label">CORRIGÉ :</div>
