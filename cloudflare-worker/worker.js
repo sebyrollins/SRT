@@ -210,6 +210,29 @@ function parseSRTBlocks(srtContent) {
 }
 
 /**
+ * Applique les corrections au texte original
+ * Si Claude n'a pas appliqué les corrections dans le champ "corrected", on le fait nous-mêmes
+ */
+function applyCorrections(originalText, corrections) {
+  if (!corrections || corrections.length === 0) {
+    return originalText
+  }
+
+  let correctedText = originalText
+
+  // Appliquer chaque correction
+  // On fait des replaceAll pour gérer toutes les occurrences
+  for (const correction of corrections) {
+    if (correction.original && correction.corrected) {
+      // Remplacer toutes les occurrences de l'erreur
+      correctedText = correctedText.split(correction.original).join(correction.corrected)
+    }
+  }
+
+  return correctedText
+}
+
+/**
  * System prompt ultra-simple (comme l'utilisateur fait directement)
  */
 function buildSystemPrompt() {
@@ -380,20 +403,34 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
 
       // Accepter toutes les corrections de Claude sans validation de position stricte
       // Claude sait ce qu'il corrige, on lui fait confiance
+      let validatedCorrections = []
       if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
         // Juste s'assurer que les champs essentiels existent
-        const validatedCorrections = correctedBlock.corrections.filter(correction => {
+        validatedCorrections = correctedBlock.corrections.filter(correction => {
           return correction.original && correction.corrected && correction.reason && correction.type
         })
+      }
 
-        correctedBlock.corrections = validatedCorrections
+      // Récupérer le texte original
+      const originalText = correctedBlock.original || (originalBlock ? originalBlock.text : '')
+
+      // Appliquer les corrections nous-mêmes si Claude ne l'a pas fait
+      // On compare correctedBlock.corrected avec originalText
+      let correctedText = correctedBlock.corrected || originalText
+
+      // Si le texte corrigé est identique à l'original mais qu'il y a des corrections,
+      // alors Claude n'a pas appliqué les corrections → on les applique nous-mêmes
+      if (correctedText === originalText && validatedCorrections.length > 0) {
+        correctedText = applyCorrections(originalText, validatedCorrections)
+        console.log(`[correctWithClaude] Bloc ${correctedBlock.index}: Applied ${validatedCorrections.length} corrections manually`)
       }
 
       return {
         ...correctedBlock,
         timecode: originalBlock ? originalBlock.timecode : 'undefined',
-        // S'assurer que "original" existe (parfois Claude oublie de le mettre)
-        original: correctedBlock.original || (originalBlock ? originalBlock.text : ''),
+        original: originalText,
+        corrected: correctedText,
+        corrections: validatedCorrections
       }
     })
   } catch (e) {
