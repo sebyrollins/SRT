@@ -551,8 +551,7 @@ function renderBlocksTable() {
       <span class="block-timecode">${block.timecode}</span>
     `
 
-    // Cellule droite : bouton Modifier et Réinitialiser
-    // Afficher si : toutes corrections validées OU aucune correction
+    // Cellule droite : boutons d'action
     const headerCellRight = document.createElement('td')
     headerCellRight.className = 'block-header block-header-right'
 
@@ -560,15 +559,32 @@ function renderBlocksTable() {
     const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
     const hasCorrections = block.corrections && block.corrections.length > 0
 
+    // Vérifier si le bloc a reçu des modifications (corrections modifiées/rejetées)
+    const hasModifications = hasCorrections && block.corrections.some(correction =>
+      correction.hasOwnProperty('originalSuggestion') ||
+      correction.hasOwnProperty('originalType') ||
+      correction.hasOwnProperty('originalReason')
+    )
+
+    // Compter les corrections non validées
+    const unvalidatedCorrectionsCount = hasCorrections
+      ? block.corrections.filter((c, idx) => !AppState.validatedCorrections.has(`${block.index}-${idx}`)).length
+      : 0
+
     // Container pour les boutons
     const buttonsHtml = []
+
+    // Bouton "Valider tout" : afficher si 2+ corrections non validées
+    if (unvalidatedCorrectionsCount >= 2) {
+      buttonsHtml.push(`<button class="btn-header-validate-all" data-block-index="${block.index}" title="Valider toutes les corrections de ce bloc">✓ Tout</button>`)
+    }
 
     if (shouldShowEditButton) {
       buttonsHtml.push(`<button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>`)
     }
 
-    // Bouton réinitialiser : afficher seulement s'il y a des corrections
-    if (hasCorrections) {
+    // Bouton réinitialiser : afficher seulement si le bloc a reçu des modifications
+    if (hasModifications) {
       buttonsHtml.push(`<button class="btn-header-reset" data-block-index="${block.index}" title="Réinitialiser ce bloc">⟲</button>`)
     }
 
@@ -577,6 +593,11 @@ function renderBlocksTable() {
 
       // Ajouter les événements aux boutons après insertion dans le DOM
       setTimeout(() => {
+        const validateAllBtn = headerCellRight.querySelector('.btn-header-validate-all')
+        if (validateAllBtn) {
+          validateAllBtn.onclick = () => validateAllBlockCorrections(block.index)
+        }
+
         const editBtn = headerCellRight.querySelector('.btn-header-edit')
         if (editBtn) {
           editBtn.onclick = () => editBlockText(block.index)
@@ -740,6 +761,45 @@ function renderBlocksTable() {
     DOM.blocksTableBody.appendChild(headerRow)
     DOM.blocksTableBody.appendChild(row)
   })
+}
+
+/**
+ * Valide toutes les corrections d'un bloc en une seule fois
+ */
+function validateAllBlockCorrections(blockIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || block.corrections.length === 0) {
+    return
+  }
+
+  // Valider toutes les corrections du bloc
+  block.corrections.forEach((correction, corrIndex) => {
+    const correctionId = `${blockIndex}-${corrIndex}`
+    if (!AppState.validatedCorrections.has(correctionId)) {
+      AppState.validatedCorrections.add(correctionId)
+
+      // Appliquer la correction au texte du bloc
+      if (block.corrected.includes(correction.original)) {
+        block.corrected = block.corrected.replace(correction.original, correction.corrected)
+      }
+    }
+  })
+
+  // Mettre à jour les stats et la jauge
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
+
+  // Re-render pour mettre à jour l'affichage
+  renderBlocksTable()
+  updateMinimap()
+
+  // Auto-scroll vers le prochain bloc non validé
+  setTimeout(() => {
+    const nextBlockIndex = findNextUnvalidatedBlock(blockIndex)
+    if (nextBlockIndex !== null) {
+      scrollToBlock(nextBlockIndex)
+    }
+  }, 300)
 }
 
 /**
@@ -1568,7 +1628,10 @@ function updateProgress(percent, text) {
  * Met à jour les statistiques et la jauge de progression
  */
 function updateStats(stats) {
-  // Calculer le nombre de blocs avec corrections
+  // Afficher le nombre total de blocs dans le fichier SRT
+  const totalBlocks = AppState.blocks.length
+
+  // Calculer le nombre de blocs avec corrections (pour les filtres)
   let blocksWithCorrections = 0
   AppState.blocks.forEach(block => {
     if (block.corrections && block.corrections.length > 0) {
@@ -1576,7 +1639,7 @@ function updateStats(stats) {
     }
   })
 
-  if (DOM.statBlocks) DOM.statBlocks.textContent = blocksWithCorrections
+  if (DOM.statBlocks) DOM.statBlocks.textContent = totalBlocks
   if (DOM.statTotal) DOM.statTotal.textContent = stats.total
   if (DOM.statMinor) DOM.statMinor.textContent = stats.minor
   if (DOM.statMajor) DOM.statMajor.textContent = stats.major
