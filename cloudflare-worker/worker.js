@@ -467,15 +467,13 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
       // Ne PAS faire confiance à correctedBlock.original qui peut être incorrect
       const originalText = originalBlock ? originalBlock.text : ''
 
-      // Appliquer les corrections nous-mêmes si Claude ne l'a pas fait
-      // On compare correctedBlock.corrected avec originalText
-      let correctedText = cleanAnnotations(correctedBlock.corrected || originalText)
-
-      // Si le texte corrigé est identique à l'original mais qu'il y a des corrections,
-      // alors Claude n'a pas appliqué les corrections → on les applique nous-mêmes
-      if (correctedText === originalText && validatedCorrections.length > 0) {
+      // TOUJOURS reconstruire le texte corrigé nous-mêmes
+      // Ne JAMAIS faire confiance à correctedBlock.corrected de Claude (peut être incorrect)
+      let correctedText = originalText
+      if (validatedCorrections.length > 0) {
+        // Appliquer les corrections sur notre texte original
         correctedText = applyCorrections(originalText, validatedCorrections)
-        console.log(`[correctWithClaude] Bloc ${correctedBlock.index}: Applied ${validatedCorrections.length} corrections manually`)
+        console.log(`[correctWithClaude] Bloc ${correctedBlock.index}: Applied ${validatedCorrections.length} corrections`)
       }
 
       return {
