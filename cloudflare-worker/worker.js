@@ -245,6 +245,9 @@ Exemples de corrections :
 - c est → c'est
 - "texte" → « texte »
 - Bonjour? → Bonjour ?
+- 10000 → 10 000 (espace milliers)
+- 1000e → 1 000e (espace milliers même avec ordinal)
+- 1000ᵉ → 1 000ᵉ (espace milliers même avec ordinal)
 
 MAJUSCULES INSTITUTIONS (type "major") :
 - le gouvernement → le Gouvernement
@@ -260,15 +263,24 @@ Exemples :
 - le ministère de l'intérieur → le ministère de l'Intérieur
 - le ministère des affaires étrangères → le ministère des Affaires étrangères
 
-AMBIGUÏTÉ DE GENRE - 1ère personne + "être" (type "doubt") :
-Quand on utilise "je" avec le verbe être au passé composé, le genre est ambigu.
+AMBIGUÏTÉ DE GENRE - 1ère personne avec accord (type "doubt") :
+Quand on utilise "je" avec un adjectif ou participe qui s'accorde, le genre est ambigu.
 Suggérer l'AUTRE forme comme correction possible :
+
+Avec ÊTRE au passé composé :
 - "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
 - "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
 - "je suis allé" → suggérer "allée" (reason: "Si femme qui parle : allée")
 - "je suis allée" → suggérer "allé" (reason: "Si homme qui parle : allé")
 
-Participes concernés avec "je suis" :
+Avec SEMBLER, PARAÎTRE, DEVENIR, RESTER + adjectif :
+- "je semble perdu" → suggérer "perdue" (reason: "Si femme qui parle : perdue")
+- "je semble perdue" → suggérer "perdu" (reason: "Si homme qui parle : perdu")
+- "je parais fatigué" → suggérer "fatiguée" (reason: "Si femme qui parle : fatiguée")
+- "je deviens nerveux" → suggérer "nerveuse" (reason: "Si femme qui parle : nerveuse")
+- "je reste concentré" → suggérer "concentrée" (reason: "Si femme qui parle : concentrée")
+
+Participes avec "je suis" :
 venu(e), allé(e), parti(e), arrivé(e), resté(e), devenu(e), rentré(e), sorti(e), tombé(e), né(e)
 
 Format de réponse JSON :
