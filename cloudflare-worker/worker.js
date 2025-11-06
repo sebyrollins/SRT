@@ -233,11 +233,33 @@ function applyCorrections(originalText, corrections) {
   let correctedText = originalText
 
   // Appliquer chaque correction
-  // On fait des replaceAll pour gérer toutes les occurrences
   for (const correction of corrections) {
     if (correction.original && correction.corrected) {
-      // Remplacer toutes les occurrences de l'erreur
-      correctedText = correctedText.split(correction.original).join(correction.corrected)
+      // D'abord essayer un remplacement exact (case-sensitive)
+      if (correctedText.includes(correction.original)) {
+        correctedText = correctedText.split(correction.original).join(correction.corrected)
+      } else {
+        // Si pas trouvé, essayer case-insensitive pour gérer les inconsistances de Claude
+        // Créer une regex case-insensitive pour trouver le texte
+        const escapedOriginal = correction.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(escapedOriginal, 'gi')
+
+        // Vérifier s'il y a une correspondance
+        const match = correctedText.match(regex)
+        if (match && match[0]) {
+          // Préserver la casse du premier caractère si c'était une majuscule
+          let replacement = correction.corrected
+          if (match[0][0] === match[0][0].toUpperCase() &&
+              correction.corrected[0] === correction.corrected[0].toLowerCase()) {
+            // Le texte original commence par une majuscule mais la correction par une minuscule
+            // Mettre la première lettre de la correction en majuscule
+            replacement = correction.corrected[0].toUpperCase() + correction.corrected.slice(1)
+          }
+
+          correctedText = correctedText.replace(regex, replacement)
+          console.log(`[applyCorrections] Case-insensitive replacement: "${match[0]}" → "${replacement}"`)
+        }
+      }
     }
   }
 
