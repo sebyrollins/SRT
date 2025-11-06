@@ -246,8 +246,30 @@ Exemples de corrections :
 - "texte" → « texte »
 - Bonjour? → Bonjour ?
 
-AMBIGUÏTÉ DE GENRE (type "doubt") :
-- "je suis venu" peut être "je suis venue" (si femme qui parle)
+MAJUSCULES INSTITUTIONS (type "major") :
+- le gouvernement → le Gouvernement
+- l'assemblée nationale → l'Assemblée nationale
+- le sénat → le Sénat
+- le parlement → le Parlement
+
+RÈGLE SPÉCIALE MINISTÈRES :
+- "ministère" en minuscule
+- Première lettre des mots thématiques en MAJUSCULE
+Exemples :
+- le ministère de la transition écologique → le ministère de la Transition écologique
+- le ministère de l'intérieur → le ministère de l'Intérieur
+- le ministère des affaires étrangères → le ministère des Affaires étrangères
+
+AMBIGUÏTÉ DE GENRE - 1ère personne + "être" (type "doubt") :
+Quand on utilise "je" avec le verbe être au passé composé, le genre est ambigu.
+Suggérer l'AUTRE forme comme correction possible :
+- "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
+- "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
+- "je suis allé" → suggérer "allée" (reason: "Si femme qui parle : allée")
+- "je suis allée" → suggérer "allé" (reason: "Si homme qui parle : allé")
+
+Participes concernés avec "je suis" :
+venu(e), allé(e), parti(e), arrivé(e), resté(e), devenu(e), rentré(e), sorti(e), tombé(e), né(e)
 
 Format de réponse JSON :
 {
