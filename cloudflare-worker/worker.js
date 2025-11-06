@@ -463,8 +463,9 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
         })
       }
 
-      // Récupérer le texte original
-      const originalText = correctedBlock.original || (originalBlock ? originalBlock.text : '')
+      // Récupérer le texte original depuis NOS blocs parsés (source de vérité)
+      // Ne PAS faire confiance à correctedBlock.original qui peut être incorrect
+      const originalText = originalBlock ? originalBlock.text : ''
 
       // Appliquer les corrections nous-mêmes si Claude ne l'a pas fait
       // On compare correctedBlock.corrected avec originalText
