@@ -98,127 +98,30 @@ async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
-  // CHUNK SIZE OPTIMISÉ pour qualité maximale sur règles spécifiques
-  // Réduit à 25 blocs - tests montrent que 40 blocs trop grand pour fichiers longs
-  // Chunks très petits = Claude applique TOUJOURS les règles
-  const maxBlocksPerChunk = 25
+  // CHUNK SIZE : Augmenté pour donner plus de contexte à Claude
+  // Plus de contexte = meilleures corrections (comme quand l'utilisateur envoie tout d'un coup)
+  const maxBlocksPerChunk = 200 // Augmenté de 25 à 200
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
     chunks.push(blocks.slice(i, i + maxBlocksPerChunk))
   }
 
-  console.log(`[processSRT] Processing ${blocks.length} blocks in ${chunks.length} chunks with 4-pass system...`)
+  console.log(`[processSRT] Processing ${blocks.length} blocks in ${chunks.length} chunks with SINGLE-pass system...`)
   const startTime = Date.now()
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 1 : Ponctuation structurelle (tirets + apostrophes)
+  // PASSE UNIQUE : Toutes les corrections françaises
   // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 1: Structural punctuation (${chunks.length} chunks in parallel) ===`)
-  const pass1Start = Date.now()
+  console.log(`[processSRT] === Correcting ${chunks.length} chunks in parallel ===`)
 
-  const correctedChunksPass1 = await Promise.all(
-    chunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
+  const correctedChunks = await Promise.all(
+    chunks.map(chunk => correctWithClaude(chunk, 'sonnet'))
   )
-  const blocksAfterPass1 = correctedChunksPass1.flat()
-
-  const pass1End = Date.now()
-  console.log(`[processSRT] Pass 1 completed in ${pass1End - pass1Start}ms`)
-
-  // ═══════════════════════════════════════════════════════════════
-  // PASSE 2 : Typographie française (guillemets, espaces, ...)
-  // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 2: French typography (${chunks.length} chunks in parallel) ===`)
-  const pass2Start = Date.now()
-
-  const blocksForPass2 = blocksAfterPass1.map(block => ({
-    index: block.index,
-    timecode: block.timecode,
-    text: block.corrected, // Le texte corrigé de Pass 1
-    original: block.original,
-    previousCorrections: block.corrections || []
-  }))
-
-  const chunksPass2 = []
-  for (let i = 0; i < blocksForPass2.length; i += maxBlocksPerChunk) {
-    chunksPass2.push(blocksForPass2.slice(i, i + maxBlocksPerChunk))
-  }
-
-  const correctedChunksPass2 = await Promise.all(
-    chunksPass2.map(chunk => correctWithClaude(chunk, 'sonnet', 2))
-  )
-  const blocksAfterPass2 = correctedChunksPass2.flat()
-
-  const pass2End = Date.now()
-  console.log(`[processSRT] Pass 2 completed in ${pass2End - pass2Start}ms`)
-
-  // ═══════════════════════════════════════════════════════════════
-  // PASSE 3 : Orthographe lexicale (mots + conjugaison)
-  // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 3: Lexical spelling (${chunks.length} chunks in parallel) ===`)
-  const pass3Start = Date.now()
-
-  const blocksForPass3 = blocksAfterPass2.map((block, idx) => ({
-    index: block.index,
-    timecode: block.timecode,
-    text: block.corrected, // Le texte corrigé de Pass 2
-    original: blocksAfterPass1[idx].original, // Le vrai original
-    previousCorrections: [
-      ...(blocksAfterPass1[idx].corrections || []),
-      ...(block.corrections || [])
-    ]
-  }))
-
-  const chunksPass3 = []
-  for (let i = 0; i < blocksForPass3.length; i += maxBlocksPerChunk) {
-    chunksPass3.push(blocksForPass3.slice(i, i + maxBlocksPerChunk))
-  }
-
-  const correctedChunksPass3 = await Promise.all(
-    chunksPass3.map(chunk => correctWithClaude(chunk, 'sonnet', 3))
-  )
-  const blocksAfterPass3 = correctedChunksPass3.flat()
-
-  const pass3End = Date.now()
-  console.log(`[processSRT] Pass 3 completed in ${pass3End - pass3Start}ms`)
-
-  // ═══════════════════════════════════════════════════════════════
-  // PASSE 4 : Grammaire contextuelle (accords + majuscules)
-  // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 4: Contextual grammar (${chunks.length} chunks in parallel) ===`)
-  const pass4Start = Date.now()
-
-  const blocksForPass4 = blocksAfterPass3.map((block, idx) => ({
-    index: block.index,
-    timecode: block.timecode,
-    text: block.corrected, // Le texte corrigé de Pass 3
-    original: blocksForPass3[idx].original, // Le vrai original
-    previousCorrections: blocksForPass3[idx].previousCorrections.concat(block.corrections || [])
-  }))
-
-  const chunksPass4 = []
-  for (let i = 0; i < blocksForPass4.length; i += maxBlocksPerChunk) {
-    chunksPass4.push(blocksForPass4.slice(i, i + maxBlocksPerChunk))
-  }
-
-  const correctedChunksPass4 = await Promise.all(
-    chunksPass4.map(chunk => correctWithClaude(chunk, 'sonnet', 4))
-  )
-
-  // Fusionner toutes les corrections des 4 passes
-  const finalBlocks = correctedChunksPass4.flat().map((block, idx) => {
-    return {
-      ...block,
-      original: blocksForPass4[idx].original, // IMPORTANT: Garder le vrai original (avant toutes passes)
-      corrections: blocksForPass4[idx].previousCorrections.concat(block.corrections || [])
-    }
-  })
-
-  const pass4End = Date.now()
-  console.log(`[processSRT] Pass 4 completed in ${pass4End - pass4Start}ms`)
+  const finalBlocks = correctedChunks.flat()
 
   const endTime = Date.now()
-  console.log(`[processSRT] Total processing time: ${endTime - startTime}ms (Pass 1: ${pass1End - pass1Start}ms, Pass 2: ${pass2End - pass2Start}ms, Pass 3: ${pass3End - pass3Start}ms, Pass 4: ${pass4End - pass4Start}ms)`)
+  console.log(`[processSRT] Total processing time: ${endTime - startTime}ms`)
 
   return finalBlocks
 }
@@ -285,266 +188,74 @@ function parseSRTBlocks(srtContent) {
 }
 
 /**
- * PASSE 1 : Ponctuation structurelle (tirets + apostrophes)
+ * System prompt ultra-simple (comme l'utilisateur fait directement)
  */
-function buildSystemPromptPass1() {
-  return `Tu es un correcteur professionnel français spécialisé dans la ponctuation structurelle.
+function buildSystemPrompt() {
+  return `Corrige toutes les fautes de français dans ce fichier SRT.
 
-MISSION : Corrige UNIQUEMENT les tirets et apostrophes manquants. Ignore tout le reste.
+Règles simples :
+- rendez vous → rendez-vous
+- c'est a dire → c'est-à-dire
+- peut etre → peut-être
+- c est → c'est
+- "texte" → « texte »
+- Bonjour? → Bonjour ?
 
-RÈGLES À APPLIQUER :
+AMBIGUÏTÉ DE GENRE (type "doubt") :
+- "je suis venu" peut être "je suis venue" (si femme qui parle)
 
-1. TIRETS - Inversions verbe-sujet dans questions :
-   • "pensez vous" → "pensez-vous"
-   • "allez vous" → "allez-vous"
-   • "avez vous" → "avez-vous"
-   • Règle : verbe + (vous/tu/il/elle/on) dans question = TIRET
+Retourne le JSON suivant :
+{"blocks": [{"index": 1, "original": "texte exact", "corrected": "texte corrigé", "corrections": [{"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant", "position": 12}]}]}
 
-2. TIRETS - Noms composés :
-   • "avant première" → "avant-première"
-   • "rendez vous" → "rendez-vous"
-   • "week end" → "week-end"
-   • "arc en ciel" → "arc-en-ciel"
-
-3. TIRETS - Locutions figées :
-   • "c'est a dire" → "c'est-à-dire"
-   • "peut etre" → "peut-être"
-   • "vis a vis" → "vis-à-vis"
-
-4. APOSTROPHES - Élisions manquantes :
-   • "l eau" → "l'eau"
-   • "d accord" → "d'accord"
-   • "qu il" → "qu'il"
-   • "s il" → "s'il"
-
-Type de correction : "major"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "major",
-          "original": "pensez vous",
-          "corrected": "pensez-vous",
-          "reason": "Tiret inversion question",
-          "position": 15
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0) dans le texte original
-2. "original" = texte exact du fichier (tel quel)
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-
-Retourne uniquement le JSON, rien d'autre.`
+Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)`
 }
 
 /**
- * PASSE 2 : Typographie française (guillemets, espaces, points de suspension)
- */
-function buildSystemPromptPass2() {
-  return `Tu es un correcteur professionnel français spécialisé en typographie.
-
-MISSION : Corrige UNIQUEMENT la typographie française. Les tirets/apostrophes sont déjà corrigés.
-
-RÈGLES À APPLIQUER :
-
-1. GUILLEMETS : Remplacer guillemets droits par guillemets français
-   • "bonjour" → « bonjour »
-   • 'bonjour' → « bonjour »
-   Type : "minor"
-
-2. POINTS DE SUSPENSION : Remplacer trois points par caractère unique
-   • "et..." → "et…"
-   • "mais..." → "mais…"
-   Type : "minor"
-
-3. ESPACES INSÉCABLES : Avant : ; ! ?
-   • "Bonjour?" → "Bonjour ?"
-   • "Vraiment!" → "Vraiment !"
-   • SAUF si espace déjà présent ("Bonjour ?" est correct)
-   Type : "minor"
-
-4. ESPACES MILLIERS : Séparateur pour grands nombres
-   • "10000" → "10 000"
-   • "1000e" → "1 000e"
-   • EXCEPTION : années (2024, 1789 restent sans espace)
-   Type : "minor"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "minor",
-          "original": "\"bonjour\"",
-          "corrected": "« bonjour »",
-          "reason": "Guillemets français",
-          "position": 0
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0)
-2. "original" = texte exact du fichier
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-
-Retourne uniquement le JSON, rien d'autre.`
-}
-
-/**
- * PASSE 3 : Orthographe lexicale (mots + conjugaison)
- */
-function buildSystemPromptPass3() {
-  return `Tu es un correcteur professionnel français spécialisé en orthographe.
-
-MISSION : Corrige UNIQUEMENT les fautes d'orthographe et de conjugaison de base.
-
-RÈGLES À APPLIQUER :
-
-1. FAUTES DE MOTS :
-   • "language" → "langage"
-   • "developper" → "développer"
-   • "apartement" → "appartement"
-   Type : "major"
-
-2. CONJUGAISON INCORRECTE :
-   • "Il à pris" → "Il a pris" (auxiliaire avoir)
-   • "Ils va" → "Ils vont"
-   • "Je sait" → "Je sais"
-   Type : "major"
-
-3. HOMOPHONES GRAMMATICAUX :
-   • "à" vs "a" (auxiliaire)
-   • "et" vs "est" (verbe être)
-   • "son" vs "sont"
-   Type : "major"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "major",
-          "original": "language",
-          "corrected": "langage",
-          "reason": "Orthographe",
-          "position": 5
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0)
-2. "original" = texte exact du fichier
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-
-Retourne uniquement le JSON, rien d'autre.`
-}
-
-/**
- * PASSE 4 : Grammaire contextuelle (accords + majuscules)
- */
-function buildSystemPromptPass4() {
-  return `Tu es un correcteur professionnel français spécialisé en grammaire.
-
-MISSION : Corrige UNIQUEMENT les accords et majuscules. Tout le reste est déjà corrigé.
-
-RÈGLES À APPLIQUER :
-
-1. ACCORDS SUJET-VERBE :
-   • "ils fait" → "ils font"
-   • "nous va" → "nous allons"
-   Type : "major"
-
-2. ACCORDS ADJECTIFS :
-   • "ils sont beau" → "ils sont beaux"
-   • "elle est grand" → "elle est grande"
-   Type : "major"
-
-3. ACCORDS PARTICIPES PASSÉS (si contexte clair) :
-   • "ils ont fait" → correct
-   • "elle est partie" → correct
-   • Si 1ère personne ambigu : type "doubt"
-   Type : "major" ou "doubt"
-
-4. MAJUSCULES INSTITUTIONS :
-   • "le gouvernement" → "le Gouvernement" (institution française)
-   • "l'assemblée nationale" → "l'Assemblée nationale"
-   • "le sénat" → "le Sénat"
-   Règle MINISTÈRES : "ministère" en minuscule, premier mot des secteurs en majuscule
-   • "le ministère de la Transition écologique"
-   Type : "major"
-
-5. MAJUSCULES PHRASES :
-   • Début après . ! ? → majuscule
-   • JAMAIS après virgule ou retour ligne simple
-   • ", Mesdames" → ", mesdames" (corriger majuscule excessive)
-   Type : "major"
-
-Retourne UNIQUEMENT un JSON valide (pas de markdown) :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte original exact",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {
-          "type": "major",
-          "original": "ils sont beau",
-          "corrected": "ils sont beaux",
-          "reason": "Accord adjectif pluriel",
-          "position": 10
-        }
-      ]
-    }
-  ]
-}
-
-RÈGLES STRICTES :
-1. Position = index exact (compte de 0)
-2. "original" = texte exact du fichier
-3. Si aucune correction : corrections = []
-4. N'applique QUE les règles ci-dessus
-5. "doubt" seulement pour accords 1ère personne ambigus
-
-Retourne uniquement le JSON, rien d'autre.`
-}
-
-/**
- * Construit le user prompt (partie variable)
- * Contient uniquement les blocs SRT à corriger
+ * Construit le user prompt au format SRT natif (comme l'utilisateur fait)
  */
 function buildUserPrompt(blocks) {
-  const blocksText = blocks.map(b => `[Bloc ${b.index}]\n${b.text}`).join('\n\n')
-  return `TEXTE À CORRIGER :
+  // Garder le format SRT original avec timecodes
+  const srtText = blocks.map(b => `${b.index}\n${b.timecode}\n${b.text}`).join('\n\n')
+  return `Corrige ce fichier SRT :
 
-${blocksText}`
+${srtText}`
+}
+
+/**
+ * Retry avec exponential backoff pour les erreurs API
+ */
+async function fetchWithRetry(url, options, maxRetries = 4) {
+  const delays = [2000, 4000, 8000, 16000] // 2s, 4s, 8s, 16s
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options)
+
+      // Si erreur 529 (overloaded) ou 429 (rate limit), retry
+      if (response.status === 529 || response.status === 429) {
+        if (attempt < maxRetries) {
+          const delay = delays[attempt]
+          const errorType = response.status === 529 ? 'API overloaded' : 'Rate limit'
+          console.log(`[fetchWithRetry] ${errorType} (${response.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+      }
+
+      return response
+    } catch (error) {
+      // Erreur réseau
+      if (attempt < maxRetries) {
+        const delay = delays[attempt]
+        console.log(`[fetchWithRetry] Network error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new Error('Max retries exceeded')
 }
 
 /**
@@ -552,7 +263,7 @@ ${blocksText}`
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
  */
-async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
+async function correctWithClaude(blocks, modelType = 'sonnet') {
   // Choisir le modèle selon le type
   const modelConfig = {
     sonnet: {
@@ -566,29 +277,11 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   }
 
   const config = modelConfig[modelType] || modelConfig.sonnet
+  const systemPrompt = buildSystemPrompt()
 
-  // Choisir le prompt selon la passe
-  let systemPrompt
-  switch (pass) {
-    case 1:
-      systemPrompt = buildSystemPromptPass1()
-      break
-    case 2:
-      systemPrompt = buildSystemPromptPass2()
-      break
-    case 3:
-      systemPrompt = buildSystemPromptPass3()
-      break
-    case 4:
-      systemPrompt = buildSystemPromptPass4()
-      break
-    default:
-      systemPrompt = buildSystemPromptPass1()
-  }
+  console.log(`[correctWithClaude] Using model: ${config.name} for ${blocks.length} blocks`)
 
-  console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

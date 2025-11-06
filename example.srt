@@ -36,3 +36,23 @@ C'est tres important.
 00:00:22,500 --> 00:00:25,000
 Nous avons analysé la situation,
 et voici notre conclusion.
+
+9
+00:00:25,500 --> 00:00:28,000
+Je suis venu hier
+pour discuter de ce projet.
+
+10
+00:00:28,500 --> 00:00:31,000
+Ils ont compris l'importance
+d'organiser un rendez vous urgent.
+
+11
+00:00:31,500 --> 00:00:34,000
+C est a dire que nous devons
+préparer le dossier maintenant.
+
+12
+00:00:34,500 --> 00:00:37,000
+À dire vrai, je ne suis pas
+entièrement convaincu.
