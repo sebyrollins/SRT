@@ -283,12 +283,6 @@ Avec SEMBLER, PARAÎTRE, DEVENIR, RESTER + adjectif :
 Participes avec "je suis" :
 venu(e), allé(e), parti(e), arrivé(e), resté(e), devenu(e), rentré(e), sorti(e), tombé(e), né(e)
 
-CAS OÙ IL NE FAUT PAS créer de correction de genre :
-- "je salue" : pas d'accord (verbe conjugué) → PAS de correction
-- "je parle" : pas d'accord (verbe conjugué) → PAS de correction
-- "je mange" : pas d'accord (verbe conjugué) → PAS de correction
-- "je pense que" : pas d'accord → PAS de correction
-
 Format de réponse JSON :
 {
   "blocks": [
@@ -307,18 +301,13 @@ IMPORTANT:
 - "original" = texte tel quel, sans rien changer
 - "corrected" = texte avec TOUTES les fautes corrigées (appliquer toutes les corrections)
 - "corrections" = liste des corrections individuelles
-- Le champ "corrected" ne doit JAMAIS contenir d'annotations entre parenthèses
-- Les explications vont dans le champ "reason", PAS dans "corrected"
 
 Exemple concret:
 Si le texte est "Je suis allé au rendez vous hier"
 Alors:
 - "original": "Je suis allé au rendez vous hier"
 - "corrected": "Je suis allé au rendez-vous hier"  (avec le tiret appliqué!)
-- "corrections": [{"original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}]
-
-❌ INCORRECT : "corrected": "rendez-vous (avec tiret)"
-✓ CORRECT : "corrected": "rendez-vous"  ET  "reason": "Tiret manquant"
+- "corrections": [{"original": "rendez vous", "corrected": "rendez-vous", ...}]
 
 Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)
 Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
