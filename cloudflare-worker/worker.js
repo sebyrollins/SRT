@@ -98,9 +98,9 @@ async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
-  // CHUNK SIZE : Augmenté pour donner plus de contexte à Claude
-  // Plus de contexte = meilleures corrections (comme quand l'utilisateur envoie tout d'un coup)
-  const maxBlocksPerChunk = 200 // Augmenté de 25 à 200
+  // CHUNK SIZE : Large pour maximum de contexte
+  // L'ajout d'exemples explicites compense les chunks larges
+  const maxBlocksPerChunk = 200 // Maximum de contexte, exemples explicites dans le prompt
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
@@ -210,6 +210,63 @@ function parseSRTBlocks(srtContent) {
 }
 
 /**
+ * Nettoie les annotations entre parenthèses du texte
+ * Exemple : "je salue (accord neutre)" → "je salue"
+ */
+function cleanAnnotations(text) {
+  if (!text) return text
+
+  // Supprimer les annotations entre parenthèses à la fin du texte
+  // Pattern: texte suivi optionnellement d'un espace puis (annotation)
+  return text.replace(/\s*\([^)]*\)\s*$/g, '').trim()
+}
+
+/**
+ * Applique les corrections au texte original
+ * Si Claude n'a pas appliqué les corrections dans le champ "corrected", on le fait nous-mêmes
+ */
+function applyCorrections(originalText, corrections) {
+  if (!corrections || corrections.length === 0) {
+    return originalText
+  }
+
+  let correctedText = originalText
+
+  // Appliquer chaque correction
+  for (const correction of corrections) {
+    if (correction.original && correction.corrected) {
+      // D'abord essayer un remplacement exact (case-sensitive)
+      if (correctedText.includes(correction.original)) {
+        correctedText = correctedText.split(correction.original).join(correction.corrected)
+      } else {
+        // Si pas trouvé, essayer case-insensitive pour gérer les inconsistances de Claude
+        // Créer une regex case-insensitive pour trouver le texte
+        const escapedOriginal = correction.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(escapedOriginal, 'gi')
+
+        // Vérifier s'il y a une correspondance
+        const match = correctedText.match(regex)
+        if (match && match[0]) {
+          // Préserver la casse du premier caractère si c'était une majuscule
+          let replacement = correction.corrected
+          if (match[0][0] === match[0][0].toUpperCase() &&
+              correction.corrected[0] === correction.corrected[0].toLowerCase()) {
+            // Le texte original commence par une majuscule mais la correction par une minuscule
+            // Mettre la première lettre de la correction en majuscule
+            replacement = correction.corrected[0].toUpperCase() + correction.corrected.slice(1)
+          }
+
+          correctedText = correctedText.replace(regex, replacement)
+          console.log(`[applyCorrections] Case-insensitive replacement: "${match[0]}" → "${replacement}"`)
+        }
+      }
+    }
+  }
+
+  return correctedText
+}
+
+/**
  * System prompt ultra-simple (comme l'utilisateur fait directement)
  */
 function buildSystemPrompt() {
@@ -219,12 +276,47 @@ Exemples de corrections :
 - rendez vous → rendez-vous
 - c'est a dire → c'est-à-dire
 - peut etre → peut-être
+- est ce que → est-ce que
 - c est → c'est
 - "texte" → « texte »
 - Bonjour? → Bonjour ?
+- 10000 → 10 000 (espace milliers)
+- 1000e → 1 000e (espace milliers même avec ordinal)
+- 1000ᵉ → 1 000ᵉ (espace milliers même avec ordinal)
 
-AMBIGUÏTÉ DE GENRE (type "doubt") :
-- "je suis venu" peut être "je suis venue" (si femme qui parle)
+MAJUSCULES INSTITUTIONS (type "major") :
+- le gouvernement → le Gouvernement
+- l'assemblée nationale → l'Assemblée nationale
+- le sénat → le Sénat
+- le parlement → le Parlement
+
+RÈGLE SPÉCIALE MINISTÈRES :
+- "ministère" en minuscule
+- Première lettre des mots thématiques en MAJUSCULE
+Exemples :
+- le ministère de la transition écologique → le ministère de la Transition écologique
+- le ministère de l'intérieur → le ministère de l'Intérieur
+- le ministère des affaires étrangères → le ministère des Affaires étrangères
+
+AMBIGUÏTÉ DE GENRE - 1ère personne avec accord (type "doubt") :
+Quand on utilise "je" avec un adjectif ou participe qui s'accorde, le genre est ambigu.
+Suggérer l'AUTRE forme comme correction possible :
+
+Avec ÊTRE au passé composé :
+- "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
+- "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
+- "je suis allé" → suggérer "allée" (reason: "Si femme qui parle : allée")
+- "je suis allée" → suggérer "allé" (reason: "Si homme qui parle : allé")
+
+Avec SEMBLER, PARAÎTRE, DEVENIR, RESTER + adjectif :
+- "je semble perdu" → suggérer "perdue" (reason: "Si femme qui parle : perdue")
+- "je semble perdue" → suggérer "perdu" (reason: "Si homme qui parle : perdu")
+- "je parais fatigué" → suggérer "fatiguée" (reason: "Si femme qui parle : fatiguée")
+- "je deviens nerveux" → suggérer "nerveuse" (reason: "Si femme qui parle : nerveuse")
+- "je reste concentré" → suggérer "concentrée" (reason: "Si femme qui parle : concentrée")
+
+Participes avec "je suis" :
+venu(e), allé(e), parti(e), arrivé(e), resté(e), devenu(e), rentré(e), sorti(e), tombé(e), né(e)
 
 Format de réponse JSON :
 {
@@ -380,20 +472,39 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
 
       // Accepter toutes les corrections de Claude sans validation de position stricte
       // Claude sait ce qu'il corrige, on lui fait confiance
+      let validatedCorrections = []
       if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
         // Juste s'assurer que les champs essentiels existent
-        const validatedCorrections = correctedBlock.corrections.filter(correction => {
+        validatedCorrections = correctedBlock.corrections.filter(correction => {
           return correction.original && correction.corrected && correction.reason && correction.type
+        }).map(correction => {
+          // Nettoyer les annotations dans les corrections individuelles
+          return {
+            ...correction,
+            corrected: cleanAnnotations(correction.corrected)
+          }
         })
+      }
 
-        correctedBlock.corrections = validatedCorrections
+      // Récupérer le texte original depuis NOS blocs parsés (source de vérité)
+      // Ne PAS faire confiance à correctedBlock.original qui peut être incorrect
+      const originalText = originalBlock ? originalBlock.text : ''
+
+      // TOUJOURS reconstruire le texte corrigé nous-mêmes
+      // Ne JAMAIS faire confiance à correctedBlock.corrected de Claude (peut être incorrect)
+      let correctedText = originalText
+      if (validatedCorrections.length > 0) {
+        // Appliquer les corrections sur notre texte original
+        correctedText = applyCorrections(originalText, validatedCorrections)
+        console.log(`[correctWithClaude] Bloc ${correctedBlock.index}: Applied ${validatedCorrections.length} corrections`)
       }
 
       return {
         ...correctedBlock,
         timecode: originalBlock ? originalBlock.timecode : 'undefined',
-        // S'assurer que "original" existe (parfois Claude oublie de le mettre)
-        original: correctedBlock.original || (originalBlock ? originalBlock.text : ''),
+        original: originalText,
+        corrected: correctedText,
+        corrections: validatedCorrections
       }
     })
   } catch (e) {

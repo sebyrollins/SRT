@@ -259,6 +259,10 @@ async function processUploadedFile(content, filename) {
       if (!block.hasOwnProperty('originalCorrected')) {
         block.originalCorrected = block.corrected
       }
+      // Sauvegarder si le bloc avait des corrections à l'origine (avant toute modification manuelle)
+      if (!block.hasOwnProperty('hadOriginalCorrections')) {
+        block.hadOriginalCorrections = block.corrections && block.corrections.length > 0
+      }
     })
 
     // Progression ralentie et fluide de 80% à 100% (moitié de la vitesse)
@@ -547,8 +551,7 @@ function renderBlocksTable() {
       <span class="block-timecode">${block.timecode}</span>
     `
 
-    // Cellule droite : bouton Modifier et Réinitialiser
-    // Afficher si : toutes corrections validées OU aucune correction
+    // Cellule droite : boutons d'action
     const headerCellRight = document.createElement('td')
     headerCellRight.className = 'block-header block-header-right'
 
@@ -556,15 +559,30 @@ function renderBlocksTable() {
     const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
     const hasCorrections = block.corrections && block.corrections.length > 0
 
+    // Vérifier si le bloc a au moins une correction validée
+    const hasValidatedCorrections = hasCorrections && block.corrections.some((correction, idx) =>
+      AppState.validatedCorrections.has(`${block.index}-${idx}`)
+    )
+
+    // Compter les corrections non validées
+    const unvalidatedCorrectionsCount = hasCorrections
+      ? block.corrections.filter((c, idx) => !AppState.validatedCorrections.has(`${block.index}-${idx}`)).length
+      : 0
+
     // Container pour les boutons
     const buttonsHtml = []
+
+    // Bouton "Valider tout" : afficher si 2+ corrections non validées
+    if (unvalidatedCorrectionsCount >= 2) {
+      buttonsHtml.push(`<button class="btn-header-validate-all" data-block-index="${block.index}" title="Valider toutes les corrections de ce bloc"><span>✓</span><span>tout</span></button>`)
+    }
 
     if (shouldShowEditButton) {
       buttonsHtml.push(`<button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>`)
     }
 
-    // Bouton réinitialiser : afficher seulement s'il y a des corrections
-    if (hasCorrections) {
+    // Bouton réinitialiser : afficher dès qu'une correction a été validée
+    if (hasValidatedCorrections) {
       buttonsHtml.push(`<button class="btn-header-reset" data-block-index="${block.index}" title="Réinitialiser ce bloc">⟲</button>`)
     }
 
@@ -573,6 +591,11 @@ function renderBlocksTable() {
 
       // Ajouter les événements aux boutons après insertion dans le DOM
       setTimeout(() => {
+        const validateAllBtn = headerCellRight.querySelector('.btn-header-validate-all')
+        if (validateAllBtn) {
+          validateAllBtn.onclick = () => validateAllBlockCorrections(block.index)
+        }
+
         const editBtn = headerCellRight.querySelector('.btn-header-edit')
         if (editBtn) {
           editBtn.onclick = () => editBlockText(block.index)
@@ -615,37 +638,9 @@ function renderBlocksTable() {
     const correctedEl = document.createElement('div')
     correctedEl.className = `block-section block-corrected ${shouldBeBold ? 'block-validated' : 'block-unvalidated'}`
 
-    // Appliquer toutes les corrections au texte original pour obtenir le vrai texte corrigé
-    let finalCorrectedText = block.original
-    if (block.corrections && block.corrections.length > 0) {
-      // Trier les corrections par position décroissante pour ne pas décaler les positions
-      const sortedCorrections = [...block.corrections].sort((a, b) => b.position - a.position)
-      sortedCorrections.forEach(correction => {
-        const startPos = correction.position
-        const endPos = startPos + correction.original.length
-
-        // Validation stricte : vérifier que la portion de texte correspond vraiment à correction.original
-        if (startPos >= 0 && endPos <= finalCorrectedText.length) {
-          const actualTextAtPosition = finalCorrectedText.substring(startPos, endPos)
-
-          // Si le texte ne correspond pas, log l'erreur et skip cette correction
-          if (actualTextAtPosition !== correction.original) {
-            console.error(`Bloc #${block.index}: Position de correction invalide!`)
-            console.error(`  Position: ${startPos}-${endPos}`)
-            console.error(`  Attendu: "${correction.original}"`)
-            console.error(`  Trouvé: "${actualTextAtPosition}"`)
-            console.error(`  Texte complet: "${finalCorrectedText}"`)
-            // NE PAS appliquer cette correction invalide
-            return
-          }
-
-          // Appliquer la correction
-          finalCorrectedText = finalCorrectedText.substring(0, startPos) +
-                              correction.corrected +
-                              finalCorrectedText.substring(endPos)
-        }
-      })
-    }
+    // Utiliser block.corrected directement du worker (qui a déjà appliqué les corrections)
+    // Plus besoin de réappliquer les corrections avec les positions ici
+    const finalCorrectedText = block.corrected || block.original
 
     correctedEl.innerHTML = `
       <div class="block-label">CORRIGÉ :</div>
@@ -764,6 +759,45 @@ function renderBlocksTable() {
     DOM.blocksTableBody.appendChild(headerRow)
     DOM.blocksTableBody.appendChild(row)
   })
+}
+
+/**
+ * Valide toutes les corrections d'un bloc en une seule fois
+ */
+function validateAllBlockCorrections(blockIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || block.corrections.length === 0) {
+    return
+  }
+
+  // Valider toutes les corrections du bloc
+  block.corrections.forEach((correction, corrIndex) => {
+    const correctionId = `${blockIndex}-${corrIndex}`
+    if (!AppState.validatedCorrections.has(correctionId)) {
+      AppState.validatedCorrections.add(correctionId)
+
+      // Appliquer la correction au texte du bloc
+      if (block.corrected.includes(correction.original)) {
+        block.corrected = block.corrected.replace(correction.original, correction.corrected)
+      }
+    }
+  })
+
+  // Mettre à jour les stats et la jauge
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
+
+  // Re-render pour mettre à jour l'affichage
+  renderBlocksTable()
+  updateMinimap()
+
+  // Auto-scroll vers le prochain bloc non validé
+  setTimeout(() => {
+    const nextBlockIndex = findNextUnvalidatedBlock(blockIndex)
+    if (nextBlockIndex !== null) {
+      scrollToBlock(nextBlockIndex)
+    }
+  }, 300)
 }
 
 /**
@@ -1303,6 +1337,30 @@ function resetBlockToInitialState(blockIndex) {
     return
   }
 
+  // CAS SPÉCIAL : Si le bloc n'avait pas de corrections à l'origine,
+  // supprimer toutes les corrections créées manuellement
+  if (block.hadOriginalCorrections === false) {
+    // Supprimer toutes les validations
+    block.corrections.forEach((_, corrIndex) => {
+      const correctionId = `${blockIndex}-${corrIndex}`
+      AppState.validatedCorrections.delete(correctionId)
+    })
+
+    // Supprimer toutes les corrections et restaurer le texte original
+    block.corrections = []
+    block.corrected = block.original
+
+    // Mettre à jour les stats et la jauge
+    const stats = SRTParser.calculateStats(AppState.blocks)
+    updateStats(stats)
+
+    // Re-render pour mettre à jour l'affichage
+    renderBlocksTable()
+    updateMinimap()
+    return
+  }
+
+  // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
   // Supprimer toutes les validations pour ce bloc
   block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
@@ -1368,6 +1426,15 @@ function resetToInitialState() {
   // Restaurer les types originaux et supprimer les modifications
   AppState.blocks.forEach(block => {
     if (block.corrections && block.corrections.length > 0) {
+      // CAS SPÉCIAL : Si le bloc n'avait pas de corrections à l'origine,
+      // supprimer toutes les corrections créées manuellement
+      if (block.hadOriginalCorrections === false) {
+        block.corrections = []
+        block.corrected = block.original
+        return // Passer au bloc suivant
+      }
+
+      // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
       block.corrections.forEach((correction, corrIndex) => {
         // Restaurer la suggestion originale si elle a été modifiée ou rejetée
         if (correction.hasOwnProperty('originalSuggestion')) {
@@ -1559,7 +1626,10 @@ function updateProgress(percent, text) {
  * Met à jour les statistiques et la jauge de progression
  */
 function updateStats(stats) {
-  // Calculer le nombre de blocs avec corrections
+  // Afficher le nombre total de blocs dans le fichier SRT
+  const totalBlocks = AppState.blocks.length
+
+  // Calculer le nombre de blocs avec corrections (pour les filtres)
   let blocksWithCorrections = 0
   AppState.blocks.forEach(block => {
     if (block.corrections && block.corrections.length > 0) {
@@ -1567,7 +1637,7 @@ function updateStats(stats) {
     }
   })
 
-  if (DOM.statBlocks) DOM.statBlocks.textContent = blocksWithCorrections
+  if (DOM.statBlocks) DOM.statBlocks.textContent = totalBlocks
   if (DOM.statTotal) DOM.statTotal.textContent = stats.total
   if (DOM.statMinor) DOM.statMinor.textContent = stats.minor
   if (DOM.statMajor) DOM.statMajor.textContent = stats.major
@@ -1875,27 +1945,32 @@ function getBlockMinimapClass(block) {
   }
 
   // Non validées : déterminer le type dominant
-  // Priorité basée sur les corrections NON validées : majeur > doute > mineur
+  // Nouvelle priorité : majeure non validée > doute (validé ou non) > mineure
   const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
     c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
   )
-  const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
-    c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-  )
+
+  // Si une majeure non validée existe, priorité absolue
+  if (hasUnvalidatedMajor) {
+    return 'minimap-major'
+  }
+
+  // Sinon, vérifier si le bloc contient au moins un doute (validé ou non)
+  const hasDoubt = block.corrections.some(c => c.type === 'doubt')
+  if (hasDoubt) {
+    return 'minimap-doubt'
+  }
+
+  // Sinon, vérifier s'il reste des mineures non validées
   const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
     c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
   )
-
-  if (hasUnvalidatedMajor) {
-    return 'minimap-major'
-  } else if (hasUnvalidatedDoubt) {
-    return 'minimap-doubt'
-  } else if (hasUnvalidatedMinor) {
+  if (hasUnvalidatedMinor) {
     return 'minimap-minor'
-  } else {
-    // Normalement on ne devrait pas arriver ici car allValidated aurait dû être true
-    return 'minimap-validated'
   }
+
+  // Tout est validé (aucune majeure non validée, aucun doute, aucune mineure non validée)
+  return 'minimap-validated'
 }
 
 /**
