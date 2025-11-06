@@ -1945,27 +1945,32 @@ function getBlockMinimapClass(block) {
   }
 
   // Non validées : déterminer le type dominant
-  // Priorité basée sur les corrections NON validées : majeur > doute > mineur
+  // Nouvelle priorité : majeure non validée > doute (validé ou non) > mineure
   const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
     c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
   )
-  const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
-    c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-  )
+
+  // Si une majeure non validée existe, priorité absolue
+  if (hasUnvalidatedMajor) {
+    return 'minimap-major'
+  }
+
+  // Sinon, vérifier si le bloc contient au moins un doute (validé ou non)
+  const hasDoubt = block.corrections.some(c => c.type === 'doubt')
+  if (hasDoubt) {
+    return 'minimap-doubt'
+  }
+
+  // Sinon, vérifier s'il reste des mineures non validées
   const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
     c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
   )
-
-  if (hasUnvalidatedMajor) {
-    return 'minimap-major'
-  } else if (hasUnvalidatedDoubt) {
-    return 'minimap-doubt'
-  } else if (hasUnvalidatedMinor) {
+  if (hasUnvalidatedMinor) {
     return 'minimap-minor'
-  } else {
-    // Normalement on ne devrait pas arriver ici car allValidated aurait dû être true
-    return 'minimap-validated'
   }
+
+  // Tout est validé (aucune majeure non validée, aucun doute, aucune mineure non validée)
+  return 'minimap-validated'
 }
 
 /**
