@@ -559,11 +559,9 @@ function renderBlocksTable() {
     const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
     const hasCorrections = block.corrections && block.corrections.length > 0
 
-    // Vérifier si le bloc a reçu des modifications (corrections modifiées/rejetées)
-    const hasModifications = hasCorrections && block.corrections.some(correction =>
-      correction.hasOwnProperty('originalSuggestion') ||
-      correction.hasOwnProperty('originalType') ||
-      correction.hasOwnProperty('originalReason')
+    // Vérifier si le bloc a au moins une correction validée
+    const hasValidatedCorrections = hasCorrections && block.corrections.some((correction, idx) =>
+      AppState.validatedCorrections.has(`${block.index}-${idx}`)
     )
 
     // Compter les corrections non validées
@@ -583,8 +581,8 @@ function renderBlocksTable() {
       buttonsHtml.push(`<button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>`)
     }
 
-    // Bouton réinitialiser : afficher seulement si le bloc a reçu des modifications
-    if (hasModifications) {
+    // Bouton réinitialiser : afficher dès qu'une correction a été validée
+    if (hasValidatedCorrections) {
       buttonsHtml.push(`<button class="btn-header-reset" data-block-index="${block.index}" title="Réinitialiser ce bloc">⟲</button>`)
     }
 
