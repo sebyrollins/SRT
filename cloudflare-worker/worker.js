@@ -118,7 +118,29 @@ async function processSRT(srtContent) {
   const correctedChunks = await Promise.all(
     chunks.map(chunk => correctWithClaude(chunk, 'sonnet'))
   )
-  const finalBlocks = correctedChunks.flat()
+  const correctedBlocks = correctedChunks.flat()
+
+  // Fusionner les blocs corrigés avec TOUS les blocs originaux
+  // Claude ne retourne que les blocs avec corrections, on doit rajouter les autres
+  const correctedMap = new Map()
+  correctedBlocks.forEach(block => correctedMap.set(block.index, block))
+
+  const finalBlocks = blocks.map(originalBlock => {
+    const correctedBlock = correctedMap.get(originalBlock.index)
+    if (correctedBlock) {
+      // Utiliser le bloc corrigé par Claude
+      return correctedBlock
+    } else {
+      // Pas de corrections, garder l'original
+      return {
+        index: originalBlock.index,
+        timecode: originalBlock.timecode,
+        original: originalBlock.text,
+        corrected: originalBlock.text,  // Identique à l'original
+        corrections: []  // Aucune correction
+      }
+    }
+  })
 
   const endTime = Date.now()
   console.log(`[processSRT] Total processing time: ${endTime - startTime}ms`)
@@ -346,7 +368,9 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
 
       return {
         ...correctedBlock,
-        timecode: originalBlock ? originalBlock.timecode : 'undefined'
+        timecode: originalBlock ? originalBlock.timecode : 'undefined',
+        // S'assurer que "original" existe (parfois Claude oublie de le mettre)
+        original: correctedBlock.original || (originalBlock ? originalBlock.text : ''),
       }
     })
   } catch (e) {
