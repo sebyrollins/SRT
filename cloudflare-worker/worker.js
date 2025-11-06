@@ -98,9 +98,9 @@ async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
-  // CHUNK SIZE : Équilibre entre contexte et attention de Claude
-  // Trop petit = manque de contexte, trop grand = Claude manque des erreurs
-  const maxBlocksPerChunk = 75 // Optimisé pour qualité de détection
+  // CHUNK SIZE : Large pour maximum de contexte
+  // L'ajout d'exemples explicites compense les chunks larges
+  const maxBlocksPerChunk = 200 // Maximum de contexte, exemples explicites dans le prompt
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
@@ -276,6 +276,7 @@ Exemples de corrections :
 - rendez vous → rendez-vous
 - c'est a dire → c'est-à-dire
 - peut etre → peut-être
+- est ce que → est-ce que
 - c est → c'est
 - "texte" → « texte »
 - Bonjour? → Bonjour ?
