@@ -98,9 +98,9 @@ async function processSRT(srtContent) {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
-  // CHUNK SIZE : Augmenté pour donner plus de contexte à Claude
-  // Plus de contexte = meilleures corrections (comme quand l'utilisateur envoie tout d'un coup)
-  const maxBlocksPerChunk = 200 // Augmenté de 25 à 200
+  // CHUNK SIZE : Équilibre entre contexte et attention de Claude
+  // Trop petit = manque de contexte, trop grand = Claude manque des erreurs
+  const maxBlocksPerChunk = 75 // Optimisé pour qualité de détection
   const chunks = []
 
   for (let i = 0; i < blocks.length; i += maxBlocksPerChunk) {
