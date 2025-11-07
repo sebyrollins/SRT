@@ -105,15 +105,15 @@ function needsSecondPass(blocks) {
 
   // Détecter les cas nécessitant une passe 2 ciblée
   return (
-    /ministère/i.test(text) ||              // Règle ministères
-    /\d{4,}e/i.test(text) ||                // Nombres avec ordinal (1000e → 1 000 e)
-    /\d{4,}ᵉ/i.test(text) ||                // Nombres avec ordinal exposant (1000ᵉ → 1 000ᵉ)
-    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||   // Grands nombres sans espace (10000 → 10 000)
-    /\.\.\./.test(text) ||                  // Ellipsis à corriger (... → …)
-    /mesdames et messieurs/i.test(text) ||  // Majuscules dialogues
-    /monsieur/i.test(text) ||               // Détection de "monsieur" pour règle majuscules
-    /madame/i.test(text) ||                 // Détection de "madame" pour règle majuscules
-    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules potentiellement abusives après articles
+    /ministère/i.test(text) ||                      // Règle ministères
+    /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
+    /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
+    /\d{4,}e/i.test(text) ||                        // Nombres avec ordinal
+    /\d{4,}ᵉ/i.test(text) ||                        // Nombres avec ordinal exposant
+    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Grands nombres sans espace
+    /\.\.\./.test(text) ||                          // Ellipsis
+    /mesdames et messieurs/i.test(text) ||          // Majuscules dialogues
+    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
   )
 }
 
@@ -599,46 +599,11 @@ function applyCorrections(originalText, corrections) {
 }
 
 /**
- * PASSE 1 : Prompt général pour corrections universelles
- * Focus sur orthographe, grammaire, tirets, guillemets, espaces ponctuation
+ * PASSE 1 : Prompt ultra-simple pour corrections naturelles
+ * Laisse Claude détecter les fautes évidentes sans surcharge
  */
 function buildSystemPromptPass1() {
   return `Corrige toutes les fautes de français dans ce fichier SRT.
-
-Exemples de corrections :
-- rendez vous → rendez-vous
-- c'est a dire → c'est-à-dire
-- peut etre → peut-être
-- est ce que → est-ce que
-- c est → c'est
-- "texte" → « texte »
-- Bonjour? → Bonjour ?
-
-MAJUSCULES INSTITUTIONS (type "major") :
-- le gouvernement → le Gouvernement
-- l'assemblée nationale → l'Assemblée nationale
-- le sénat → le Sénat
-- le parlement → le Parlement
-
-AMBIGUÏTÉ DE GENRE - 1ère personne avec accord (type "doubt") :
-Quand on utilise "je" avec un adjectif ou participe qui s'accorde, le genre est ambigu.
-Suggérer l'AUTRE forme comme correction possible :
-
-Avec ÊTRE au passé composé :
-- "je suis venu" → suggérer "venue" (reason: "Si femme qui parle : venue")
-- "je suis venue" → suggérer "venu" (reason: "Si homme qui parle : venu")
-- "je suis allé" → suggérer "allée" (reason: "Si femme qui parle : allée")
-- "je suis allée" → suggérer "allé" (reason: "Si homme qui parle : allé")
-
-Avec SEMBLER, PARAÎTRE, DEVENIR, RESTER + adjectif :
-- "je semble perdu" → suggérer "perdue" (reason: "Si femme qui parle : perdue")
-- "je semble perdue" → suggérer "perdu" (reason: "Si homme qui parle : perdu")
-- "je parais fatigué" → suggérer "fatiguée" (reason: "Si femme qui parle : fatiguée")
-- "je deviens nerveux" → suggérer "nerveuse" (reason: "Si femme qui parle : nerveuse")
-- "je reste concentré" → suggérer "concentrée" (reason: "Si femme qui parle : concentrée")
-
-Participes avec "je suis" :
-venu(e), allé(e), parti(e), arrivé(e), resté(e), devenu(e), rentré(e), sorti(e), tombé(e), né(e)
 
 Format de réponse JSON :
 {
@@ -656,17 +621,10 @@ Format de réponse JSON :
 
 IMPORTANT:
 - "original" = texte tel quel, sans rien changer
-- "corrected" = texte avec TOUTES les fautes corrigées (appliquer toutes les corrections)
+- "corrected" = texte avec TOUTES les fautes corrigées
 - "corrections" = liste des corrections individuelles
 
-Exemple concret:
-Si le texte est "Je suis allé au rendez vous hier"
-Alors:
-- "original": "Je suis allé au rendez vous hier"
-- "corrected": "Je suis allé au rendez-vous hier"  (avec le tiret appliqué!)
-- "corrections": [{"original": "rendez vous", "corrected": "rendez-vous", ...}]
-
-Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)
+Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté)
 Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
@@ -676,53 +634,43 @@ Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
  */
 function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ (orthographe et grammaire OK).
-Applique UNIQUEMENT ces règles typographiques spécifiques :
+Applique UNIQUEMENT ces règles spécifiques :
 
 1. MINISTÈRES (type "major") :
    - "ministère" TOUJOURS en minuscule
    - Première lettre des mots thématiques en MAJUSCULE
-   Exemples EXACTS :
+   Exemples :
    ✓ le ministère de la Transition écologique
    ✓ le ministère de l'Intérieur
-   ✓ le ministère des Affaires étrangères
-   ✗ le Ministère de la transition écologique (FAUX)
+   ✗ le Ministère de la transition (FAUX)
 
-2. ESPACES MILLIERS + ORDINAUX (type "minor") :
-   - Espace insécable tous les 3 chiffres
-   - Espace AVANT l'ordinal (e ou ᵉ)
-   Exemples :
-   ✓ 10 000 (espace milliers)
-   ✓ 1 000 e (espace avant ordinal)
-   ✓ 1 000ᵉ (pas d'espace si caractère exposant Unicode)
+2. MAJUSCULES INSTITUTIONS (type "major") :
+   - le gouvernement → le Gouvernement
+   - l'assemblée nationale → l'Assemblée nationale
+   - le sénat → le Sénat
+   - le parlement → le Parlement
+
+3. AMBIGUÏTÉ DE GENRE (type "doubt") :
+   Avec "je" + adjectif/participe qui s'accorde, suggérer l'AUTRE forme :
+   - "je suis venu" → suggérer "venue" (Si femme qui parle)
+   - "je suis venue" → suggérer "venu" (Si homme qui parle)
+   - "je suis allé/allée", "je parais fatigué/fatiguée", etc.
+
+4. ESPACES MILLIERS + ORDINAUX (type "minor") :
+   - Espace tous les 3 chiffres : 10000 → 10 000
+   - Espace avant ordinal : 1000e → 1 000 e
    ✗ 10000 (FAUX)
    ✗ 1000e (FAUX)
 
-3. ELLIPSIS (type "minor") :
-   - Trois points → caractère unique
-   Exemple :
-   ✓ … (U+2026)
-   ✗ ... (FAUX)
+5. ELLIPSIS (type "minor") :
+   - Trois points → caractère unique : ... → …
 
-4. MAJUSCULES APRÈS DIALOGUE (type "minor") :
-   - Après "Mesdames et Messieurs," si nouvelle ligne SANS guillemet fermant → minuscule
-   Exemple :
-   "Mesdames et Messieurs,
-   je suis heureux" → "je" en minuscule (même locuteur)
+6. MAJUSCULES DIALOGUES (type "minor") :
+   - Après "Mesdames et Messieurs," + nouvelle ligne → minuscule si même locuteur
 
-   "Bonjour. Je suis heureux" → "Je" en majuscule (nouvelle phrase)
-
-5. MAJUSCULES ABUSIVES (type "minor") :
-   - Les noms communs ne doivent PAS avoir de majuscule en milieu de phrase
-   Exemples :
-   ✓ la plaque labellisant (nom commun)
-   ✗ la Plaque labellisant (FAUX)
-   ✓ le bâtiment de la Défense (nom commun "bâtiment", nom propre "la Défense")
-   ✗ le Bâtiment de la Défense (FAUX)
-
-   EXCEPTIONS (garder les majuscules) :
-   - Noms propres : La Grande Arche, La Défense, Le Louvre
-   - Après un point : "Voici le résultat. La plaque..."
-   - Début de phrase
+7. MAJUSCULES ABUSIVES (type "minor") :
+   - Noms communs en milieu de phrase : la Plaque → la plaque
+   - Exceptions : noms propres (La Grande Arche), après un point, début de phrase
 
 Format de réponse JSON :
 {
