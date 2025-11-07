@@ -103,8 +103,18 @@ function analyzeChunkComplexity(blocks) {
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // Détecter UNIQUEMENT la règle des ministères
-  return /ministère/i.test(text)
+  // Détecter tous les cas nécessitant la passe 2
+  return (
+    /ministère/i.test(text) ||                      // Ministères
+    /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
+    /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
+    /\d{4,}e/i.test(text) ||                        // Ordinaux (1000e)
+    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Milliers (10000)
+    /au dela|par dessus/i.test(text) ||             // Traits d'union
+    /\.\.\./.test(text) ||                          // Ellipsis
+    /mesdames et messieurs/i.test(text) ||          // Dialogues
+    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
+  )
 }
 
 /**
@@ -624,24 +634,45 @@ Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
  */
 function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique UNIQUEMENT cette règle :
+Applique ces règles dans l'ordre :
 
-MINISTÈRES - ALGORITHME STRICT :
+1. MINISTÈRES :
+   Quand tu vois "ministère de/du..." :
+   - "ministère" en minuscule
+   - "de", "du", "des", "de la", "de l'" en minuscule
+   - MAJUSCULE première lettre de tous les autres mots
+   ✗ ministère de l'écologie et des territoires
+   ✓ ministère de l'Écologie et des Territoires
 
-Quand tu vois "ministère de..." ou "ministère du..." :
-1. Garde "ministère" en MINUSCULE
-2. Garde "de", "du", "des", "de la", "de l'", "d'" en minuscule
-3. Mets une MAJUSCULE à la première lettre de TOUS les autres mots après
+2. INSTITUTIONS :
+   ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
+   ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
 
-Exemples à suivre EXACTEMENT :
-✗ ministère de l'écologie et des territoires
-✓ ministère de l'Écologie et des Territoires
+3. AMBIGUÏTÉ GENRE (type "doubt") :
+   Avec "je" + participe, suggérer l'AUTRE forme :
+   "je suis venu" → suggérer "venue" (si femme)
+   "je suis allé" → suggérer "allée" (si femme)
 
-✗ ministère de la transition écologique
-✓ ministère de la Transition écologique
+4. ESPACES MILLIERS + ORDINAUX :
+   ✗ 10000, 1000e
+   ✓ 10 000, 1 000 e
 
-✗ ministère des affaires étrangères
-✓ ministère des Affaires étrangères
+5. TRAITS D'UNION :
+   ✗ au dela, par dessus
+   ✓ au-delà, par-dessus
+
+6. ELLIPSIS :
+   ✗ ...
+   ✓ …
+
+7. MAJUSCULES DIALOGUES :
+   Après "Mesdames et Messieurs," + saut de ligne → minuscule si même locuteur
+
+8. MAJUSCULES ABUSIVES :
+   Noms communs en milieu de phrase :
+   ✗ la Plaque, le Bâtiment
+   ✓ la plaque, le bâtiment
+   Exception : noms propres (La Grande Arche)
 
 Format JSON :
 {
@@ -651,7 +682,7 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "de l'écologie et des territoires", "corrected": "de l'Écologie et des Territoires", "reason": "Majuscules ministère"}
+        {"type": "major", "original": "...", "corrected": "...", "reason": "..."}
       ]
     }
   ]
