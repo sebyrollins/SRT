@@ -113,7 +113,8 @@ function needsSecondPass(blocks) {
     /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Grands nombres sans espace
     /\.\.\./.test(text) ||                          // Ellipsis
     /mesdames et messieurs/i.test(text) ||          // Majuscules dialogues
-    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
+    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text) || // Majuscules abusives
+    /au dela|par dessus/i.test(text)                // Traits d'union locutions
   )
 }
 
@@ -671,6 +672,13 @@ Applique UNIQUEMENT ces règles spécifiques :
 7. MAJUSCULES ABUSIVES (type "minor") :
    - Noms communs en milieu de phrase : la Plaque → la plaque
    - Exceptions : noms propres (La Grande Arche), après un point, début de phrase
+
+8. TRAITS D'UNION LOCUTIONS (type "minor") :
+   - au dela → au-delà
+   - par dessus → par-dessus
+   - en dehors → en dehors (pas de tiret)
+   ✗ au dela (FAUX)
+   ✗ par dessus (FAUX)
 
 Format de réponse JSON :
 {
