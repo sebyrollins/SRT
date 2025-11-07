@@ -806,16 +806,44 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
     const correctedBlocks = parsed.blocks || []
 
     // Réinjecter les timecodes et valider les corrections
-    return correctedBlocks.map(correctedBlock => {
+    const validatedBlocks = correctedBlocks.map(correctedBlock => {
       const originalBlock = blocks.find(b => b.index === correctedBlock.index)
 
-      // Accepter toutes les corrections de Claude sans validation de position stricte
-      // Claude sait ce qu'il corrige, on lui fait confiance
+      // VALIDATION CRITIQUE : Vérifier que le bloc retourné par Claude correspond bien
+      if (!originalBlock) {
+        console.error(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index} returned by Claude but not found in original blocks!`)
+        return null
+      }
+
+      // Valider que l'original retourné par Claude correspond au texte du bloc
+      const normalizedClaudeOriginal = correctedBlock.original?.toLowerCase().trim()
+      const normalizedBlockText = originalBlock.text.toLowerCase().trim()
+
+      if (normalizedClaudeOriginal && normalizedClaudeOriginal !== normalizedBlockText) {
+        console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
+        console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+        console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
+        // Ne pas retourner ce bloc, il y a une confusion d'index
+        return null
+      }
+
+      // Valider les corrections individuellement
       let validatedCorrections = []
       if (correctedBlock.corrections && correctedBlock.corrections.length > 0) {
-        // Juste s'assurer que les champs essentiels existent
         validatedCorrections = correctedBlock.corrections.filter(correction => {
-          return correction.original && correction.corrected && correction.reason && correction.type
+          // Vérifier que les champs essentiels existent
+          if (!correction.original || !correction.corrected || !correction.reason || !correction.type) {
+            return false
+          }
+
+          // VALIDATION : Vérifier que la correction appartient bien à ce bloc
+          const blockTextToCheck = pass === 1 ? originalBlock.text : originalBlock.text  // Pour pass 2, on vérifie contre le texte d'entrée
+          if (!validateCorrectionBelongsToBlock(correction, blockTextToCheck, correctedBlock.index)) {
+            console.warn(`[correctWithClaude] Pass ${pass} - Rejecting correction from block #${correctedBlock.index}: "${correction.original}" → "${correction.corrected}"`)
+            return false
+          }
+
+          return true
         }).map(correction => {
           // Nettoyer les annotations dans les corrections individuelles
           return {
@@ -845,7 +873,14 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
         corrected: correctedText,
         corrections: validatedCorrections
       }
-    })
+    }).filter(Boolean)  // Retirer les blocs null (rejetés par validation)
+
+    // Log le nombre de blocs rejetés
+    if (validatedBlocks.length < correctedBlocks.length) {
+      console.log(`[correctWithClaude] Pass ${pass} - Rejected ${correctedBlocks.length - validatedBlocks.length} blocks due to validation failures`)
+    }
+
+    return validatedBlocks
   } catch (e) {
     console.error('Erreur parsing réponse Claude:', e)
     console.error('Contenu reçu:', content)
