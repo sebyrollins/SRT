@@ -112,7 +112,8 @@ function needsSecondPass(blocks) {
     /\.\.\./.test(text) ||                  // Ellipsis à corriger (... → …)
     /mesdames et messieurs/i.test(text) ||  // Majuscules dialogues
     /monsieur/i.test(text) ||               // Détection de "monsieur" pour règle majuscules
-    /madame/i.test(text)                    // Détection de "madame" pour règle majuscules
+    /madame/i.test(text) ||                 // Détection de "madame" pour règle majuscules
+    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules potentiellement abusives après articles
   )
 }
 
@@ -247,6 +248,47 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
 }
 
 /**
+ * Déduplique les corrections identiques (même original → même corrected)
+ * Garde la première occurrence et supprime les doublons
+ * @param {Array} corrections - Liste de corrections
+ * @param {number} blockIndex - Index du bloc pour les logs
+ * @returns {Array} Liste dédupliquée
+ */
+function deduplicateCorrections(corrections, blockIndex) {
+  const seen = new Map()
+  const deduplicated = []
+  const duplicates = []
+
+  corrections.forEach(correction => {
+    // Créer une clé unique basée sur original → corrected (normalisé)
+    const key = `${correction.original.trim().toLowerCase()} → ${correction.corrected.trim().toLowerCase()}`
+
+    if (seen.has(key)) {
+      // Doublon détecté
+      duplicates.push({
+        original: correction.original,
+        corrected: correction.corrected,
+        reason: correction.reason,
+        firstReason: seen.get(key).reason
+      })
+      console.log(`[deduplicateCorrections] Block #${blockIndex} - Duplicate: "${correction.original}" → "${correction.corrected}"`)
+      console.log(`[deduplicateCorrections]   First reason: "${seen.get(key).reason}"`)
+      console.log(`[deduplicateCorrections]   Duplicate reason: "${correction.reason}"`)
+    } else {
+      // Première occurrence, la garder
+      seen.set(key, correction)
+      deduplicated.push(correction)
+    }
+  })
+
+  if (duplicates.length > 0) {
+    console.log(`[deduplicateCorrections] Block #${blockIndex} - Removed ${duplicates.length} duplicate correction(s)`)
+  }
+
+  return deduplicated
+}
+
+/**
  * Fusionne intelligemment les corrections de la passe 1 et de la passe 2
  * @param {Array} blocksAfterPass1 - Blocs après la passe 1
  * @param {Array} pass2Blocks - Blocs corrigés par la passe 2
@@ -311,14 +353,17 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
       blockPass1.index       // Index du bloc pour les logs
     )
 
-    console.log(`  → Merged: ${cleanedCorrections.length} total corrections (${(blockPass1.corrections?.length || 0) + (blockPass2.corrections?.length || 0) - cleanedCorrections.length} invalid/contradictory removed)`)
+    // Dédupliquer les corrections identiques
+    const deduplicatedCorrections = deduplicateCorrections(cleanedCorrections, blockPass1.index)
+
+    console.log(`  → Merged: ${deduplicatedCorrections.length} total corrections (${(blockPass1.corrections?.length || 0) + (blockPass2.corrections?.length || 0) - deduplicatedCorrections.length} invalid/contradictory/duplicate removed)`)
 
     return {
       index: blockPass1.index,
       timecode: blockPass1.timecode,
       original: trueOriginal,  // Le vrai original (avant toute correction)
       corrected: blockPass2.corrected,  // Le texte final (avec corrections passe 1 + passe 2)
-      corrections: cleanedCorrections  // Liste nettoyée des corrections
+      corrections: deduplicatedCorrections  // Liste nettoyée et dédupliquée des corrections
     }
   })
 }
@@ -665,6 +710,19 @@ Applique UNIQUEMENT ces règles typographiques spécifiques :
    je suis heureux" → "je" en minuscule (même locuteur)
 
    "Bonjour. Je suis heureux" → "Je" en majuscule (nouvelle phrase)
+
+5. MAJUSCULES ABUSIVES (type "minor") :
+   - Les noms communs ne doivent PAS avoir de majuscule en milieu de phrase
+   Exemples :
+   ✓ la plaque labellisant (nom commun)
+   ✗ la Plaque labellisant (FAUX)
+   ✓ le bâtiment de la Défense (nom commun "bâtiment", nom propre "la Défense")
+   ✗ le Bâtiment de la Défense (FAUX)
+
+   EXCEPTIONS (garder les majuscules) :
+   - Noms propres : La Grande Arche, La Défense, Le Louvre
+   - Après un point : "Voici le résultat. La plaque..."
+   - Début de phrase
 
 Format de réponse JSON :
 {
