@@ -56,10 +56,15 @@ async function handleRequest(request) {
     })
 
   } catch (error) {
-    console.error('Erreur lors du traitement:', error)
+    console.error('[handleRequest] Error during processing:', error.message)
+    console.error('[handleRequest] Stack trace:', error.stack)
+    console.error('[handleRequest] Error type:', error.constructor.name)
+
     return new Response(JSON.stringify({
       success: false,
-      error: error.message || 'Erreur lors du traitement'
+      error: error.message || 'Erreur lors du traitement',
+      errorType: error.constructor.name,
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: corsHeaders
@@ -789,7 +794,17 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   }
 
   const result = await response.json()
+
+  // Vérifier que la réponse est valide
+  if (!result.content || !result.content[0] || !result.content[0].text) {
+    console.error('[correctWithClaude] Invalid API response structure:', JSON.stringify(result))
+    throw new Error('Invalid API response structure')
+  }
+
   let content = result.content[0].text
+
+  // Log de la réponse brute pour debugging (premiers 500 caractères)
+  console.log(`[correctWithClaude] Pass ${pass} - Raw response preview: ${content.substring(0, 500)}...`)
 
   // Nettoyer la réponse (enlever les balises markdown si présentes)
   // Claude Sonnet 4.5 retourne parfois ```json ... ``` au lieu de JSON pur
@@ -801,9 +816,34 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   }
 
   // Parse la réponse JSON de Claude
+  let parsed
   try {
-    const parsed = JSON.parse(content.trim())
-    const correctedBlocks = parsed.blocks || []
+    parsed = JSON.parse(content.trim())
+  } catch (parseError) {
+    console.error('[correctWithClaude] JSON parse error:', parseError.message)
+    console.error('[correctWithClaude] Content that failed to parse (first 1000 chars):', content.substring(0, 1000))
+    console.error('[correctWithClaude] Content that failed to parse (last 500 chars):', content.substring(Math.max(0, content.length - 500)))
+    throw new Error(`JSON parsing failed: ${parseError.message}`)
+  }
+
+  // Valider la structure de la réponse
+  if (!parsed || typeof parsed !== 'object') {
+    console.error('[correctWithClaude] Parsed content is not an object:', typeof parsed)
+    throw new Error('Parsed response is not an object')
+  }
+
+  if (!parsed.blocks) {
+    console.error('[correctWithClaude] No "blocks" field in parsed response:', Object.keys(parsed))
+    throw new Error('No "blocks" field in response')
+  }
+
+  if (!Array.isArray(parsed.blocks)) {
+    console.error('[correctWithClaude] "blocks" is not an array:', typeof parsed.blocks)
+    throw new Error('"blocks" field is not an array')
+  }
+
+  try {
+    const correctedBlocks = parsed.blocks
 
     // Réinjecter les timecodes et valider les corrections
     const validatedBlocks = correctedBlocks.map(correctedBlock => {
@@ -882,8 +922,10 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
 
     return validatedBlocks
   } catch (e) {
-    console.error('Erreur parsing réponse Claude:', e)
-    console.error('Contenu reçu:', content)
-    throw new Error('Format de réponse invalide')
+    console.error('[correctWithClaude] Error during block validation:', e.message)
+    console.error('[correctWithClaude] Stack trace:', e.stack)
+    console.error('[correctWithClaude] Number of blocks to validate:', correctedBlocks.length)
+    console.error('[correctWithClaude] Input blocks count:', blocks.length)
+    throw new Error(`Block validation failed: ${e.message}`)
   }
 }
