@@ -638,12 +638,23 @@ function buildSystemPromptPass2() {
 Applique UNIQUEMENT ces règles spécifiques :
 
 1. MINISTÈRES (type "major") :
-   - "ministère" TOUJOURS en minuscule
-   - Première lettre des mots thématiques en MAJUSCULE
-   Exemples :
-   ✓ le ministère de la Transition écologique
-   ✓ le ministère de l'Intérieur
-   ✗ le Ministère de la transition (FAUX)
+   RÈGLE STRICTE : "ministère" en minuscule + MAJUSCULE aux mots thématiques
+
+   Exemples à suivre EXACTEMENT :
+   ✓ ministère de la Transition écologique
+   ✓ ministère de l'Écologie et des Territoires
+   ✓ ministère de l'Intérieur
+   ✓ ministère des Affaires étrangères
+   ✓ ministère de la Justice
+
+   Erreurs à corriger :
+   ✗ le Ministère de la transition → le ministère de la Transition
+   ✗ ministère de l'écologie → ministère de l'Écologie
+   ✗ ministère des affaires étrangères → ministère des Affaires étrangères
+
+   ATTENTION : Première lettre des NOMS THÉMATIQUES en MAJUSCULE
+   - "de la" / "de l'" / "du" / "des" → minuscules
+   - Mots thématiques → Majuscules (Transition, Écologie, Territoires, Intérieur, etc.)
 
 2. MAJUSCULES INSTITUTIONS (type "major") :
    - le gouvernement → le Gouvernement
