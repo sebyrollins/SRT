@@ -103,13 +103,8 @@ function analyzeChunkComplexity(blocks) {
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // Détecter UNIQUEMENT les 3 règles spécifiques de la passe 2
-  return (
-    /ministère/i.test(text) ||                  // Règle ministères
-    /\d{4,}e/i.test(text) ||                    // Nombres avec ordinal (1000e)
-    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||       // Grands nombres sans espace (10000)
-    /au dela|par dessus/i.test(text)            // Traits d'union locutions
-  )
+  // Détecter UNIQUEMENT la règle des ministères
+  return /ministère/i.test(text)
 }
 
 /**
@@ -628,28 +623,25 @@ Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
  * Appliqué UNIQUEMENT sur les chunks détectés avec needsSecondPass()
  */
 function buildSystemPromptPass2() {
-  return `Tu reçois un texte DÉJÀ CORRIGÉ (orthographe et grammaire OK).
-Applique UNIQUEMENT ces règles spécifiques :
+  return `Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique UNIQUEMENT cette règle :
 
-1. MINISTÈRES - RÈGLE STRICTE :
-   "ministère" en minuscule + Majuscule aux mots thématiques
+MINISTÈRES - ALGORITHME STRICT :
 
-   Exemples EXACTS :
-   ✓ ministère de l'Écologie et des Territoires
-   ✓ ministère de la Transition écologique
-   ✓ ministère de l'Intérieur
+Quand tu vois "ministère de..." ou "ministère du..." :
+1. Garde "ministère" en MINUSCULE
+2. Garde "de", "du", "des", "de la", "de l'", "d'" en minuscule
+3. Mets une MAJUSCULE à la première lettre de TOUS les autres mots après
 
-   ✗ ministère de l'écologie → ministère de l'Écologie
-   ✗ ministère des territoires → ministère des Territoires
+Exemples à suivre EXACTEMENT :
+✗ ministère de l'écologie et des territoires
+✓ ministère de l'Écologie et des Territoires
 
-2. ESPACES MILLIERS + ORDINAUX :
-   ✓ 10 000 (espace tous les 3 chiffres)
-   ✓ 1 000 e (espace avant ordinal "e")
-   ✗ 10000, 1000e (FAUX)
+✗ ministère de la transition écologique
+✓ ministère de la Transition écologique
 
-3. TRAITS D'UNION LOCUTIONS :
-   ✓ au-delà, par-dessus
-   ✗ au dela, par dessus (FAUX)
+✗ ministère des affaires étrangères
+✓ ministère des Affaires étrangères
 
 Format JSON :
 {
@@ -659,13 +651,11 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "écologie", "corrected": "Écologie", "reason": "Majuscule ministère"}
+        {"type": "major", "original": "de l'écologie et des territoires", "corrected": "de l'Écologie et des Territoires", "reason": "Majuscules ministère"}
       ]
     }
   ]
-}
-
-IMPORTANT : Ne retourne QUE les blocs où tu appliques ces 3 règles.`
+}`
 }
 
 /**
