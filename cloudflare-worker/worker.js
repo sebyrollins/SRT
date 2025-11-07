@@ -820,10 +820,75 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   try {
     parsed = JSON.parse(content.trim())
   } catch (parseError) {
-    console.error('[correctWithClaude] JSON parse error:', parseError.message)
-    console.error('[correctWithClaude] Content that failed to parse (first 1000 chars):', content.substring(0, 1000))
-    console.error('[correctWithClaude] Content that failed to parse (last 500 chars):', content.substring(Math.max(0, content.length - 500)))
-    throw new Error(`JSON parsing failed: ${parseError.message}`)
+    // Si le parsing échoue, c'est peut-être parce que Claude a ajouté du texte après le JSON
+    // Essayer d'extraire uniquement la partie JSON valide
+    console.warn('[correctWithClaude] Initial JSON parse failed, attempting to extract JSON portion...')
+
+    try {
+      // Trouver le début du JSON (premier '{')
+      const jsonStart = content.indexOf('{')
+      if (jsonStart === -1) {
+        throw new Error('No JSON object found in response')
+      }
+
+      // Extraire depuis le début du JSON
+      const jsonContent = content.substring(jsonStart)
+
+      // Essayer de parser en trouvant la fin du JSON de manière incrémentale
+      // On cherche le premier JSON valide complet
+      let braceCount = 0
+      let jsonEnd = -1
+      let inString = false
+      let escapeNext = false
+
+      for (let i = 0; i < jsonContent.length; i++) {
+        const char = jsonContent[i]
+
+        if (escapeNext) {
+          escapeNext = false
+          continue
+        }
+
+        if (char === '\\') {
+          escapeNext = true
+          continue
+        }
+
+        if (char === '"') {
+          inString = !inString
+          continue
+        }
+
+        if (!inString) {
+          if (char === '{') {
+            braceCount++
+          } else if (char === '}') {
+            braceCount--
+            if (braceCount === 0) {
+              jsonEnd = i + 1
+              break
+            }
+          }
+        }
+      }
+
+      if (jsonEnd === -1) {
+        throw new Error('Could not find end of JSON object')
+      }
+
+      const extractedJson = jsonContent.substring(0, jsonEnd)
+      console.log(`[correctWithClaude] Extracted JSON (${extractedJson.length} chars), ignoring trailing content`)
+
+      parsed = JSON.parse(extractedJson)
+      console.log('[correctWithClaude] Successfully parsed extracted JSON')
+
+    } catch (extractError) {
+      console.error('[correctWithClaude] JSON parse error:', parseError.message)
+      console.error('[correctWithClaude] Extract attempt also failed:', extractError.message)
+      console.error('[correctWithClaude] Content that failed to parse (first 1000 chars):', content.substring(0, 1000))
+      console.error('[correctWithClaude] Content that failed to parse (last 500 chars):', content.substring(Math.max(0, content.length - 500)))
+      throw new Error(`JSON parsing failed: ${parseError.message}`)
+    }
   }
 
   // Valider la structure de la réponse
