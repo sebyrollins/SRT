@@ -91,6 +91,81 @@ function analyzeChunkComplexity(blocks) {
 }
 
 /**
+ * Détecte si un chunk nécessite une passe 2 pour des règles spécifiques
+ * @param {Array} blocks - Blocs SRT à analyser
+ * @returns {boolean} - true si le chunk nécessite une passe 2
+ */
+function needsSecondPass(blocks) {
+  const text = blocks.map(b => b.text).join(' ')
+
+  // Détecter les cas nécessitant une passe 2 ciblée
+  return (
+    /ministère/i.test(text) ||              // Règle ministères
+    /\d{4,}e/i.test(text) ||                // Nombres avec ordinal (1000e → 1 000 e)
+    /\d{4,}ᵉ/i.test(text) ||                // Nombres avec ordinal exposant (1000ᵉ → 1 000ᵉ)
+    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||   // Grands nombres sans espace (10000 → 10 000)
+    /\.\.\./.test(text) ||                  // Ellipsis à corriger (... → …)
+    /mesdames et messieurs/i.test(text) ||  // Majuscules dialogues
+    /monsieur/i.test(text) ||               // Détection de "monsieur" pour règle majuscules
+    /madame/i.test(text)                    // Détection de "madame" pour règle majuscules
+  )
+}
+
+/**
+ * Fusionne intelligemment les corrections de la passe 1 et de la passe 2
+ * @param {Array} blocksAfterPass1 - Blocs après la passe 1
+ * @param {Array} pass2Blocks - Blocs corrigés par la passe 2
+ * @param {Array} originalBlocks - Blocs originaux du fichier SRT (pour le vrai "original")
+ * @returns {Array} Blocs fusionnés avec toutes les corrections
+ */
+function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
+  // Créer une map des blocs de la passe 2 pour un accès rapide
+  const pass2Map = new Map()
+  pass2Blocks.forEach(block => pass2Map.set(block.index, block))
+
+  // Créer une map des blocs originaux pour récupérer le vrai texte original
+  const originalMap = new Map()
+  originalBlocks.forEach(block => originalMap.set(block.index, block))
+
+  return blocksAfterPass1.map(blockPass1 => {
+    const blockPass2 = pass2Map.get(blockPass1.index)
+
+    // Si ce bloc n'a pas été traité par la passe 2, retourner le bloc de la passe 1 tel quel
+    if (!blockPass2) {
+      return blockPass1
+    }
+
+    // FUSION : Ce bloc a été traité par les deux passes
+    const originalBlock = originalMap.get(blockPass1.index)
+    const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
+
+    console.log(`[mergePass1AndPass2] Merging block #${blockPass1.index}`)
+    console.log(`  - Pass 1: ${blockPass1.corrections?.length || 0} corrections`)
+    console.log(`  - Pass 2: ${blockPass2.corrections?.length || 0} corrections`)
+
+    // STRATÉGIE DE FUSION :
+    // 1. Garder le vrai "original" (texte du fichier SRT d'origine)
+    // 2. Utiliser le "corrected" de la passe 2 (qui contient TOUTES les corrections appliquées)
+    // 3. Fusionner les listes de corrections (passe 1 + passe 2)
+
+    const mergedCorrections = [
+      ...(blockPass1.corrections || []),
+      ...(blockPass2.corrections || [])
+    ]
+
+    console.log(`  → Merged: ${mergedCorrections.length} total corrections`)
+
+    return {
+      index: blockPass1.index,
+      timecode: blockPass1.timecode,
+      original: trueOriginal,  // Le vrai original (avant toute correction)
+      corrected: blockPass2.corrected,  // Le texte final (avec corrections passe 1 + passe 2)
+      corrections: mergedCorrections  // Liste fusionnée des corrections
+    }
+  })
+}
+
+/**
  * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
  * Utilise Sonnet pour garantir la qualité maximale sur toutes les règles
  */
@@ -107,43 +182,97 @@ async function processSRT(srtContent) {
     chunks.push(blocks.slice(i, i + maxBlocksPerChunk))
   }
 
-  console.log(`[processSRT] Processing ${blocks.length} blocks in ${chunks.length} chunks with SINGLE-pass system...`)
+  console.log(`[processSRT] Processing ${blocks.length} blocks in ${chunks.length} chunks with MULTI-PASS system...`)
   const startTime = Date.now()
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE UNIQUE : Toutes les corrections françaises
+  // PASSE 1 : Correction générale (orthographe, grammaire, tirets)
   // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === Correcting ${chunks.length} chunks in parallel ===`)
+  console.log(`[processSRT] === PASS 1: General corrections on ${chunks.length} chunks in parallel ===`)
 
-  const correctedChunks = await Promise.all(
-    chunks.map(chunk => correctWithClaude(chunk, 'sonnet'))
+  const pass1Chunks = await Promise.all(
+    chunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
   )
-  const correctedBlocks = correctedChunks.flat()
+  const pass1Blocks = pass1Chunks.flat()
 
-  // Fusionner les blocs corrigés avec TOUS les blocs originaux
-  // Claude ne retourne que les blocs avec corrections, on doit rajouter les autres
-  const correctedMap = new Map()
-  correctedBlocks.forEach(block => correctedMap.set(block.index, block))
+  // Fusionner les blocs corrigés de la passe 1 avec TOUS les blocs originaux
+  const pass1Map = new Map()
+  pass1Blocks.forEach(block => pass1Map.set(block.index, block))
 
-  const finalBlocks = blocks.map(originalBlock => {
-    const correctedBlock = correctedMap.get(originalBlock.index)
+  const blocksAfterPass1 = blocks.map(originalBlock => {
+    const correctedBlock = pass1Map.get(originalBlock.index)
     if (correctedBlock) {
-      // Utiliser le bloc corrigé par Claude
       return correctedBlock
     } else {
-      // Pas de corrections, garder l'original
+      // Pas de corrections en passe 1, garder l'original
       return {
         index: originalBlock.index,
         timecode: originalBlock.timecode,
         original: originalBlock.text,
-        corrected: originalBlock.text,  // Identique à l'original
-        corrections: []  // Aucune correction
+        corrected: originalBlock.text,
+        corrections: []
       }
     }
   })
 
+  console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected`)
+
+  // ═══════════════════════════════════════════════════════════════
+  // DÉTECTION : Quels chunks nécessitent la passe 2 ?
+  // ═══════════════════════════════════════════════════════════════
+  const chunksNeedingPass2 = []
+
+  chunks.forEach((originalChunk, chunkIndex) => {
+    if (needsSecondPass(originalChunk)) {
+      // Récupérer les blocs DÉJÀ CORRIGÉS de la passe 1 pour ce chunk
+      const correctedChunk = originalChunk.map(originalBlock => {
+        const blockAfterPass1 = blocksAfterPass1.find(b => b.index === originalBlock.index)
+        if (!blockAfterPass1) {
+          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 1!`)
+          return originalBlock
+        }
+        // Créer un bloc avec le texte corrigé de la passe 1 comme "texte d'entrée"
+        return {
+          index: blockAfterPass1.index,
+          timecode: blockAfterPass1.timecode,
+          text: blockAfterPass1.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+        }
+      })
+      chunksNeedingPass2.push({ chunkIndex, chunk: correctedChunk })
+    }
+  })
+
+  console.log(`[processSRT] ${chunksNeedingPass2.length}/${chunks.length} chunks need pass 2`)
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 2 : Correction ciblée (règles typographiques spécifiques)
+  // ═══════════════════════════════════════════════════════════════
+  let finalBlocks = [...blocksAfterPass1]
+
+  if (chunksNeedingPass2.length > 0) {
+    console.log(`[processSRT] === PASS 2: Specific rules on ${chunksNeedingPass2.length} chunks in parallel ===`)
+
+    const pass2Results = await Promise.all(
+      chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 2))
+    )
+    const pass2Blocks = pass2Results.flat()
+
+    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with specific corrections`)
+
+    // ═══════════════════════════════════════════════════════════════
+    // FUSION : Combiner les corrections de la passe 1 et de la passe 2
+    // ═══════════════════════════════════════════════════════════════
+    finalBlocks = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, blocks)
+  }
+
   const endTime = Date.now()
-  console.log(`[processSRT] Total processing time: ${endTime - startTime}ms`)
+  console.log(`[processSRT] ========================================`)
+  console.log(`[processSRT] SUMMARY:`)
+  console.log(`[processSRT]   Total blocks: ${blocks.length}`)
+  console.log(`[processSRT]   Pass 1 corrections: ${pass1Blocks.length} blocks`)
+  console.log(`[processSRT]   Pass 2 corrections: ${chunksNeedingPass2.length} chunks`)
+  console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
+  console.log(`[processSRT] ========================================`)
 
   return finalBlocks
 }
@@ -267,9 +396,10 @@ function applyCorrections(originalText, corrections) {
 }
 
 /**
- * System prompt ultra-simple (comme l'utilisateur fait directement)
+ * PASSE 1 : Prompt général pour corrections universelles
+ * Focus sur orthographe, grammaire, tirets, guillemets, espaces ponctuation
  */
-function buildSystemPrompt() {
+function buildSystemPromptPass1() {
   return `Corrige toutes les fautes de français dans ce fichier SRT.
 
 Exemples de corrections :
@@ -280,23 +410,12 @@ Exemples de corrections :
 - c est → c'est
 - "texte" → « texte »
 - Bonjour? → Bonjour ?
-- 10000 → 10 000 (espace milliers)
-- 1000e → 1 000e (espace milliers même avec ordinal)
-- 1000ᵉ → 1 000ᵉ (espace milliers même avec ordinal)
 
 MAJUSCULES INSTITUTIONS (type "major") :
 - le gouvernement → le Gouvernement
 - l'assemblée nationale → l'Assemblée nationale
 - le sénat → le Sénat
 - le parlement → le Parlement
-
-RÈGLE SPÉCIALE MINISTÈRES :
-- "ministère" en minuscule
-- Première lettre des mots thématiques en MAJUSCULE
-Exemples :
-- le ministère de la transition écologique → le ministère de la Transition écologique
-- le ministère de l'intérieur → le ministère de l'Intérieur
-- le ministère des affaires étrangères → le ministère des Affaires étrangères
 
 AMBIGUÏTÉ DE GENRE - 1ère personne avec accord (type "doubt") :
 Quand on utilise "je" avec un adjectif ou participe qui s'accorde, le genre est ambigu.
@@ -345,6 +464,70 @@ Alors:
 - "corrections": [{"original": "rendez vous", "corrected": "rendez-vous", ...}]
 
 Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté genre)
+Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
+}
+
+/**
+ * PASSE 2 : Prompt spécifique pour règles typographiques complexes
+ * Appliqué UNIQUEMENT sur les chunks détectés avec needsSecondPass()
+ */
+function buildSystemPromptPass2() {
+  return `Tu reçois un texte DÉJÀ CORRIGÉ (orthographe et grammaire OK).
+Applique UNIQUEMENT ces règles typographiques spécifiques :
+
+1. MINISTÈRES (type "major") :
+   - "ministère" TOUJOURS en minuscule
+   - Première lettre des mots thématiques en MAJUSCULE
+   Exemples EXACTS :
+   ✓ le ministère de la Transition écologique
+   ✓ le ministère de l'Intérieur
+   ✓ le ministère des Affaires étrangères
+   ✗ le Ministère de la transition écologique (FAUX)
+
+2. ESPACES MILLIERS + ORDINAUX (type "minor") :
+   - Espace insécable tous les 3 chiffres
+   - Espace AVANT l'ordinal (e ou ᵉ)
+   Exemples :
+   ✓ 10 000 (espace milliers)
+   ✓ 1 000 e (espace avant ordinal)
+   ✓ 1 000ᵉ (pas d'espace si caractère exposant Unicode)
+   ✗ 10000 (FAUX)
+   ✗ 1000e (FAUX)
+
+3. ELLIPSIS (type "minor") :
+   - Trois points → caractère unique
+   Exemple :
+   ✓ … (U+2026)
+   ✗ ... (FAUX)
+
+4. MAJUSCULES APRÈS DIALOGUE (type "minor") :
+   - Après "Mesdames et Messieurs," si nouvelle ligne SANS guillemet fermant → minuscule
+   Exemple :
+   "Mesdames et Messieurs,
+   je suis heureux" → "je" en minuscule (même locuteur)
+
+   "Bonjour. Je suis heureux" → "Je" en majuscule (nouvelle phrase)
+
+Format de réponse JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte EXACT du bloc (celui AVANT tes corrections)",
+      "corrected": "texte du bloc avec tes corrections APPLIQUÉES",
+      "corrections": [
+        {"type": "major", "original": "ministère de la transition", "corrected": "ministère de la Transition", "reason": "Majuscule thématique ministère"}
+      ]
+    }
+  ]
+}
+
+CRITIQUE :
+- "original" = le texte QUE TU REÇOIS (déjà corrigé par passe 1)
+- "corrected" = texte avec TES corrections typographiques appliquées
+- Ne retourne QUE les blocs où tu appliques ces règles spécifiques
+
+Types : "major" (ministères, institutions), "minor" (espaces, ellipsis, majuscules dialogues)
 Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
@@ -400,8 +583,9 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
+ * @param {number} pass - Numéro de passe : 1 (général) ou 2 (spécifique)
  */
-async function correctWithClaude(blocks, modelType = 'sonnet') {
+async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le modèle selon le type
   const modelConfig = {
     sonnet: {
@@ -415,9 +599,11 @@ async function correctWithClaude(blocks, modelType = 'sonnet') {
   }
 
   const config = modelConfig[modelType] || modelConfig.sonnet
-  const systemPrompt = buildSystemPrompt()
 
-  console.log(`[correctWithClaude] Using model: ${config.name} for ${blocks.length} blocks`)
+  // Choisir le prompt selon la passe
+  const systemPrompt = pass === 1 ? buildSystemPromptPass1() : buildSystemPromptPass2()
+
+  console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
 
   const response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
     method: 'POST',
