@@ -96,16 +96,27 @@ function analyzeChunkComplexity(blocks) {
 }
 
 /**
- * Détecte si un chunk nécessite une passe 2 pour des règles spécifiques
+ * Détecte si un chunk nécessite une passe 2 pour la règle des ministères
  * @param {Array} blocks - Blocs SRT à analyser
  * @returns {boolean} - true si le chunk nécessite une passe 2
  */
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // Détecter tous les cas nécessitant la passe 2
+  // PASSE 2 : UNIQUEMENT la règle des ministères
+  return /ministère/i.test(text)
+}
+
+/**
+ * Détecte si un chunk nécessite une passe 3 pour les autres règles spécifiques
+ * @param {Array} blocks - Blocs SRT à analyser
+ * @returns {boolean} - true si le chunk nécessite une passe 3
+ */
+function needsPass3(blocks) {
+  const text = blocks.map(b => b.text).join(' ')
+
+  // PASSE 3 : Les 7 autres règles spécifiques
   return (
-    /ministère/i.test(text) ||                      // Ministères
     /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
     /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
     /\d{4,}e/i.test(text) ||                        // Ordinaux (1000e)
@@ -448,24 +459,72 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] ${chunksNeedingPass2.length}/${chunks.length} chunks need pass 2`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 2 : Correction ciblée (règles typographiques spécifiques)
+  // PASSE 2 : Correction ciblée (UNIQUEMENT ministères)
   // ═══════════════════════════════════════════════════════════════
-  let finalBlocks = [...blocksAfterPass1]
+  let blocksAfterPass2 = [...blocksAfterPass1]
 
   if (chunksNeedingPass2.length > 0) {
-    console.log(`[processSRT] === PASS 2: Specific rules on ${chunksNeedingPass2.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 2: Ministries rule on ${chunksNeedingPass2.length} chunks in parallel ===`)
 
     const pass2Results = await Promise.all(
       chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 2))
     )
     const pass2Blocks = pass2Results.flat()
 
-    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with specific corrections`)
+    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with ministries corrections`)
 
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner les corrections de la passe 1 et de la passe 2
     // ═══════════════════════════════════════════════════════════════
-    finalBlocks = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, blocks)
+    blocksAfterPass2 = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, blocks)
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // DÉTECTION : Quels chunks nécessitent la passe 3 ?
+  // ═══════════════════════════════════════════════════════════════
+  const chunksNeedingPass3 = []
+
+  chunks.forEach((originalChunk, chunkIndex) => {
+    if (needsPass3(originalChunk)) {
+      // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 2 pour ce chunk
+      const correctedChunk = originalChunk.map(originalBlock => {
+        const blockAfterPass2 = blocksAfterPass2.find(b => b.index === originalBlock.index)
+        if (!blockAfterPass2) {
+          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 2!`)
+          return originalBlock
+        }
+        // Créer un bloc avec le texte corrigé de la passe 2 comme "texte d'entrée"
+        return {
+          index: blockAfterPass2.index,
+          timecode: blockAfterPass2.timecode,
+          text: blockAfterPass2.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+        }
+      })
+      chunksNeedingPass3.push({ chunkIndex, chunk: correctedChunk })
+    }
+  })
+
+  console.log(`[processSRT] ${chunksNeedingPass3.length}/${chunks.length} chunks need pass 3`)
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 3 : Correction ciblée (autres règles spécifiques)
+  // ═══════════════════════════════════════════════════════════════
+  let finalBlocks = [...blocksAfterPass2]
+
+  if (chunksNeedingPass3.length > 0) {
+    console.log(`[processSRT] === PASS 3: Other specific rules on ${chunksNeedingPass3.length} chunks in parallel ===`)
+
+    const pass3Results = await Promise.all(
+      chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 3))
+    )
+    const pass3Blocks = pass3Results.flat()
+
+    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with other specific corrections`)
+
+    // ═══════════════════════════════════════════════════════════════
+    // FUSION : Combiner toutes les corrections (passe 1 + 2 + 3)
+    // ═══════════════════════════════════════════════════════════════
+    finalBlocks = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, blocks)
   }
 
   const endTime = Date.now()
@@ -473,7 +532,8 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] SUMMARY:`)
   console.log(`[processSRT]   Total blocks: ${blocks.length}`)
   console.log(`[processSRT]   Pass 1 corrections: ${pass1Blocks.length} blocks`)
-  console.log(`[processSRT]   Pass 2 corrections: ${chunksNeedingPass2.length} chunks`)
+  console.log(`[processSRT]   Pass 2 (ministries): ${chunksNeedingPass2.length} chunks`)
+  console.log(`[processSRT]   Pass 3 (other rules): ${chunksNeedingPass3.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
@@ -629,50 +689,69 @@ Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
 /**
- * PASSE 2 : Prompt spécifique pour règles typographiques complexes
- * Appliqué UNIQUEMENT sur les chunks détectés avec needsSecondPass()
+ * PASSE 2 : UNIQUEMENT ministères (règle critique prioritaire)
  */
 function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique ces règles dans l'ordre :
+Applique UNIQUEMENT cette règle :
 
-1. MINISTÈRES :
-   Quand tu vois "ministère de/du..." :
-   - "ministère" en minuscule
-   - "de", "du", "des", "de la", "de l'" en minuscule
-   - MAJUSCULE première lettre de tous les autres mots
-   ✗ ministère de l'écologie et des territoires
-   ✓ ministère de l'Écologie et des Territoires
+MINISTÈRES :
+Quand tu vois "ministère de/du..." :
+- "ministère" en minuscule
+- "de", "du", "des", "de la", "de l'" en minuscule
+- MAJUSCULE première lettre de tous les autres mots
 
-2. INSTITUTIONS :
+✗ ministère de l'écologie et des territoires
+✓ ministère de l'Écologie et des Territoires
+
+Format JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
+      "corrections": [
+        {"type": "major", "original": "...", "corrected": "...", "reason": "Majuscules ministère"}
+      ]
+    }
+  ]
+}`
+}
+
+/**
+ * PASSE 3 : Autres règles spécifiques (après ministères)
+ */
+function buildSystemPromptPass3() {
+  return `Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique ces règles :
+
+1. INSTITUTIONS :
    ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
    ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
 
-3. AMBIGUÏTÉ GENRE (type "doubt") :
+2. AMBIGUÏTÉ GENRE (type "doubt") :
    Avec "je" + participe, suggérer l'AUTRE forme :
    "je suis venu" → suggérer "venue" (si femme)
-   "je suis allé" → suggérer "allée" (si femme)
 
-4. ESPACES MILLIERS + ORDINAUX :
+3. ESPACES MILLIERS + ORDINAUX :
    ✗ 10000, 1000e
    ✓ 10 000, 1 000 e
 
-5. TRAITS D'UNION :
+4. TRAITS D'UNION :
    ✗ au dela, par dessus
    ✓ au-delà, par-dessus
 
-6. ELLIPSIS :
+5. ELLIPSIS :
    ✗ ...
    ✓ …
 
-7. MAJUSCULES DIALOGUES :
-   Après "Mesdames et Messieurs," + saut de ligne → minuscule si même locuteur
+6. MAJUSCULES DIALOGUES :
+   Après "Mesdames et Messieurs," + saut de ligne → minuscule
 
-8. MAJUSCULES ABUSIVES :
-   Noms communs en milieu de phrase :
+7. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
    ✓ la plaque, le bâtiment
-   Exception : noms propres (La Grande Arche)
 
 Format JSON :
 {
@@ -741,7 +820,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
- * @param {number} pass - Numéro de passe : 1 (général) ou 2 (spécifique)
+ * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères), 3 (autres règles spécifiques)
  */
 async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le modèle selon le type
@@ -759,7 +838,9 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   const config = modelConfig[modelType] || modelConfig.sonnet
 
   // Choisir le prompt selon la passe
-  const systemPrompt = pass === 1 ? buildSystemPromptPass1() : buildSystemPromptPass2()
+  const systemPrompt = pass === 1 ? buildSystemPromptPass1() :
+                       pass === 2 ? buildSystemPromptPass2() :
+                       buildSystemPromptPass3()
 
   console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
 
