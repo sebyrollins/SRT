@@ -103,18 +103,12 @@ function analyzeChunkComplexity(blocks) {
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // Détecter les cas nécessitant une passe 2 ciblée
+  // Détecter UNIQUEMENT les 3 règles spécifiques de la passe 2
   return (
-    /ministère/i.test(text) ||                      // Règle ministères
-    /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
-    /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
-    /\d{4,}e/i.test(text) ||                        // Nombres avec ordinal
-    /\d{4,}ᵉ/i.test(text) ||                        // Nombres avec ordinal exposant
-    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Grands nombres sans espace
-    /\.\.\./.test(text) ||                          // Ellipsis
-    /mesdames et messieurs/i.test(text) ||          // Majuscules dialogues
-    /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text) || // Majuscules abusives
-    /au dela|par dessus/i.test(text)                // Traits d'union locutions
+    /ministère/i.test(text) ||                  // Règle ministères
+    /\d{4,}e/i.test(text) ||                    // Nombres avec ordinal (1000e)
+    /\d{1,3}(\d{3})+(?!\s)/.test(text) ||       // Grands nombres sans espace (10000)
+    /au dela|par dessus/i.test(text)            // Traits d'union locutions
   )
 }
 
@@ -637,81 +631,41 @@ function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ (orthographe et grammaire OK).
 Applique UNIQUEMENT ces règles spécifiques :
 
-1. MINISTÈRES (type "major") :
-   RÈGLE STRICTE : "ministère" en minuscule + MAJUSCULE aux mots thématiques
+1. MINISTÈRES - RÈGLE STRICTE :
+   "ministère" en minuscule + Majuscule aux mots thématiques
 
-   Exemples à suivre EXACTEMENT :
-   ✓ ministère de la Transition écologique
+   Exemples EXACTS :
    ✓ ministère de l'Écologie et des Territoires
+   ✓ ministère de la Transition écologique
    ✓ ministère de l'Intérieur
-   ✓ ministère des Affaires étrangères
-   ✓ ministère de la Justice
 
-   Erreurs à corriger :
-   ✗ le Ministère de la transition → le ministère de la Transition
    ✗ ministère de l'écologie → ministère de l'Écologie
-   ✗ ministère des affaires étrangères → ministère des Affaires étrangères
+   ✗ ministère des territoires → ministère des Territoires
 
-   ATTENTION : Première lettre des NOMS THÉMATIQUES en MAJUSCULE
-   - "de la" / "de l'" / "du" / "des" → minuscules
-   - Mots thématiques → Majuscules (Transition, Écologie, Territoires, Intérieur, etc.)
+2. ESPACES MILLIERS + ORDINAUX :
+   ✓ 10 000 (espace tous les 3 chiffres)
+   ✓ 1 000 e (espace avant ordinal "e")
+   ✗ 10000, 1000e (FAUX)
 
-2. MAJUSCULES INSTITUTIONS (type "major") :
-   - le gouvernement → le Gouvernement
-   - l'assemblée nationale → l'Assemblée nationale
-   - le sénat → le Sénat
-   - le parlement → le Parlement
+3. TRAITS D'UNION LOCUTIONS :
+   ✓ au-delà, par-dessus
+   ✗ au dela, par dessus (FAUX)
 
-3. AMBIGUÏTÉ DE GENRE (type "doubt") :
-   Avec "je" + adjectif/participe qui s'accorde, suggérer l'AUTRE forme :
-   - "je suis venu" → suggérer "venue" (Si femme qui parle)
-   - "je suis venue" → suggérer "venu" (Si homme qui parle)
-   - "je suis allé/allée", "je parais fatigué/fatiguée", etc.
-
-4. ESPACES MILLIERS + ORDINAUX (type "minor") :
-   - Espace tous les 3 chiffres : 10000 → 10 000
-   - Espace avant ordinal : 1000e → 1 000 e
-   ✗ 10000 (FAUX)
-   ✗ 1000e (FAUX)
-
-5. ELLIPSIS (type "minor") :
-   - Trois points → caractère unique : ... → …
-
-6. MAJUSCULES DIALOGUES (type "minor") :
-   - Après "Mesdames et Messieurs," + nouvelle ligne → minuscule si même locuteur
-
-7. MAJUSCULES ABUSIVES (type "minor") :
-   - Noms communs en milieu de phrase : la Plaque → la plaque
-   - Exceptions : noms propres (La Grande Arche), après un point, début de phrase
-
-8. TRAITS D'UNION LOCUTIONS (type "minor") :
-   - au dela → au-delà
-   - par dessus → par-dessus
-   - en dehors → en dehors (pas de tiret)
-   ✗ au dela (FAUX)
-   ✗ par dessus (FAUX)
-
-Format de réponse JSON :
+Format JSON :
 {
   "blocks": [
     {
       "index": 1,
-      "original": "texte EXACT du bloc (celui AVANT tes corrections)",
-      "corrected": "texte du bloc avec tes corrections APPLIQUÉES",
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "ministère de la transition", "corrected": "ministère de la Transition", "reason": "Majuscule thématique ministère"}
+        {"type": "major", "original": "écologie", "corrected": "Écologie", "reason": "Majuscule ministère"}
       ]
     }
   ]
 }
 
-CRITIQUE :
-- "original" = le texte QUE TU REÇOIS (déjà corrigé par passe 1)
-- "corrected" = texte avec TES corrections typographiques appliquées
-- Ne retourne QUE les blocs où tu appliques ces règles spécifiques
-
-Types : "major" (ministères, institutions), "minor" (espaces, ellipsis, majuscules dialogues)
-Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
+IMPORTANT : Ne retourne QUE les blocs où tu appliques ces 3 règles.`
 }
 
 /**
