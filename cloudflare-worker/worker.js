@@ -609,9 +609,6 @@ Exemples de corrections :
 - rendez vous → rendez-vous
 - c'est a dire → c'est-à-dire
 - peut etre → peut-être
-- au dela → au-delà
-- par dessus → par-dessus
-- en dessous → en dessous (pas de tiret)
 - est ce que → est-ce que
 - c est → c'est
 - "texte" → « texte »
