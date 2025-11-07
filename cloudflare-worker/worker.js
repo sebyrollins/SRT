@@ -112,25 +112,70 @@ function needsSecondPass(blocks) {
 }
 
 /**
+ * Valide qu'une correction appartient bien au texte du bloc
+ * @param {Object} correction - Correction à valider
+ * @param {string} blockText - Texte du bloc (original ou corrigé selon la passe)
+ * @param {number} blockIndex - Index du bloc pour les logs
+ * @returns {boolean} - true si la correction est valide
+ */
+function validateCorrectionBelongsToBlock(correction, blockText, blockIndex) {
+  // Normaliser pour comparaison insensible à la casse
+  const normalizedBlockText = blockText.toLowerCase()
+  const normalizedOriginal = correction.original.toLowerCase()
+
+  // Vérifier si le texte à corriger existe dans le bloc
+  if (!normalizedBlockText.includes(normalizedOriginal)) {
+    console.log(`[validateCorrection] INVALID: Correction "${correction.original}" → "${correction.corrected}" does not belong to block #${blockIndex}`)
+    console.log(`[validateCorrection]   Block text: "${blockText.substring(0, 100)}..."`)
+    return false
+  }
+
+  return true
+}
+
+/**
  * Détecte et supprime les corrections contradictoires entre deux passes
  * @param {Array} pass1Corrections - Corrections de la passe 1
  * @param {Array} pass2Corrections - Corrections de la passe 2
  * @param {string} trueOriginal - Texte original du bloc
+ * @param {string} textAfterPass1 - Texte après la passe 1
+ * @param {number} blockIndex - Index du bloc pour les logs
  * @returns {Array} Liste nettoyée des corrections (sans contradictions)
  */
-function detectContradictoryCorrections(pass1Corrections, pass2Corrections, trueOriginal) {
+function detectContradictoryCorrections(pass1Corrections, pass2Corrections, trueOriginal, textAfterPass1, blockIndex) {
   const validCorrections = []
   const contradictions = []
 
   // Normaliser pour comparaison (trim + toLowerCase)
   const normalize = (text) => text.trim().toLowerCase()
 
-  // Vérifier chaque correction de passe 1
+  // ===================================================================
+  // ÉTAPE 1 : Valider que les corrections appartiennent bien au bloc
+  // ===================================================================
+  const pass1BelongingToBlock = pass1Corrections.filter(corr1 =>
+    validateCorrectionBelongsToBlock(corr1, trueOriginal, blockIndex)
+  )
+
+  const pass2BelongingToBlock = pass2Corrections.filter(corr2 =>
+    validateCorrectionBelongsToBlock(corr2, textAfterPass1, blockIndex)
+  )
+
+  if (pass1Corrections.length !== pass1BelongingToBlock.length) {
+    console.log(`[detectContradictoryCorrections] Removed ${pass1Corrections.length - pass1BelongingToBlock.length} invalid Pass 1 corrections from block #${blockIndex}`)
+  }
+
+  if (pass2Corrections.length !== pass2BelongingToBlock.length) {
+    console.log(`[detectContradictoryCorrections] Removed ${pass2Corrections.length - pass2BelongingToBlock.length} invalid Pass 2 corrections from block #${blockIndex}`)
+  }
+
+  // ===================================================================
+  // ÉTAPE 2 : Détecter les contradictions entre les corrections valides
+  // ===================================================================
   const pass1Valid = []
-  pass1Corrections.forEach(corr1 => {
+  pass1BelongingToBlock.forEach(corr1 => {
     // Chercher si passe 2 annule cette correction
     // Contradiction = passe 2 ramène au texte de départ de passe 1
-    const isContradicted = pass2Corrections.some(corr2 => {
+    const isContradicted = pass2BelongingToBlock.some(corr2 => {
       // Cas 1 : Correction exactement inverse
       // Pass1: A→B, Pass2: B→A
       const exactReverse = (
@@ -142,7 +187,8 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
       // Pass1: A→B, Pass2: B→A (où A est dans l'original)
       const revertsToOriginal = (
         normalize(corr1.corrected) === normalize(corr2.original) &&
-        trueOriginal.toLowerCase().includes(normalize(corr2.corrected))
+        normalize(corr2.corrected) === normalize(corr1.original) &&
+        trueOriginal.toLowerCase().includes(normalize(corr1.original))
       )
 
       return exactReverse || revertsToOriginal
@@ -155,7 +201,7 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
         corrected: corr1.corrected,
         reason: corr1.reason
       })
-      console.log(`[detectContradictoryCorrections] Pass 1 contradiction: "${corr1.original}" → "${corr1.corrected}" (annulée par passe 2)`)
+      console.log(`[detectContradictoryCorrections] Block #${blockIndex} - Pass 1 contradiction: "${corr1.original}" → "${corr1.corrected}" (annulée par passe 2)`)
     } else {
       pass1Valid.push(corr1)
     }
@@ -163,16 +209,17 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
 
   // Vérifier chaque correction de passe 2
   const pass2Valid = []
-  pass2Corrections.forEach(corr2 => {
+  pass2BelongingToBlock.forEach(corr2 => {
     // Chercher si cette correction annule une correction de passe 1
-    const isContradicting = pass1Corrections.some(corr1 => {
+    const isContradicting = pass1BelongingToBlock.some(corr1 => {
       const exactReverse = (
         normalize(corr1.corrected) === normalize(corr2.original) &&
         normalize(corr2.corrected) === normalize(corr1.original)
       )
       const revertsToOriginal = (
         normalize(corr1.corrected) === normalize(corr2.original) &&
-        trueOriginal.toLowerCase().includes(normalize(corr2.corrected))
+        normalize(corr2.corrected) === normalize(corr1.original) &&
+        trueOriginal.toLowerCase().includes(normalize(corr1.original))
       )
       return exactReverse || revertsToOriginal
     })
@@ -184,7 +231,7 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
         corrected: corr2.corrected,
         reason: corr2.reason
       })
-      console.log(`[detectContradictoryCorrections] Pass 2 contradiction: "${corr2.original}" → "${corr2.corrected}" (annule passe 1)`)
+      console.log(`[detectContradictoryCorrections] Block #${blockIndex} - Pass 2 contradiction: "${corr2.original}" → "${corr2.corrected}" (annule passe 1)`)
     } else {
       pass2Valid.push(corr2)
     }
@@ -229,12 +276,15 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
     // STRATÉGIE DE FUSION :
     // 1. Garder le vrai "original" (texte du fichier SRT d'origine)
     // 2. Utiliser le "corrected" de la passe 2 (qui contient TOUTES les corrections appliquées)
-    // 3. Fusionner les listes de corrections EN SUPPRIMANT LES CONTRADICTIONS
+    // 3. Valider que les corrections appartiennent au bloc
+    // 4. Fusionner les listes de corrections EN SUPPRIMANT LES CONTRADICTIONS
 
     const cleanedCorrections = detectContradictoryCorrections(
       blockPass1.corrections || [],
       blockPass2.corrections || [],
-      trueOriginal
+      trueOriginal,
+      blockPass1.corrected,  // Texte après la passe 1 (pour valider les corrections de passe 2)
+      blockPass1.index       // Index du bloc pour les logs
     )
 
     console.log(`  → Merged: ${cleanedCorrections.length} total corrections (${(blockPass1.corrections?.length || 0) + (blockPass2.corrections?.length || 0) - cleanedCorrections.length} contradictions removed)`)
