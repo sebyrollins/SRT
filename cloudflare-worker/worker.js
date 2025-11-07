@@ -260,9 +260,25 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
   return blocksAfterPass1.map(blockPass1 => {
     const blockPass2 = pass2Map.get(blockPass1.index)
 
-    // Si ce bloc n'a pas été traité par la passe 2, retourner le bloc de la passe 1 tel quel
+    // Si ce bloc n'a pas été traité par la passe 2, valider quand même les corrections de passe 1
     if (!blockPass2) {
-      return blockPass1
+      const originalBlock = originalMap.get(blockPass1.index)
+      const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
+
+      // Valider les corrections de passe 1
+      const validPass1Corrections = (blockPass1.corrections || []).filter(corr =>
+        validateCorrectionBelongsToBlock(corr, trueOriginal, blockPass1.index)
+      )
+
+      if (validPass1Corrections.length !== (blockPass1.corrections || []).length) {
+        console.log(`[mergePass1AndPass2] Block #${blockPass1.index}: Removed ${(blockPass1.corrections || []).length - validPass1Corrections.length} invalid Pass 1 corrections`)
+      }
+
+      return {
+        ...blockPass1,
+        original: trueOriginal,
+        corrections: validPass1Corrections
+      }
     }
 
     // FUSION : Ce bloc a été traité par les deux passes
@@ -270,6 +286,9 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
     const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
 
     console.log(`[mergePass1AndPass2] Merging block #${blockPass1.index}`)
+    console.log(`  - True original: "${trueOriginal.substring(0, 60)}..."`)
+    console.log(`  - After Pass 1: "${blockPass1.corrected.substring(0, 60)}..."`)
+    console.log(`  - After Pass 2: "${blockPass2.corrected.substring(0, 60)}..."`)
     console.log(`  - Pass 1: ${blockPass1.corrections?.length || 0} corrections`)
     console.log(`  - Pass 2: ${blockPass2.corrections?.length || 0} corrections`)
 
@@ -287,7 +306,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
       blockPass1.index       // Index du bloc pour les logs
     )
 
-    console.log(`  → Merged: ${cleanedCorrections.length} total corrections (${(blockPass1.corrections?.length || 0) + (blockPass2.corrections?.length || 0) - cleanedCorrections.length} contradictions removed)`)
+    console.log(`  → Merged: ${cleanedCorrections.length} total corrections (${(blockPass1.corrections?.length || 0) + (blockPass2.corrections?.length || 0) - cleanedCorrections.length} invalid/contradictory removed)`)
 
     return {
       index: blockPass1.index,
