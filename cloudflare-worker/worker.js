@@ -1052,55 +1052,43 @@ Format JSON :
  * PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée pour fiabilité)
  */
 function buildSystemPromptPass4() {
-  return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique UNIQUEMENT cette règle :
+  return `Tu corriges des sous-titres français.
 
-AMBIGUÏTÉ DE GENRE :
-TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
-NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
+RÈGLE UNIQUE À APPLIQUER :
+Quand tu vois "je" + verbe d'état (être, devenir, rester, paraître, sembler, etc.) + adjectif/participe passé accordable,
+tu DOIS créer une correction de type "doubt" qui suggère l'autre genre.
 
-RÈGLE IMPORTANTE :
-Dans un sous-titre (SRT), quand on voit "je" + VERBE D'ÉTAT + participe passé/adjectif, on ne peut PAS savoir si c'est un homme ou une femme qui parle.
-MÊME SI le texte actuel indique un genre (ex: "engagée" = féminin), tu dois TOUJOURS suggérer l'autre forme.
+POURQUOI ? Dans un sous-titre, on ne sait pas si "je" est un homme ou une femme.
 
-VERBES D'ÉTAT concernés : être, devenir, paraître, sembler, demeurer, rester, tomber, avoir l'air, se faire, se montrer, se trouver, naître, vivre, mourir, etc.
+EXEMPLES :
+- "je suis venu" → type: "doubt", corrected: "je suis venu (ou venue)"
+- "je suis engagée" → type: "doubt", corrected: "je suis engagée (ou engagé)"
+- "je deviens fatigué" → type: "doubt", corrected: "je deviens fatigué (ou fatiguée)"
+- "je reste convaincu" → type: "doubt", corrected: "je reste convaincu (ou convaincue)"
 
-Exemples avec différents verbes (peu importe le genre actuel du texte) :
-- je suis engagé → je suis engagé (ou engagée)
-- je suis venue → je suis venue (ou venu)
-- je deviens fatigué → je deviens fatigué (ou fatiguée)
-- je reste convaincu → je reste convaincu (ou convaincue)
-- je parais étonné → je parais étonné (ou étonnée)
-- je semble perdu → je semble perdu (ou perdue)
-- je tombe amoureux → je tombe amoureux (ou amoureuse)
-- je me fais vieux → je me fais vieux (ou vieille)
-- je vis heureux → je vis heureux (ou heureuse)
-
-✗ INCORRECT : je suis venu → je suis venue (remplacement)
-✓ CORRECT : je suis venu → je suis venu (ou venue) (suggestion)
-✓ CORRECT : je deviens fatigué → je deviens fatigué (ou fatiguée) (suggestion)
-
-C'est une SUGGESTION, pas une correction !
-
-Format JSON :
+FORMAT DE RÉPONSE :
 {
   "blocks": [
     {
       "index": 1,
-      "original": "texte reçu",
-      "corrected": "texte corrigé",
+      "original": "texte exact reçu",
+      "corrected": "texte avec suggestion genre ajoutée",
       "corrections": [
-        {"type": "doubt", "original": "je suis engagée", "corrected": "je suis engagée (ou engagé)", "reason": "Ambiguïté de genre"}
+        {
+          "type": "doubt",
+          "original": "je suis venu",
+          "corrected": "je suis venu (ou venue)",
+          "reason": "Genre du locuteur inconnu"
+        }
       ]
     }
   ]
 }
 
-RAPPEL CRITIQUE:
-- Type = "doubt" (JAMAIS "major")
-- Ajouter "(ou ...)" pour suggérer l'AUTRE genre
-- NE PAS remplacer le genre actuel, AJOUTER l'alternative
-- Peu importe si le texte est masculin ou féminin, TOUJOURS suggérer l'autre forme`
+IMPORTANT :
+- Type = TOUJOURS "doubt"
+- Ajouter "(ou forme_alternative)" après l'adjectif/participe
+- Si aucune ambiguïté de genre trouvée, retourner {"blocks": []}`
 }
 
 /**
