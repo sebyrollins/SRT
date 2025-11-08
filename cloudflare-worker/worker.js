@@ -133,29 +133,6 @@ function needsPass3(blocks) {
 }
 
 /**
- * Détecte si un chunk nécessite une passe 4 pour l'ambiguïté de genre
- * @param {Array} blocks - Blocs SRT à analyser
- * @returns {boolean} - true si le chunk nécessite une passe 4
- */
-function needsPass4(blocks) {
-  const text = blocks.map(b => b.text).join(' ')
-
-  // PASSE 4 : UNIQUEMENT ambiguïté de genre
-  // Détecter "je" + verbe d'état + participe passé/adjectif accordable
-  // Verbes d'état: être, devenir, paraître, sembler, demeurer, rester, tomber, naître, vivre, mourir, etc.
-  // Terminaisons accordables: é/ée, i/ie, u/ue, t/te, s/se, eux/euse, if/ive, er/ère, et/ette, etc.
-  // Note: (?=\W|$) accepte la ponctuation après (ex: "venu." "partie!")
-
-  const stateVerbs = 'suis|deviens|redeviens|parais|apparais|semble|demeure|reste|ai l\'air|passe pour|tombe|retombe|me fais|me montre|me trouve|me révèle|m\'avère|m\'affirme|nais|vis|meurs'
-
-  // Terminaisons de participes passés et adjectifs accordables
-  const endings = 'é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|s|se|eux|euse|euses|if|ive|ifs|ives|er|ère|ers|ères|et|ette|ets|ettes|el|elle|els|elles|ien|ienne|iens|iennes|on|onne|ons|onnes|ain|aine|ains|aines|in|ine|ins|ines|an|ane|ans|anes'
-
-  const regex = new RegExp(`\\bje (${stateVerbs}) \\S*?(?:${endings})(?=\\W|$)`, 'i')
-  return regex.test(text)
-}
-
-/**
  * PASSE 0 : Prétraitement avec regex (règles déterministes)
  * Applique des corrections typographiques sûres sans appel API
  * @param {string} text - Texte à corriger
@@ -764,27 +741,28 @@ async function processSRT(srtContent, modelType = 'haiku') {
   // ═══════════════════════════════════════════════════════════════
   const chunksNeedingPass4 = []
 
+  // IMPORTANT : On envoie TOUS les chunks à Pass 4
+  // Laisser Claude détecter lui-même les cas d'ambiguïté de genre
+  // (plus fiable que la regex)
   chunks.forEach((originalChunk, chunkIndex) => {
-    if (needsPass4(originalChunk)) {
-      // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
-      const correctedChunk = originalChunk.map(originalBlock => {
-        const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
-        if (!blockAfterPass3) {
-          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 3!`)
-          return originalBlock
-        }
-        // Créer un bloc avec le texte corrigé de la passe 3 comme "texte d'entrée"
-        return {
-          index: blockAfterPass3.index,
-          timecode: blockAfterPass3.timecode,
-          text: blockAfterPass3.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
-        }
-      })
-      chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
-    }
+    // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
+    const correctedChunk = originalChunk.map(originalBlock => {
+      const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
+      if (!blockAfterPass3) {
+        console.error(`[processSRT] Block ${originalBlock.index} not found after pass 3!`)
+        return originalBlock
+      }
+      // Créer un bloc avec le texte corrigé de la passe 3 comme "texte d'entrée"
+      return {
+        index: blockAfterPass3.index,
+        timecode: blockAfterPass3.timecode,
+        text: blockAfterPass3.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+      }
+    })
+    chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
   })
 
-  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks need pass 4`)
+  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks sent to pass 4 (all chunks)`)
 
   // ═══════════════════════════════════════════════════════════════
   // PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée)
