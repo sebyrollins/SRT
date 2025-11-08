@@ -945,9 +945,14 @@ Applique ces règles :
    ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
    ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
 
-2. AMBIGUÏTÉ GENRE (type "doubt") :
-   Avec "je" + participe, suggérer l'AUTRE forme :
-   "je suis venu" → suggérer "venue" (si femme)
+2. AMBIGUÏTÉ GENRE :
+   TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
+   NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
+
+   ✗ je suis venu → je suis venue
+   ✓ je suis venu → je suis venu (ou venue)
+
+   C'est une SUGGESTION, pas une correction
 
 3. ESPACES MILLIERS + ORDINAUX :
    ✗ 10000, 1000e
@@ -969,11 +974,14 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "...", "corrected": "...", "reason": "..."}
+        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
+        {"type": "doubt", "original": "je suis venu", "corrected": "je suis venu (ou venue)", "reason": "Ambiguïté de genre"}
       ]
     }
   ]
-}`
+}
+
+RAPPEL: Type "doubt" = suggestion UNIQUEMENT (ajouter "ou ..."), PAS une correction !`
 }
 
 /**
