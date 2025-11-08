@@ -744,9 +744,9 @@ async function processSRT(srtContent, modelType = 'haiku') {
   // Filtrer pour n'envoyer que les chunks contenant "je/Je/J'/j'"
   // Économise les appels API en excluant les chunks sans "je"
   chunks.forEach((originalChunk, chunkIndex) => {
-    // Vérifier si le chunk contient "je", "Je", "J'" ou "j'" (apostrophe droite ' ou courbe ')
+    // Vérifier si le chunk contient "je" (toute casse : je/Je/JE) ou "j'" (apostrophe droite/courbe)
     const chunkText = originalChunk.map(b => b.text).join(' ')
-    const containsJe = /\b[jJ]e\b|\b[jJ]['\u2019]/.test(chunkText)
+    const containsJe = /\bje\b|\bj['\u2019]/i.test(chunkText)
 
     if (!containsJe) {
       return // Skip ce chunk, pas de "je"
