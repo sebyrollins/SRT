@@ -141,9 +141,18 @@ function needsPass4(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
   // PASSE 4 : UNIQUEMENT ambiguïté de genre
-  // Détecter "je suis" + participe passé (terminaisons: é/ée/és/ées, i/ie/is/ies, u/ue/us/ues, t/te/ts/tes, s/se)
-  // Note: Utiliser (?=\W|$) pour accepter la ponctuation après le participe (ex: "venu." "partie!")
-  return /\bje suis \S*?(?:é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|se)(?=\W|$)/i.test(text)
+  // Détecter "je" + verbe d'état + participe passé/adjectif accordable
+  // Verbes d'état: être, devenir, paraître, sembler, demeurer, rester, tomber, naître, vivre, mourir, etc.
+  // Terminaisons accordables: é/ée, i/ie, u/ue, t/te, s/se, eux/euse, if/ive, er/ère, et/ette, etc.
+  // Note: (?=\W|$) accepte la ponctuation après (ex: "venu." "partie!")
+
+  const stateVerbs = 'suis|deviens|redeviens|parais|apparais|semble|demeure|reste|ai l\'air|passe pour|tombe|retombe|me fais|me montre|me trouve|me révèle|m\'avère|m\'affirme|nais|vis|meurs'
+
+  // Terminaisons de participes passés et adjectifs accordables
+  const endings = 'é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|s|se|eux|euse|euses|if|ive|ifs|ives|er|ère|ers|ères|et|ette|ets|ettes|el|elle|els|elles|ien|ienne|iens|iennes|on|onne|ons|onnes|ain|aine|ains|aines|in|ine|ins|ines|an|ane|ans|anes'
+
+  const regex = new RegExp(`\\bje (${stateVerbs}) \\S*?(?:${endings})(?=\\W|$)`, 'i')
+  return regex.test(text)
 }
 
 /**
@@ -1051,22 +1060,25 @@ TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
 NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
 
 RÈGLE IMPORTANTE :
-Dans un sous-titre (SRT), quand on voit "je suis" + participe passé, on ne peut PAS savoir si c'est un homme ou une femme qui parle.
+Dans un sous-titre (SRT), quand on voit "je" + VERBE D'ÉTAT + participe passé/adjectif, on ne peut PAS savoir si c'est un homme ou une femme qui parle.
 MÊME SI le texte actuel indique un genre (ex: "engagée" = féminin), tu dois TOUJOURS suggérer l'autre forme.
 
-Exemples (peu importe le genre actuel du texte) :
+VERBES D'ÉTAT concernés : être, devenir, paraître, sembler, demeurer, rester, tomber, avoir l'air, se faire, se montrer, se trouver, naître, vivre, mourir, etc.
+
+Exemples avec différents verbes (peu importe le genre actuel du texte) :
 - je suis engagé → je suis engagé (ou engagée)
-- je suis engagée → je suis engagée (ou engagé)
 - je suis venue → je suis venue (ou venu)
-- je suis venu → je suis venu (ou venue)
-- je suis allé → je suis allé (ou allée)
-- je suis allée → je suis allée (ou allé)
-- je suis parti → je suis parti (ou partie)
-- je suis partie → je suis partie (ou parti)
+- je deviens fatigué → je deviens fatigué (ou fatiguée)
+- je reste convaincu → je reste convaincu (ou convaincue)
+- je parais étonné → je parais étonné (ou étonnée)
+- je semble perdu → je semble perdu (ou perdue)
+- je tombe amoureux → je tombe amoureux (ou amoureuse)
+- je me fais vieux → je me fais vieux (ou vieille)
+- je vis heureux → je vis heureux (ou heureuse)
 
 ✗ INCORRECT : je suis venu → je suis venue (remplacement)
 ✓ CORRECT : je suis venu → je suis venu (ou venue) (suggestion)
-✓ CORRECT : je suis engagée → je suis engagée (ou engagé) (suggestion de l'autre forme)
+✓ CORRECT : je deviens fatigué → je deviens fatigué (ou fatiguée) (suggestion)
 
 C'est une SUGGESTION, pas une correction !
 
