@@ -123,7 +123,7 @@ function needsPass3(blocks) {
     /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Milliers (10000)
     /au dela|par dessus/i.test(text) ||             // Traits d'union
     /\.\.\./.test(text) ||                          // Ellipsis
-    /mesdames et messieurs/i.test(text) ||          // Dialogues
+    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text) || // Formules de politesse
     /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
   )
 }
@@ -746,10 +746,12 @@ Applique ces règles :
    ✗ ...
    ✓ …
 
-6. MESDAMES ET MESSIEURS :
-   Dans un discours oral (SRT), seul le premier mot prend la majuscule
-   ✗ Mesdames et Messieurs
-   ✓ Mesdames et messieurs
+6. MONSIEUR / MADAME / MADEMOISELLE :
+   Dans un discours oral (SRT), minuscule sauf début de phrase
+   ✗ Bonjour Monsieur, Merci Madame, Mesdames et Messieurs
+   ✓ Bonjour monsieur, Merci madame, Mesdames et messieurs
+   ✗ Monsieur le président, Monsieur le Président
+   ✓ Monsieur le président, monsieur le Président
 
 7. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
