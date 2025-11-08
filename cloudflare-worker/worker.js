@@ -34,7 +34,7 @@ async function handleRequest(request) {
 
   try {
     const data = await request.json()
-    const { srtContent, fileName } = data
+    const { srtContent, fileName, model } = data
 
     if (!srtContent) {
       return new Response(JSON.stringify({ error: 'Contenu SRT manquant' }), {
@@ -43,8 +43,12 @@ async function handleRequest(request) {
       })
     }
 
+    // Déterminer le modèle à utiliser (haiku par défaut)
+    const modelType = model === 'sonnet' ? 'sonnet' : 'haiku'
+    console.log(`[handleRequest] Using model: ${modelType}`)
+
     // Traitement du contenu SRT
-    const result = await processSRT(srtContent)
+    const result = await processSRT(srtContent, modelType)
 
     return new Response(JSON.stringify({
       success: true,
@@ -566,9 +570,10 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
 /**
  * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
- * Utilise Sonnet pour garantir la qualité maximale sur toutes les règles
+ * @param {string} srtContent - Contenu du fichier SRT
+ * @param {string} modelType - Type de modèle à utiliser : 'haiku' (rapide) ou 'sonnet' (qualité)
  */
-async function processSRT(srtContent) {
+async function processSRT(srtContent, modelType = 'haiku') {
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
@@ -621,7 +626,7 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] === PASS 1: General corrections on ${preprocessedChunks.length} chunks in parallel ===`)
 
   const pass1Chunks = await Promise.all(
-    preprocessedChunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
+    preprocessedChunks.map(chunk => correctWithClaude(chunk, modelType, 1))
   )
   const pass1Blocks = pass1Chunks.flat()
 
@@ -685,7 +690,7 @@ async function processSRT(srtContent) {
     console.log(`[processSRT] === PASS 2: Ministries + politeness formulas on ${chunksNeedingPass2.length} chunks in parallel ===`)
 
     const pass2Results = await Promise.all(
-      chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 2))
+      chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, modelType, 2))
     )
     const pass2Blocks = pass2Results.flat()
 
@@ -733,7 +738,7 @@ async function processSRT(srtContent) {
     console.log(`[processSRT] === PASS 3: Institutions + formatting rules on ${chunksNeedingPass3.length} chunks in parallel ===`)
 
     const pass3Results = await Promise.all(
-      chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 3))
+      chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, modelType, 3))
     )
     const pass3Blocks = pass3Results.flat()
 
@@ -781,7 +786,7 @@ async function processSRT(srtContent) {
     console.log(`[processSRT] === PASS 4: Gender ambiguity ONLY on ${chunksNeedingPass4.length} chunks in parallel ===`)
 
     const pass4Results = await Promise.all(
-      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 4))
+      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4))
     )
     const pass4Blocks = pass4Results.flat()
 
@@ -1137,10 +1142,10 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
 /**
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
- * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
+ * @param {string} modelType - Type de modèle : 'haiku' (rapide, par défaut) ou 'sonnet' (qualité max)
  * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (4 règles), 4 (genre UNIQUEMENT)
  */
-async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
+async function correctWithClaude(blocks, modelType = 'haiku', pass = 1) {
   // Choisir le modèle selon le type
   const modelConfig = {
     sonnet: {

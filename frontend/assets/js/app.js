@@ -430,6 +430,10 @@ async function sendToWorker(content, filename) {
     throw new Error(`⚠️ Le Worker Cloudflare n'est pas encore configuré.\n\nÉtapes :\n1. Déployez le Worker sur Cloudflare\n2. Modifiez l'URL dans frontend/lib/config.php\n\nConsultez le README.md pour les instructions.`)
   }
 
+  // Récupérer le modèle sélectionné
+  const modelSelect = document.getElementById('modelSelect')
+  const selectedModel = modelSelect ? modelSelect.value : 'haiku'
+
   const response = await fetch(window.APP_CONFIG.workerUrl, {
     method: 'POST',
     headers: {
@@ -437,7 +441,8 @@ async function sendToWorker(content, filename) {
     },
     body: JSON.stringify({
       srtContent: content,
-      fileName: filename
+      fileName: filename,
+      model: selectedModel
     })
   })
 

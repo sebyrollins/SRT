@@ -60,6 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                     </h1>
                     <p class="app-subtitle">Correction professionnelle de sous-titres avec IA by SebyRollins 2025</p>
                 </div>
+                <div class="header-model-selector">
+                    <label for="modelSelect" class="model-label">Modèle :</label>
+                    <select id="modelSelect" class="model-select">
+                        <option value="haiku" selected>Basique - Haiku</option>
+                        <option value="sonnet">Pro - Sonnet 4.5</option>
+                    </select>
+                </div>
             </div>
         </div>
     </header>
