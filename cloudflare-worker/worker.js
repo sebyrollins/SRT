@@ -96,15 +96,18 @@ function analyzeChunkComplexity(blocks) {
 }
 
 /**
- * Détecte si un chunk nécessite une passe 2 pour la règle des ministères
+ * Détecte si un chunk nécessite une passe 2 pour ministères + formules de politesse
  * @param {Array} blocks - Blocs SRT à analyser
  * @returns {boolean} - true si le chunk nécessite une passe 2
  */
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 2 : UNIQUEMENT la règle des ministères
-  return /ministère/i.test(text)
+  // PASSE 2 : Ministères + Monsieur/Madame/Mademoiselle
+  return (
+    /ministère/i.test(text) ||
+    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text)
+  )
 }
 
 /**
@@ -115,7 +118,7 @@ function needsSecondPass(blocks) {
 function needsPass3(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 3 : Les 7 autres règles spécifiques
+  // PASSE 3 : Les 6 règles restantes (Monsieur/Madame maintenant en Pass 2)
   return (
     /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
     /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
@@ -123,7 +126,6 @@ function needsPass3(blocks) {
     /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Milliers (10000)
     /au dela|par dessus/i.test(text) ||             // Traits d'union
     /\.\.\./.test(text) ||                          // Ellipsis
-    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text) || // Formules de politesse
     /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
   )
 }
@@ -459,19 +461,19 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] ${chunksNeedingPass2.length}/${chunks.length} chunks need pass 2`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 2 : Correction ciblée (UNIQUEMENT ministères)
+  // PASSE 2 : Correction ciblée (ministères + formules de politesse)
   // ═══════════════════════════════════════════════════════════════
   let blocksAfterPass2 = [...blocksAfterPass1]
 
   if (chunksNeedingPass2.length > 0) {
-    console.log(`[processSRT] === PASS 2: Ministries rule on ${chunksNeedingPass2.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 2: Ministries + politeness formulas on ${chunksNeedingPass2.length} chunks in parallel ===`)
 
     const pass2Results = await Promise.all(
       chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 2))
     )
     const pass2Blocks = pass2Results.flat()
 
-    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with ministries corrections`)
+    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with ministries + politeness corrections`)
 
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner les corrections de la passe 1 et de la passe 2
@@ -532,8 +534,8 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] SUMMARY:`)
   console.log(`[processSRT]   Total blocks: ${blocks.length}`)
   console.log(`[processSRT]   Pass 1 corrections: ${pass1Blocks.length} blocks`)
-  console.log(`[processSRT]   Pass 2 (ministries): ${chunksNeedingPass2.length} chunks`)
-  console.log(`[processSRT]   Pass 3 (other rules): ${chunksNeedingPass3.length} chunks`)
+  console.log(`[processSRT]   Pass 2 (ministries + politeness): ${chunksNeedingPass2.length} chunks`)
+  console.log(`[processSRT]   Pass 3 (other 6 rules): ${chunksNeedingPass3.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
@@ -689,20 +691,29 @@ Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
 /**
- * PASSE 2 : UNIQUEMENT ministères (règle critique prioritaire)
+ * PASSE 2 : Ministères + Formules de politesse
  */
 function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique UNIQUEMENT cette règle :
+Applique CES DEUX règles :
 
-MINISTÈRES :
-Quand tu vois "ministère de/du..." :
-- "ministère" en minuscule
-- "de", "du", "des", "de la", "de l'" en minuscule
-- MAJUSCULE première lettre de tous les autres mots
+1. MINISTÈRES :
+   Quand tu vois "ministère de/du..." :
+   - "ministère" en minuscule
+   - "de", "du", "des", "de la", "de l'" en minuscule
+   - MAJUSCULE première lettre de tous les autres mots
 
-✗ ministère de l'écologie et des territoires
-✓ ministère de l'Écologie et des Territoires
+   ✗ ministère de l'écologie et des territoires
+   ✓ ministère de l'Écologie et des Territoires
+
+2. MONSIEUR / MADAME / MADEMOISELLE :
+   Dans un discours oral (SRT), minuscule sauf début de phrase
+
+   ✗ Bonjour Monsieur, Merci Madame, Mesdames et Messieurs
+   ✓ Bonjour monsieur, Merci madame, Mesdames et messieurs
+
+   ✗ Monsieur le président, Monsieur le Président
+   ✓ Monsieur le président, monsieur le Président
 
 Format JSON :
 {
@@ -712,7 +723,7 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "...", "corrected": "...", "reason": "Majuscules ministère"}
+        {"type": "major", "original": "...", "corrected": "...", "reason": "..."}
       ]
     }
   ]
@@ -720,7 +731,7 @@ Format JSON :
 }
 
 /**
- * PASSE 3 : Autres règles spécifiques (après ministères)
+ * PASSE 3 : Autres règles spécifiques (après ministères et formules de politesse)
  */
 function buildSystemPromptPass3() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
@@ -746,14 +757,7 @@ Applique ces règles :
    ✗ ...
    ✓ …
 
-6. MONSIEUR / MADAME / MADEMOISELLE :
-   Dans un discours oral (SRT), minuscule sauf début de phrase
-   ✗ Bonjour Monsieur, Merci Madame, Mesdames et Messieurs
-   ✓ Bonjour monsieur, Merci madame, Mesdames et messieurs
-   ✗ Monsieur le président, Monsieur le Président
-   ✓ Monsieur le président, monsieur le Président
-
-7. MAJUSCULES ABUSIVES :
+6. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
    ✓ la plaque, le bâtiment
 
@@ -824,7 +828,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
- * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères), 3 (autres règles spécifiques)
+ * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (6 autres règles)
  */
 async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le modèle selon le type
