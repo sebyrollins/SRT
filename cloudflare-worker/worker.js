@@ -138,7 +138,8 @@ function needsPass4(blocks) {
 
   // PASSE 4 : UNIQUEMENT ambiguïté de genre
   // Détecter "je suis" + participe passé (terminaisons: é/ée/és/ées, i/ie/is/ies, u/ue/us/ues, t/te/ts/tes, s/se)
-  return /\bje suis \w+(é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|s|se)\b/i.test(text)
+  // Note: \b ne fonctionne pas avec les accents en JS, donc on utilise un lookahead (?=\s|$) pour fin de mot
+  return /\bje suis \S*?(?:é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|se)(?=\s|$)/i.test(text)
 }
 
 /**
@@ -1044,15 +1045,23 @@ AMBIGUÏTÉ DE GENRE :
 TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
 NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
 
-Quand tu vois "je" + participe passé, ajoute l'AUTRE forme entre parenthèses :
-- je suis engagé → je suis engagé (ou engagée)
-- je suis venue → je suis venue (ou venu)
-- je suis allé → je suis allé (ou allée)
-- je suis parti → je suis parti (ou partie)
-- je suis arrivé → je suis arrivé (ou arrivée)
+RÈGLE IMPORTANTE :
+Dans un sous-titre (SRT), quand on voit "je suis" + participe passé, on ne peut PAS savoir si c'est un homme ou une femme qui parle.
+MÊME SI le texte actuel indique un genre (ex: "engagée" = féminin), tu dois TOUJOURS suggérer l'autre forme.
 
-✗ INCORRECT : je suis venu → je suis venue (correction)
+Exemples (peu importe le genre actuel du texte) :
+- je suis engagé → je suis engagé (ou engagée)
+- je suis engagée → je suis engagée (ou engagé)
+- je suis venue → je suis venue (ou venu)
+- je suis venu → je suis venu (ou venue)
+- je suis allé → je suis allé (ou allée)
+- je suis allée → je suis allée (ou allé)
+- je suis parti → je suis parti (ou partie)
+- je suis partie → je suis partie (ou parti)
+
+✗ INCORRECT : je suis venu → je suis venue (remplacement)
 ✓ CORRECT : je suis venu → je suis venu (ou venue) (suggestion)
+✓ CORRECT : je suis engagée → je suis engagée (ou engagé) (suggestion de l'autre forme)
 
 C'est une SUGGESTION, pas une correction !
 
@@ -1064,7 +1073,7 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "doubt", "original": "je suis engagé", "corrected": "je suis engagé (ou engagée)", "reason": "Ambiguïté de genre"}
+        {"type": "doubt", "original": "je suis engagée", "corrected": "je suis engagée (ou engagé)", "reason": "Ambiguïté de genre"}
       ]
     }
   ]
@@ -1072,8 +1081,9 @@ Format JSON :
 
 RAPPEL CRITIQUE:
 - Type = "doubt" (JAMAIS "major")
-- Ajouter "(ou ...)" à la fin
-- NE PAS remplacer, COMPLÉTER`
+- Ajouter "(ou ...)" pour suggérer l'AUTRE genre
+- NE PAS remplacer le genre actuel, AJOUTER l'alternative
+- Peu importe si le texte est masculin ou féminin, TOUJOURS suggérer l'autre forme`
 }
 
 /**
