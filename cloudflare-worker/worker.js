@@ -52,7 +52,8 @@ async function handleRequest(request) {
 
     return new Response(JSON.stringify({
       success: true,
-      data: result,
+      data: result.blocks,
+      debugLogs: result.debugLogs,
       fileName: fileName
     }), {
       status: 200,
@@ -560,6 +561,9 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
  * @param {string} modelType - Type de modèle à utiliser : 'haiku' (rapide) ou 'sonnet' (qualité)
  */
 async function processSRT(srtContent, modelType = 'haiku') {
+  // Tableau de logs pour debugging (sera renvoyé au frontend)
+  const debugLogs = []
+
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
@@ -783,7 +787,7 @@ async function processSRT(srtContent, modelType = 'haiku') {
     console.log(`[DEBUG Pass 4] First chunk content:`, chunksNeedingPass4[0]?.chunk.slice(0, 3).map(b => b.text))
 
     const pass4Results = await Promise.all(
-      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4))
+      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4, debugLogs))
     )
     const pass4Blocks = pass4Results.flat()
 
@@ -820,7 +824,10 @@ async function processSRT(srtContent, modelType = 'haiku') {
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
-  return finalBlocks
+  return {
+    blocks: finalBlocks,
+    debugLogs: debugLogs
+  }
 }
 
 /**
@@ -1146,7 +1153,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
  * @param {string} modelType - Type de modèle : 'haiku' (rapide, par défaut) ou 'sonnet' (qualité max)
  * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (4 règles), 4 (genre UNIQUEMENT)
  */
-async function correctWithClaude(blocks, modelType = 'haiku', pass = 1) {
+async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLogs = null) {
   // Choisir le modèle selon le type
   const modelConfig = {
     sonnet: {
@@ -1173,6 +1180,15 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1) {
   if (pass === 4) {
     const userPrompt = buildUserPrompt(blocks)
     console.log(`[DEBUG Pass 4] User prompt (first 1000 chars):`, userPrompt.substring(0, 1000))
+    // Ajouter aux logs de debug pour le frontend
+    if (debugLogs) {
+      debugLogs.push({
+        type: 'pass4_user_prompt',
+        content: userPrompt,
+        blocksCount: blocks.length,
+        timestamp: new Date().toISOString()
+      })
+    }
   }
 
   const response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
@@ -1221,6 +1237,15 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1) {
   // DEBUG Pass 4 : Log complet de la réponse pour comprendre pourquoi aucune correction
   if (pass === 4) {
     console.log(`[DEBUG Pass 4] FULL Claude response:`, content)
+    // Ajouter aux logs de debug pour le frontend
+    if (debugLogs) {
+      debugLogs.push({
+        type: 'pass4_claude_response',
+        content: content,
+        blocksCount: blocks.length,
+        timestamp: new Date().toISOString()
+      })
+    }
   }
 
   // Nettoyer la réponse (enlever les balises markdown si présentes)

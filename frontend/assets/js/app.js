@@ -457,6 +457,21 @@ async function sendToWorker(content, filename) {
     throw new Error(result.error || 'Erreur inconnue')
   }
 
+  // Afficher les logs de debug si présents
+  if (result.debugLogs && result.debugLogs.length > 0) {
+    console.log('=== DEBUG LOGS FROM WORKER ===')
+    result.debugLogs.forEach((log, index) => {
+      console.log(`\n[${index + 1}] ${log.type} (${log.timestamp}):`)
+      if (log.type === 'pass4_user_prompt') {
+        console.log('User Prompt:', log.content)
+      } else if (log.type === 'pass4_claude_response') {
+        console.log('Claude Response:', log.content)
+        console.log('Blocks Count:', log.blocksCount)
+      }
+    })
+    console.log('=== END DEBUG LOGS ===\n')
+  }
+
   return result.data
 }
 
