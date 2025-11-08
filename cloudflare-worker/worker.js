@@ -118,16 +118,99 @@ function needsSecondPass(blocks) {
 function needsPass3(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 3 : Les 6 règles restantes (Monsieur/Madame maintenant en Pass 2)
+  // PASSE 3 : Les 5 règles restantes (ellipsis géré par Pass 0)
   return (
     /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
     /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
     /\d{4,}e/i.test(text) ||                        // Ordinaux (1000e)
     /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Milliers (10000)
     /au dela|par dessus/i.test(text) ||             // Traits d'union
-    /\.\.\./.test(text) ||                          // Ellipsis
     /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
   )
+}
+
+/**
+ * PASSE 0 : Prétraitement avec regex (règles déterministes)
+ * Applique des corrections typographiques sûres sans appel API
+ * @param {string} text - Texte à corriger
+ * @returns {Object} - { corrected: string, corrections: Array }
+ */
+function preProcessWithRegex(text) {
+  let corrected = text
+  const corrections = []
+
+  // 1. ELLIPSIS : ... → …
+  if (/\.\.\./.test(corrected)) {
+    const matches = corrected.match(/\.\.\./g)
+    if (matches) {
+      corrections.push({
+        type: 'minor',
+        original: '...',
+        corrected: '…',
+        reason: 'Ellipsis typographique'
+      })
+      corrected = corrected.replace(/\.\.\./g, '…')
+    }
+  }
+
+  // 2. ESPACES MULTIPLES : "  " → " "
+  if (/ {2,}/.test(corrected)) {
+    const beforeSpaces = corrected.match(/ {2,}/g)
+    if (beforeSpaces && beforeSpaces.length > 0) {
+      corrections.push({
+        type: 'minor',
+        original: beforeSpaces[0],
+        corrected: ' ',
+        reason: 'Espaces multiples'
+      })
+      corrected = corrected.replace(/ {2,}/g, ' ')
+    }
+  }
+
+  // 3. ESPACE AVANT PONCTUATION SIMPLE : "texte ." → "texte."
+  if (/ ([,.])/.test(corrected)) {
+    const matches = corrected.match(/ ([,.])/g)
+    if (matches) {
+      corrections.push({
+        type: 'minor',
+        original: matches[0],
+        corrected: matches[0].trim(),
+        reason: 'Espace avant ponctuation'
+      })
+      corrected = corrected.replace(/ ([,.])/g, '$1')
+    }
+  }
+
+  // 4. ESPACE INSÉCABLE APRÈS PONCTUATION HAUTE : ": " → ":\u00A0"
+  const punctuationHaute = /([;:!?]) /g
+  if (punctuationHaute.test(corrected)) {
+    const matches = corrected.match(/([;:!?]) /g)
+    if (matches) {
+      corrections.push({
+        type: 'minor',
+        original: matches[0],
+        corrected: matches[0].replace(' ', '\u00A0'),
+        reason: 'Espace insécable après ponctuation haute'
+      })
+      corrected = corrected.replace(/([;:!?]) /g, '$1\u00A0')
+    }
+  }
+
+  // 5. GUILLEMETS FRANÇAIS : "texte" → « texte »
+  if (/"[^"]+"/g.test(corrected)) {
+    const matches = corrected.match(/"([^"]+)"/g)
+    if (matches) {
+      corrections.push({
+        type: 'minor',
+        original: matches[0],
+        corrected: matches[0].replace(/"/g, '«').replace(/«([^«]+)«/g, '«\u00A0$1\u00A0»'),
+        reason: 'Guillemets français'
+      })
+      corrected = corrected.replace(/"([^"]+)"/g, '«\u00A0$1\u00A0»')
+    }
+  }
+
+  return { corrected, corrections }
 }
 
 /**
@@ -402,36 +485,69 @@ async function processSRT(srtContent) {
   const startTime = Date.now()
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 1 : Correction générale (orthographe, grammaire, tirets)
+  // PASSE 0 : Prétraitement avec regex (corrections déterministes)
   // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 1: General corrections on ${chunks.length} chunks in parallel ===`)
+  console.log(`[processSRT] === PASS 0: Regex preprocessing on ${blocks.length} blocks ===`)
 
-  const pass1Chunks = await Promise.all(
-    chunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
-  )
-  const pass1Blocks = pass1Chunks.flat()
-
-  // Fusionner les blocs corrigés de la passe 1 avec TOUS les blocs originaux
-  const pass1Map = new Map()
-  pass1Blocks.forEach(block => pass1Map.set(block.index, block))
-
-  const blocksAfterPass1 = blocks.map(originalBlock => {
-    const correctedBlock = pass1Map.get(originalBlock.index)
-    if (correctedBlock) {
-      return correctedBlock
-    } else {
-      // Pas de corrections en passe 1, garder l'original
-      return {
-        index: originalBlock.index,
-        timecode: originalBlock.timecode,
-        original: originalBlock.text,
-        corrected: originalBlock.text,
-        corrections: []
-      }
+  const blocksAfterPass0 = blocks.map(block => {
+    const { corrected, corrections } = preProcessWithRegex(block.text)
+    return {
+      index: block.index,
+      timecode: block.timecode,
+      original: block.text,  // Le vrai texte original (avant regex)
+      corrected: corrected,  // Texte après regex
+      corrections: corrections  // Corrections faites par regex
     }
   })
 
-  console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected`)
+  const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
+  console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
+
+  // Recréer les chunks avec les blocs prétraités
+  const preprocessedChunks = []
+  for (let i = 0; i < blocksAfterPass0.length; i += maxBlocksPerChunk) {
+    const chunkBlocks = blocksAfterPass0.slice(i, i + maxBlocksPerChunk)
+    // Convertir au format attendu par correctWithClaude
+    preprocessedChunks.push(chunkBlocks.map(b => ({
+      index: b.index,
+      timecode: b.timecode,
+      text: b.corrected  // Utiliser le texte prétraité
+    })))
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 1 : Correction générale (orthographe, grammaire, tirets)
+  // ═══════════════════════════════════════════════════════════════
+  console.log(`[processSRT] === PASS 1: General corrections on ${preprocessedChunks.length} chunks in parallel ===`)
+
+  const pass1Chunks = await Promise.all(
+    preprocessedChunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
+  )
+  const pass1Blocks = pass1Chunks.flat()
+
+  // Fusionner les blocs corrigés de la passe 1 avec la passe 0
+  const pass1Map = new Map()
+  pass1Blocks.forEach(block => pass1Map.set(block.index, block))
+
+  const blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
+    const pass1Block = pass1Map.get(pass0Block.index)
+
+    if (pass1Block) {
+      // Fusionner les corrections de Pass 0 et Pass 1
+      return {
+        index: pass0Block.index,
+        timecode: pass0Block.timecode,
+        original: pass0Block.original,  // Le vrai original (avant Pass 0)
+        corrected: pass1Block.corrected,  // Texte final après Pass 1
+        corrections: [...pass0Block.corrections, ...pass1Block.corrections]  // Combiner les corrections
+      }
+    } else {
+      // Pas de corrections en Pass 1, garder seulement les corrections de Pass 0
+      return pass0Block
+    }
+  })
+
+  console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected by Claude`)
 
   // ═══════════════════════════════════════════════════════════════
   // DÉTECTION : Quels chunks nécessitent la passe 2 ?
@@ -533,9 +649,10 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] ========================================`)
   console.log(`[processSRT] SUMMARY:`)
   console.log(`[processSRT]   Total blocks: ${blocks.length}`)
-  console.log(`[processSRT]   Pass 1 corrections: ${pass1Blocks.length} blocks`)
+  console.log(`[processSRT]   Pass 0 (regex): ${pass0CorrectionsCount} blocks`)
+  console.log(`[processSRT]   Pass 1 (general): ${pass1Blocks.length} blocks`)
   console.log(`[processSRT]   Pass 2 (ministries + politeness): ${chunksNeedingPass2.length} chunks`)
-  console.log(`[processSRT]   Pass 3 (other 6 rules): ${chunksNeedingPass3.length} chunks`)
+  console.log(`[processSRT]   Pass 3 (other rules): ${chunksNeedingPass3.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
@@ -753,11 +870,7 @@ Applique ces règles :
    ✗ au dela, par dessus
    ✓ au-delà, par-dessus
 
-5. ELLIPSIS :
-   ✗ ...
-   ✓ …
-
-6. MAJUSCULES ABUSIVES :
+5. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
    ✓ la plaque, le bâtiment
 
@@ -828,7 +941,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
- * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (6 autres règles)
+ * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (5 autres règles)
  */
 async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le modèle selon le type
