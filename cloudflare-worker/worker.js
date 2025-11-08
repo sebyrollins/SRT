@@ -142,8 +142,8 @@ function needsPass4(blocks) {
 
   // PASSE 4 : UNIQUEMENT ambiguïté de genre
   // Détecter "je suis" + participe passé (terminaisons: é/ée/és/ées, i/ie/is/ies, u/ue/us/ues, t/te/ts/tes, s/se)
-  // Note: \b ne fonctionne pas avec les accents en JS, donc on utilise un lookahead (?=\s|$) pour fin de mot
-  return /\bje suis \S*?(?:é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|se)(?=\s|$)/i.test(text)
+  // Note: Utiliser (?=\W|$) pour accepter la ponctuation après le participe (ex: "venu." "partie!")
+  return /\bje suis \S*?(?:é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|se)(?=\W|$)/i.test(text)
 }
 
 /**
