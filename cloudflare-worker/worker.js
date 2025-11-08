@@ -118,15 +118,27 @@ function needsSecondPass(blocks) {
 function needsPass3(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 3 : Les 5 règles restantes (ellipsis géré par Pass 0)
+  // PASSE 3 : Les 4 règles restantes (ambiguïté genre maintenant en Pass 4)
   return (
     /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
-    /je suis (venu|venue|allé|allée|parti|partie)/i.test(text) || // Ambiguïté genre
     /\d{4,}e/i.test(text) ||                        // Ordinaux (1000e)
     /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Milliers (10000)
     /au dela|par dessus/i.test(text) ||             // Traits d'union
     /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
   )
+}
+
+/**
+ * Détecte si un chunk nécessite une passe 4 pour l'ambiguïté de genre
+ * @param {Array} blocks - Blocs SRT à analyser
+ * @returns {boolean} - true si le chunk nécessite une passe 4
+ */
+function needsPass4(blocks) {
+  const text = blocks.map(b => b.text).join(' ')
+
+  // PASSE 4 : UNIQUEMENT ambiguïté de genre
+  // Détecter "je suis" + participe passé (terminaisons: é/ée/és/ées, i/ie/is/ies, u/ue/us/ues, t/te/ts/tes, s/se)
+  return /\bje suis \w+(é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|s|se)\b/i.test(text)
 }
 
 /**
@@ -712,24 +724,72 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] ${chunksNeedingPass3.length}/${chunks.length} chunks need pass 3`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 3 : Correction ciblée (autres règles spécifiques)
+  // PASSE 3 : Correction ciblée (4 règles : institutions, milliers, traits d'union, majuscules)
   // ═══════════════════════════════════════════════════════════════
-  let finalBlocks = [...blocksAfterPass2]
+  let blocksAfterPass3 = [...blocksAfterPass2]
 
   if (chunksNeedingPass3.length > 0) {
-    console.log(`[processSRT] === PASS 3: Other specific rules on ${chunksNeedingPass3.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 3: Institutions + formatting rules on ${chunksNeedingPass3.length} chunks in parallel ===`)
 
     const pass3Results = await Promise.all(
       chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 3))
     )
     const pass3Blocks = pass3Results.flat()
 
-    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with other specific corrections`)
+    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with institutions + formatting corrections`)
 
     // ═══════════════════════════════════════════════════════════════
-    // FUSION : Combiner toutes les corrections (passe 1 + 2 + 3)
+    // FUSION : Combiner les corrections (passe 1 + 2 + 3)
     // ═══════════════════════════════════════════════════════════════
-    finalBlocks = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, blocks)
+    blocksAfterPass3 = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, blocks)
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // DÉTECTION : Quels chunks nécessitent la passe 4 ?
+  // ═══════════════════════════════════════════════════════════════
+  const chunksNeedingPass4 = []
+
+  chunks.forEach((originalChunk, chunkIndex) => {
+    if (needsPass4(originalChunk)) {
+      // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
+      const correctedChunk = originalChunk.map(originalBlock => {
+        const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
+        if (!blockAfterPass3) {
+          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 3!`)
+          return originalBlock
+        }
+        // Créer un bloc avec le texte corrigé de la passe 3 comme "texte d'entrée"
+        return {
+          index: blockAfterPass3.index,
+          timecode: blockAfterPass3.timecode,
+          text: blockAfterPass3.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+        }
+      })
+      chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
+    }
+  })
+
+  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks need pass 4`)
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée)
+  // ═══════════════════════════════════════════════════════════════
+  let finalBlocks = [...blocksAfterPass3]
+
+  if (chunksNeedingPass4.length > 0) {
+    console.log(`[processSRT] === PASS 4: Gender ambiguity ONLY on ${chunksNeedingPass4.length} chunks in parallel ===`)
+
+    const pass4Results = await Promise.all(
+      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 4))
+    )
+    const pass4Blocks = pass4Results.flat()
+
+    console.log(`[processSRT] Pass 4 completed: ${pass4Blocks.length} blocks with gender ambiguity suggestions`)
+
+    // ═══════════════════════════════════════════════════════════════
+    // FUSION : Combiner toutes les corrections (passe 1 + 2 + 3 + 4)
+    // ═══════════════════════════════════════════════════════════════
+    finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, blocks)
   }
 
   const endTime = Date.now()
@@ -739,7 +799,8 @@ async function processSRT(srtContent) {
   console.log(`[processSRT]   Pass 0 (regex): ${pass0CorrectionsCount} blocks`)
   console.log(`[processSRT]   Pass 1 (general): ${pass1Blocks.length} blocks`)
   console.log(`[processSRT]   Pass 2 (ministries + politeness): ${chunksNeedingPass2.length} chunks`)
-  console.log(`[processSRT]   Pass 3 (other rules): ${chunksNeedingPass3.length} chunks`)
+  console.log(`[processSRT]   Pass 3 (institutions + formatting): ${chunksNeedingPass3.length} chunks`)
+  console.log(`[processSRT]   Pass 4 (gender ambiguity ONLY): ${chunksNeedingPass4.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
@@ -945,24 +1006,15 @@ Applique ces règles :
    ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
    ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
 
-2. AMBIGUÏTÉ GENRE :
-   TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
-   NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
-
-   ✗ je suis venu → je suis venue
-   ✓ je suis venu → je suis venu (ou venue)
-
-   C'est une SUGGESTION, pas une correction
-
-3. ESPACES MILLIERS + ORDINAUX :
+2. ESPACES MILLIERS + ORDINAUX :
    ✗ 10000, 1000e
    ✓ 10 000, 1 000 e
 
-4. TRAITS D'UNION :
+3. TRAITS D'UNION :
    ✗ au dela, par dessus
    ✓ au-delà, par-dessus
 
-5. MAJUSCULES ABUSIVES :
+4. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
    ✓ la plaque, le bâtiment
 
@@ -974,14 +1026,54 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
-        {"type": "doubt", "original": "je suis venu", "corrected": "je suis venu (ou venue)", "reason": "Ambiguïté de genre"}
+        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"}
+      ]
+    }
+  ]
+}`
+}
+
+/**
+ * PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée pour fiabilité)
+ */
+function buildSystemPromptPass4() {
+  return `Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique UNIQUEMENT cette règle :
+
+AMBIGUÏTÉ DE GENRE :
+TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
+NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
+
+Quand tu vois "je" + participe passé, ajoute l'AUTRE forme entre parenthèses :
+- je suis engagé → je suis engagé (ou engagée)
+- je suis venue → je suis venue (ou venu)
+- je suis allé → je suis allé (ou allée)
+- je suis parti → je suis parti (ou partie)
+- je suis arrivé → je suis arrivé (ou arrivée)
+
+✗ INCORRECT : je suis venu → je suis venue (correction)
+✓ CORRECT : je suis venu → je suis venu (ou venue) (suggestion)
+
+C'est une SUGGESTION, pas une correction !
+
+Format JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
+      "corrections": [
+        {"type": "doubt", "original": "je suis engagé", "corrected": "je suis engagé (ou engagée)", "reason": "Ambiguïté de genre"}
       ]
     }
   ]
 }
 
-RAPPEL: Type "doubt" = suggestion UNIQUEMENT (ajouter "ou ..."), PAS une correction !`
+RAPPEL CRITIQUE:
+- Type = "doubt" (JAMAIS "major")
+- Ajouter "(ou ...)" à la fin
+- NE PAS remplacer, COMPLÉTER`
 }
 
 /**
@@ -1036,7 +1128,7 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
  * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
- * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (5 autres règles)
+ * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (4 règles), 4 (genre UNIQUEMENT)
  */
 async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le modèle selon le type
@@ -1056,7 +1148,8 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
   // Choisir le prompt selon la passe
   const systemPrompt = pass === 1 ? buildSystemPromptPass1() :
                        pass === 2 ? buildSystemPromptPass2() :
-                       buildSystemPromptPass3()
+                       pass === 3 ? buildSystemPromptPass3() :
+                       buildSystemPromptPass4()
 
   console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
 
