@@ -229,10 +229,10 @@ function preProcessWithRegex(text) {
       corrections.push({
         type: 'minor',
         original: matches[0],
-        corrected: matches[0].replace(/'\s+/, '''),
+        corrected: matches[0].replace(/'\s+/, "'"),
         reason: 'Espace après apostrophe'
       })
-      corrected = corrected.replace(/\b([ldnjmtsc])'\s+/gi, '$1'')
+      corrected = corrected.replace(/\b([ldnjmtsc])'\s+/gi, "$1'")
     }
   }
 
