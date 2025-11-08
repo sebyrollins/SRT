@@ -779,6 +779,9 @@ async function processSRT(srtContent, modelType = 'haiku') {
   if (chunksNeedingPass4.length > 0) {
     console.log(`[processSRT] === PASS 4: Gender ambiguity ONLY on ${chunksNeedingPass4.length} chunks in parallel ===`)
 
+    // DEBUG: Afficher le contenu des chunks envoyés à Pass 4
+    console.log(`[DEBUG Pass 4] First chunk content:`, chunksNeedingPass4[0]?.chunk.slice(0, 3).map(b => b.text))
+
     const pass4Results = await Promise.all(
       chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4))
     )
@@ -786,10 +789,23 @@ async function processSRT(srtContent, modelType = 'haiku') {
 
     console.log(`[processSRT] Pass 4 completed: ${pass4Blocks.length} blocks with gender ambiguity suggestions`)
 
+    // DEBUG: Afficher les corrections détectées par Pass 4
+    const blocksWithCorrections = pass4Blocks.filter(b => b.corrections && b.corrections.length > 0)
+    console.log(`[DEBUG Pass 4] Blocks with corrections: ${blocksWithCorrections.length}/${pass4Blocks.length}`)
+    if (blocksWithCorrections.length > 0) {
+      console.log(`[DEBUG Pass 4] First correction example:`, JSON.stringify(blocksWithCorrections[0], null, 2))
+    } else {
+      console.log(`[DEBUG Pass 4] No corrections found - checking first 3 blocks:`)
+      pass4Blocks.slice(0, 3).forEach(b => {
+        console.log(`  Block #${b.index}: "${b.original}" -> corrections: ${b.corrections?.length || 0}`)
+      })
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner toutes les corrections (passe 1 + 2 + 3 + 4)
     // ═══════════════════════════════════════════════════════════════
-    finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, blocks)
+    // IMPORTANT : Pass 4 travaille sur le texte APRÈS Pass 3, donc on valide contre blocksAfterPass3, pas blocks original
+    finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, blocksAfterPass3)
   }
 
   const endTime = Date.now()
@@ -1153,6 +1169,12 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1) {
 
   console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
 
+  // DEBUG Pass 4 : Log du user prompt pour voir ce qu'on envoie
+  if (pass === 4) {
+    const userPrompt = buildUserPrompt(blocks)
+    console.log(`[DEBUG Pass 4] User prompt (first 1000 chars):`, userPrompt.substring(0, 1000))
+  }
+
   const response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1195,6 +1217,11 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1) {
 
   // Log de la réponse brute pour debugging (premiers 500 caractères)
   console.log(`[correctWithClaude] Pass ${pass} - Raw response preview: ${content.substring(0, 500)}...`)
+
+  // DEBUG Pass 4 : Log complet de la réponse pour comprendre pourquoi aucune correction
+  if (pass === 4) {
+    console.log(`[DEBUG Pass 4] FULL Claude response:`, content)
+  }
 
   // Nettoyer la réponse (enlever les balises markdown si présentes)
   // Claude Sonnet 4.5 retourne parfois ```json ... ``` au lieu de JSON pur
