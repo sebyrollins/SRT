@@ -746,8 +746,10 @@ Applique ces règles :
    ✗ ...
    ✓ …
 
-6. MAJUSCULES DIALOGUES :
-   Après "Mesdames et Messieurs," + saut de ligne → minuscule
+6. MESDAMES ET MESSIEURS :
+   Dans un discours oral (SRT), seul le premier mot prend la majuscule
+   ✗ Mesdames et Messieurs
+   ✓ Mesdames et messieurs
 
 7. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
