@@ -741,10 +741,17 @@ async function processSRT(srtContent, modelType = 'haiku') {
   // ═══════════════════════════════════════════════════════════════
   const chunksNeedingPass4 = []
 
-  // IMPORTANT : On envoie TOUS les chunks à Pass 4
-  // Laisser Claude détecter lui-même les cas d'ambiguïté de genre
-  // (plus fiable que la regex)
+  // Filtrer pour n'envoyer que les chunks contenant "je/Je/J'/j'"
+  // Économise les appels API en excluant les chunks sans "je"
   chunks.forEach((originalChunk, chunkIndex) => {
+    // Vérifier si le chunk contient "je", "Je", "J'" ou "j'"
+    const chunkText = originalChunk.map(b => b.text).join(' ')
+    const containsJe = /\b[jJ]e\b|\b[jJ]'/.test(chunkText)
+
+    if (!containsJe) {
+      return // Skip ce chunk, pas de "je"
+    }
+
     // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
     const correctedChunk = originalChunk.map(originalBlock => {
       const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
@@ -762,7 +769,7 @@ async function processSRT(srtContent, modelType = 'haiku') {
     chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
   })
 
-  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks sent to pass 4 (all chunks)`)
+  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks sent to pass 4 (filtered by "je")`)
 
   // ═══════════════════════════════════════════════════════════════
   // PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée)
