@@ -139,6 +139,18 @@ function preProcessWithRegex(text) {
   let corrected = text
   const corrections = []
 
+  // 0. TRIM : Espaces en début/fin de ligne
+  const trimmed = corrected.trim()
+  if (trimmed !== corrected) {
+    corrections.push({
+      type: 'minor',
+      original: corrected,
+      corrected: trimmed,
+      reason: 'Espaces en début/fin'
+    })
+    corrected = trimmed
+  }
+
   // 1. ELLIPSIS : ... → …
   if (/\.\.\./.test(corrected)) {
     const matches = corrected.match(/\.\.\./g)
@@ -209,6 +221,81 @@ function preProcessWithRegex(text) {
       corrected = corrected.replace(/"([^"]+)"/g, '«\u00A0$1\u00A0»')
     }
   }
+
+  // 6. ESPACES AVANT APOSTROPHES : "l' école" → "l'école"
+  if (/\b([ldnjmtsc])'\s+/gi.test(corrected)) {
+    const matches = corrected.match(/\b([ldnjmtsc])'\s+/gi)
+    if (matches) {
+      corrections.push({
+        type: 'minor',
+        original: matches[0],
+        corrected: matches[0].replace(/'\s+/, '''),
+        reason: 'Espace après apostrophe'
+      })
+      corrected = corrected.replace(/\b([ldnjmtsc])'\s+/gi, '$1'')
+    }
+  }
+
+  // 7. DOUBLES PONCTUATIONS : ",," → "," ou ";;" → ";"
+  if (/([,;])\1/.test(corrected)) {
+    const matches = corrected.match(/([,;])\1/g)
+    if (matches) {
+      corrections.push({
+        type: 'minor',
+        original: matches[0],
+        corrected: matches[0][0],
+        reason: 'Ponctuation doublée'
+      })
+      corrected = corrected.replace(/([,;])\1/g, '$1')
+    }
+  }
+
+  // 8. ESPACE INSÉCABLE AVANT UNITÉS
+  // Liste des unités courantes avec leurs variantes
+  const unites = [
+    // Pourcentage et degré
+    { pattern: /(\d+)\s*%/g, replacement: '$1\u00A0%', unit: '%' },
+    { pattern: /(\d+)\s*°([CF]?)/g, replacement: '$1\u00A0°$2', unit: '°' },
+
+    // Longueur
+    { pattern: /(\d+)\s*(m|mètres?|metres?)\b/gi, replacement: '$1\u00A0m', unit: 'm' },
+    { pattern: /(\d+)\s*(km|kilomètres?|kilometres?)\b/gi, replacement: '$1\u00A0km', unit: 'km' },
+    { pattern: /(\d+)\s*(cm|centimètres?|centimetres?)\b/gi, replacement: '$1\u00A0cm', unit: 'cm' },
+    { pattern: /(\d+)\s*(mm|millimètres?|millimetres?)\b/gi, replacement: '$1\u00A0mm', unit: 'mm' },
+
+    // Masse
+    { pattern: /(\d+)\s*(kg|kilos?|kilogrammes?)\b/gi, replacement: '$1\u00A0kg', unit: 'kg' },
+    { pattern: /(\d+)\s*(g|grammes?)\b/gi, replacement: '$1\u00A0g', unit: 'g' },
+
+    // Énergie/Puissance
+    { pattern: /(\d+)\s*(kW|kilowatts?|Kilowatts?)\b/gi, replacement: '$1\u00A0kW', unit: 'kW' },
+    { pattern: /(\d+)\s*(W|watts?|Watts?)\b/gi, replacement: '$1\u00A0W', unit: 'W' },
+
+    // Volume
+    { pattern: /(\d+)\s*(l|litres?)\b/gi, replacement: '$1\u00A0l', unit: 'l' },
+    { pattern: /(\d+)\s*(ml|millilitres?)\b/gi, replacement: '$1\u00A0ml', unit: 'ml' },
+
+    // Temps
+    { pattern: /(\d+)\s*(h|heures?)\b/gi, replacement: '$1\u00A0h', unit: 'h' },
+    { pattern: /(\d+)\s*(min|minutes?)\b/gi, replacement: '$1\u00A0min', unit: 'min' },
+    { pattern: /(\d+)\s*(s|secondes?)\b/gi, replacement: '$1\u00A0s', unit: 's' },
+
+    // Monnaie
+    { pattern: /(\d+)\s*(€|euros?)\b/gi, replacement: '$1\u00A0€', unit: '€' },
+  ]
+
+  unites.forEach(({ pattern, replacement, unit }) => {
+    const matches = corrected.match(pattern)
+    if (matches && matches.length > 0) {
+      corrections.push({
+        type: 'minor',
+        original: matches[0],
+        corrected: matches[0].replace(pattern, replacement),
+        reason: `Espace insécable avant unité (${unit})`
+      })
+      corrected = corrected.replace(pattern, replacement)
+    }
+  })
 
   return { corrected, corrections }
 }
