@@ -496,7 +496,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
     // Si ce bloc n'a pas été traité par la passe 2, valider quand même les corrections de passe 1
     if (!blockPass2) {
       const originalBlock = originalMap.get(blockPass1.index)
-      const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
+      const trueOriginal = originalBlock ? (originalBlock.text || originalBlock.original) : blockPass1.original
 
       // Valider les corrections de passe 1
       const validPass1Corrections = (blockPass1.corrections || []).filter(corr =>
@@ -516,7 +516,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
     // FUSION : Ce bloc a été traité par les deux passes
     const originalBlock = originalMap.get(blockPass1.index)
-    const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
+    const trueOriginal = originalBlock ? (originalBlock.text || originalBlock.original) : blockPass1.original
 
     console.log(`[mergePass1AndPass2] Merging block #${blockPass1.index}`)
     console.log(`  - True original: "${trueOriginal.substring(0, 60)}..."`)
