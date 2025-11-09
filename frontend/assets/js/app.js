@@ -835,15 +835,19 @@ function renderBlocksTable() {
             cardEl.classList.add('validated')
           }
 
-          // Pour les corrections de doute, afficher "original → alternative" au lieu de "original → corrected"
-          const displayText = correction.type === 'doubt' && correction.alternative
+          // Pour les corrections de doute de GENRE (pas manuelles), afficher "original → alternative"
+          // Pour les corrections modifiées manuellement, afficher "corrected"
+          const displayText = correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited
             ? correction.alternative
             : correction.corrected
+
+          // Badge : afficher "MODIFIÉ" pour les corrections modifiées manuellement
+          const badgeText = correction.isManuallyEdited ? 'MODIFIÉ' : (correction.type === 'doubt' ? 'DOUTE' : 'FAUTE')
 
           cardEl.innerHTML = `
             <div class="validation-header">
               <span class="validation-type-badge badge-${correction.type}">
-                ${correction.type === 'doubt' ? 'DOUTE' : 'FAUTE'}
+                ${badgeText}
               </span>
             </div>
             <div class="validation-correction">
@@ -859,8 +863,26 @@ function renderBlocksTable() {
           const actionsEl = document.createElement('div')
           actionsEl.className = 'validation-actions'
 
+          // Pour les corrections modifiées manuellement (garder le type original mais afficher bouton réinitialiser)
+          if (correction.isManuallyEdited && isValidated) {
+            // Bouton pour réinitialiser à la suggestion de Claude
+            const resetBtn = document.createElement('button')
+            resetBtn.className = 'btn-toggle-gender'
+            resetBtn.innerHTML = '↺ Réinitialiser'
+            resetBtn.title = 'Revenir à la suggestion de Claude'
+            resetBtn.onclick = () => resetToOriginalSuggestion(block.index, corrIndex)
+            actionsEl.appendChild(resetBtn)
+
+            // Bouton Modifier
+            const editBtn = document.createElement('button')
+            editBtn.className = 'btn-icon-only btn-icon-edit'
+            editBtn.innerHTML = '✏️'
+            editBtn.title = 'Modifier'
+            editBtn.onclick = () => editCorrection(block.index, corrIndex)
+            actionsEl.appendChild(editBtn)
+          }
           // Pour les corrections de type "doubt" (genre), logique différente
-          if (correction.type === 'doubt') {
+          else if (correction.type === 'doubt' && !correction.isManuallyEdited) {
             // Vérifier si le genre a été changé (forme alternative active)
             const isGenderSwitched = AppState.genderSwitched.has(correctionId)
 
@@ -880,7 +902,7 @@ function renderBlocksTable() {
             editBtn.onclick = () => editCorrection(block.index, corrIndex)
             actionsEl.appendChild(editBtn)
           }
-          // Pour les autres types de corrections (major, minor)
+          // Pour les autres types de corrections (fault)
           else if (!isValidated) {
             // Boutons Valider, Modifier et Rejeter : seulement si NON validé
             const validateBtn = document.createElement('button')
@@ -1021,6 +1043,49 @@ function validateSingleCorrection(blockIndex, corrIndex) {
       scrollToBlock(nextBlockIndex)
     }
   }, 300)
+}
+
+/**
+ * Réinitialise une correction modifiée manuellement à la suggestion originale de Claude
+ * @param {number} blockIndex - Index du bloc
+ * @param {number} corrIndex - Index de la correction
+ */
+function resetToOriginalSuggestion(blockIndex, corrIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || !block.corrections[corrIndex]) {
+    return
+  }
+
+  const correction = block.corrections[corrIndex]
+
+  // Récupérer la suggestion originale de Claude
+  const originalSuggestion = correction.originalSuggestion
+  if (!originalSuggestion) {
+    console.log(`[resetToOriginalSuggestion] Pas de suggestion originale pour bloc #${blockIndex}, correction #${corrIndex}`)
+    return
+  }
+
+  // Remplacer la valeur actuelle par la suggestion originale
+  const currentValue = correction.corrected
+  block.corrected = block.corrected.replace(currentValue, originalSuggestion)
+  correction.corrected = originalSuggestion
+
+  // Restaurer le type et la raison originale
+  if (correction.originalType) {
+    correction.type = correction.originalType
+  }
+  if (correction.originalReason) {
+    correction.reason = correction.originalReason
+  }
+
+  // Retirer le flag de modification manuelle
+  correction.isManuallyEdited = false
+
+  console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex}, correction #${corrIndex} réinitialisée à "${originalSuggestion}"`)
+
+  // Mettre à jour l'affichage
+  renderBlocksTable()
+  updateMinimap()
 }
 
 /**
@@ -1246,6 +1311,10 @@ function editBlockText(blockIndex) {
             correction.reason = correction.originalReason
             delete correction.originalReason
           }
+          // Retirer le flag de modification manuelle
+          if (correction.isManuallyEdited) {
+            correction.isManuallyEdited = false
+          }
 
           // VALIDER la correction
           AppState.validatedCorrections.add(correctionId)
@@ -1275,16 +1344,23 @@ function editBlockText(blockIndex) {
         AppState.validatedCorrections.delete(correctionId)
       })
 
-      // Remplacer par UNE SEULE correction "doubt"
+      // Déterminer le type original (fault par défaut, ou le type de la première correction si elle existe)
+      const originalType = (oldCorrections.length > 0 && oldCorrections[0].originalType)
+        ? oldCorrections[0].originalType
+        : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
+      const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
+
+      // Remplacer par UNE SEULE correction avec le type original et flag isManuallyEdited
       block.corrections = [{
-        type: 'doubt',
+        type: originalType,
         original: block.original,
         corrected: newValue,
         reason: 'Modifié manuellement',
         position: 0,
         originalSuggestion: oldCorrected,
-        originalType: 'doubt',
-        originalReason: 'Modifié manuellement'
+        originalType: originalType,
+        originalReason: originalReason,
+        isManuallyEdited: true
       }]
 
       block.corrected = newValue
@@ -1426,7 +1502,7 @@ function editCorrection(blockIndex, corrIndex) {
       const isDifferentFromSuggestion = newValue !== correction.originalSuggestion
 
       if (isDifferentFromSuggestion) {
-        // Modifié différemment → passer SEULEMENT CETTE CORRECTION en mode "doubt"
+        // Modifié différemment → marquer comme modifié manuellement mais GARDER le type original
         console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification manuelle détectée`)
         console.log(`  Nouveau: "${newValue}" (codes: ${Array.from(newValue).map(c => c.charCodeAt(0)).join(',')})`)
         console.log(`  Suggestion: "${correction.originalSuggestion}" (codes: ${Array.from(correction.originalSuggestion).map(c => c.charCodeAt(0)).join(',')})`)
@@ -1438,14 +1514,16 @@ function editCorrection(blockIndex, corrIndex) {
         if (!correction.hasOwnProperty('originalReason')) {
           correction.originalReason = correction.reason
         }
-        // Passer SEULEMENT cette correction en doute
-        correction.type = 'doubt'
+        // Marquer comme modifié manuellement SANS changer le type
+        correction.isManuallyEdited = true
         correction.reason = 'Modifié manuellement'
       } else {
         // Remis comme la suggestion → repasser au type original
         correction.type = correction.originalType || 'fault'
         // Restaurer la raison originale
         correction.reason = correction.originalReason
+        // Retirer le flag de modification manuelle
+        correction.isManuallyEdited = false
       }
 
       // Marquer la correction comme validée
@@ -1590,16 +1668,16 @@ function resetBlockToInitialState(blockIndex) {
   }
 
   // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
-  // Supprimer toutes les validations pour ce bloc (sauf les corrections de type "doubt")
+  // Supprimer toutes les validations pour ce bloc (sauf les corrections de type "doubt" de genre)
   block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
 
-    // Pour les corrections de doute (genre), on garde la validation mais on revient à l'original
-    if (correction.type === 'doubt') {
+    // Pour les corrections de doute de GENRE (pas modifiées manuellement), on garde la validation mais on revient à l'original
+    if (correction.type === 'doubt' && !correction.isManuallyEdited) {
       AppState.genderSwitched.delete(correctionId)
       // On garde dans validatedCorrections (reste validé)
     } else {
-      // Pour les autres types, retirer la validation
+      // Pour les autres types (et corrections modifiées manuellement), retirer la validation
       AppState.validatedCorrections.delete(correctionId)
     }
 
@@ -1619,6 +1697,10 @@ function resetBlockToInitialState(blockIndex) {
       correction.reason = correction.originalReason
       delete correction.originalReason
     }
+    // Retirer le flag de modification manuelle
+    if (correction.isManuallyEdited) {
+      correction.isManuallyEdited = false
+    }
   })
 
   // Reconstruire block.corrected en appliquant toutes les corrections restaurées
@@ -1631,10 +1713,11 @@ function resetBlockToInitialState(blockIndex) {
   sortedCorrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
 
-    // Pour les corrections "doubt", ne jamais les appliquer dans le rebuild
+    // Pour les corrections "doubt" de GENRE (avec alternative), ne jamais les appliquer dans le rebuild
     // Elles restent validées mais montrent l'original par défaut
     // Elles seront appliquées seulement si on clique "Changer le genre"
-    if (correction.type === 'doubt') {
+    // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
+    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
       return // Ne pas appliquer les corrections de genre dans le rebuild
     }
 
@@ -1708,9 +1791,10 @@ function resetToInitialState() {
       let offset = 0
 
       sortedCorrections.forEach(correction => {
-        // Pour les corrections "doubt", ne jamais les appliquer dans le rebuild
+        // Pour les corrections "doubt" de GENRE, ne jamais les appliquer dans le rebuild
         // Elles seront re-validées après mais montrent l'original par défaut
-        if (correction.type === 'doubt') {
+        // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
+        if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
           return
         }
 
@@ -1819,8 +1903,8 @@ function buildTextWithValidatedCorrections(block) {
     const originalCorrIndex = block.corrections.indexOf(correction)
     const correctionId = `${block.index}-${originalCorrIndex}`
 
-    // Pour les corrections "doubt" (genre)
-    if (correction.type === 'doubt') {
+    // Pour les corrections "doubt" de GENRE (avec alternative, pas modifiées manuellement)
+    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
       // Si le genre a été changé, appliquer la forme alternative
       if (AppState.genderSwitched.has(correctionId)) {
         const alternativeForm = extractAlternativeGender(correction)
@@ -1836,7 +1920,7 @@ function buildTextWithValidatedCorrections(block) {
       return
     }
 
-    // Pour les autres types de corrections
+    // Pour les autres types de corrections (fault, et corrections modifiées manuellement)
     const startPos = correction.position + offset
     const endPos = startPos + correction.original.length
 
