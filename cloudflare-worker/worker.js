@@ -1082,7 +1082,9 @@ function buildSystemPromptPass4() {
 
 RÈGLE UNIQUE À APPLIQUER :
 Quand tu vois "je" + verbe d'état (être, devenir, rester, paraître, sembler, etc.) + adjectif/participe passé accordable,
-tu DOIS créer une correction de type "doubt" qui suggère l'autre genre.
+tu DOIS créer UNE SEULE correction de type "doubt" qui englobe TOUTE l'expression "je + verbe + adjectif".
+
+IMPORTANT : Ne crée qu'UNE SEULE correction par ambiguïté détectée, pas plusieurs variations du même cas.
 
 POURQUOI ? Dans un sous-titre, on ne sait pas si "je" est un homme ou une femme.
 
@@ -1091,6 +1093,7 @@ EXEMPLES :
 - "je suis engagée" → corrected: "je suis engagée", alternative: "je suis engagé"
 - "je reste très attachée" → corrected: "je reste très attachée", alternative: "je reste très attaché"
 - "je ne suis plus compétitrice" → corrected: "je ne suis plus compétitrice", alternative: "je ne suis plus compétiteur"
+- "Je semble perdue" → corrected: "Je semble perdue", alternative: "Je semble perdu"
 
 FORMAT DE RÉPONSE :
 {
