@@ -437,6 +437,7 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
 /**
  * Déduplique les corrections identiques (même original → même corrected)
  * Garde la première occurrence et supprime les doublons
+ * Pour les corrections de type "doubt", garde la plus longue (qui englobe les autres)
  * @param {Array} corrections - Liste de corrections
  * @param {number} blockIndex - Index du bloc pour les logs
  * @returns {Array} Liste dédupliquée
@@ -446,7 +447,35 @@ function deduplicateCorrections(corrections, blockIndex) {
   const deduplicated = []
   const duplicates = []
 
-  corrections.forEach(correction => {
+  // Séparer les corrections "doubt" des autres
+  const doubtCorrections = corrections.filter(c => c.type === 'doubt')
+  const otherCorrections = corrections.filter(c => c.type !== 'doubt')
+
+  // Pour les corrections "doubt", garder seulement la plus longue quand il y a chevauchement
+  const filteredDoubtCorrections = []
+  doubtCorrections.forEach(correction => {
+    // Vérifier si cette correction est contenue dans une autre correction doubt plus longue
+    const isContainedInLonger = doubtCorrections.some(other => {
+      if (other === correction) return false
+      // Si l'autre correction contient celle-ci (texte plus long), alors celle-ci est un doublon
+      return other.original.includes(correction.original) && other.original.length > correction.original.length
+    })
+
+    if (isContainedInLonger) {
+      console.log(`[deduplicateCorrections] Block #${blockIndex} - Removing nested doubt: "${correction.original}" (contained in longer correction)`)
+      duplicates.push({
+        original: correction.original,
+        corrected: correction.corrected,
+        reason: correction.reason,
+        firstReason: 'Nested in longer correction'
+      })
+    } else {
+      filteredDoubtCorrections.push(correction)
+    }
+  })
+
+  // Dédupliquer les autres corrections (logique normale)
+  otherCorrections.forEach(correction => {
     // Créer une clé unique basée sur original → corrected (normalisé)
     const key = `${correction.original.trim().toLowerCase()} → ${correction.corrected.trim().toLowerCase()}`
 
@@ -468,11 +497,14 @@ function deduplicateCorrections(corrections, blockIndex) {
     }
   })
 
+  // Combiner les résultats
+  const result = [...deduplicated, ...filteredDoubtCorrections]
+
   if (duplicates.length > 0) {
     console.log(`[deduplicateCorrections] Block #${blockIndex} - Removed ${duplicates.length} duplicate correction(s)`)
   }
 
-  return deduplicated
+  return result
 }
 
 /**
