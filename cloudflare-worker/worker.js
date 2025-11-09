@@ -438,6 +438,7 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
  * Déduplique les corrections identiques (même original → même corrected)
  * Garde la première occurrence et supprime les doublons
  * Pour les corrections de type "doubt", garde la plus longue (qui englobe les autres)
+ * Supprime les corrections "fault" qui sont englobées par des corrections "doubt"
  * @param {Array} corrections - Liste de corrections
  * @param {number} blockIndex - Index du bloc pour les logs
  * @returns {Array} Liste dédupliquée
@@ -474,8 +475,32 @@ function deduplicateCorrections(corrections, blockIndex) {
     }
   })
 
-  // Dédupliquer les autres corrections (logique normale)
+  // Filtrer les corrections "fault" qui sont englobées par des corrections "doubt"
+  const filteredOtherCorrections = []
   otherCorrections.forEach(correction => {
+    // Vérifier si cette correction fault est englobée par un doute de genre
+    const isEnglobed = filteredDoubtCorrections.some(doubt => {
+      // Si le doute contient l'original de la fault, c'est un chevauchement
+      // Exemple: doubt "Je semble perdu" englobe fault "perdue"
+      return doubt.original.includes(correction.original) ||
+             (doubt.alternative && doubt.alternative.includes(correction.original))
+    })
+
+    if (isEnglobed) {
+      console.log(`[deduplicateCorrections] Block #${blockIndex} - Removing fault englobed by doubt: "${correction.original}" → "${correction.corrected}"`)
+      duplicates.push({
+        original: correction.original,
+        corrected: correction.corrected,
+        reason: correction.reason,
+        firstReason: 'Englobed by gender doubt correction'
+      })
+    } else {
+      filteredOtherCorrections.push(correction)
+    }
+  })
+
+  // Dédupliquer les corrections fault restantes (logique normale)
+  filteredOtherCorrections.forEach(correction => {
     // Créer une clé unique basée sur original → corrected (normalisé)
     const key = `${correction.original.trim().toLowerCase()} → ${correction.corrected.trim().toLowerCase()}`
 
