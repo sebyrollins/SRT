@@ -1354,7 +1354,7 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
     // Réinjecter les timecodes et valider les corrections
     const validatedBlocks = correctedBlocks.map(correctedBlock => {
-      const originalBlock = blocks.find(b => b.index === correctedBlock.index)
+      let originalBlock = blocks.find(b => b.index === correctedBlock.index)
 
       // VALIDATION CRITIQUE : Vérifier que le bloc retourné par Claude correspond bien
       if (!originalBlock) {
@@ -1364,14 +1364,45 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
       // Valider que l'original retourné par Claude correspond au texte du bloc
       const normalizedClaudeOriginal = correctedBlock.original?.toLowerCase().trim()
-      const normalizedBlockText = originalBlock.text.toLowerCase().trim()
+      let normalizedBlockText = originalBlock.text.toLowerCase().trim()
 
       if (normalizedClaudeOriginal && normalizedClaudeOriginal !== normalizedBlockText) {
-        console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
-        console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
-        console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
-        // Ne pas retourner ce bloc, il y a une confusion d'index
-        return null
+        // Pour Pass 4, Claude peut se tromper d'index de ±1 car il y a beaucoup de blocs
+        // Cherchons le bon bloc dans les blocs adjacents
+        if (pass === 4) {
+          const adjacentBlocks = [
+            blocks.find(b => b.index === correctedBlock.index - 1),
+            blocks.find(b => b.index === correctedBlock.index + 1)
+          ].filter(Boolean)
+
+          let foundCorrectBlock = null
+          for (const adjacentBlock of adjacentBlocks) {
+            const normalizedAdjacent = adjacentBlock.text.toLowerCase().trim()
+            if (normalizedAdjacent === normalizedClaudeOriginal) {
+              foundCorrectBlock = adjacentBlock
+              console.log(`[correctWithClaude] Pass 4 - Block #${correctedBlock.index}: Index mismatch, found correct text in block #${adjacentBlock.index}`)
+              break
+            }
+          }
+
+          if (foundCorrectBlock) {
+            // Utiliser le bon bloc et corriger l'index
+            originalBlock = foundCorrectBlock
+            normalizedBlockText = foundCorrectBlock.text.toLowerCase().trim()
+            correctedBlock.index = foundCorrectBlock.index
+          } else {
+            console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text and no adjacent match found`)
+            console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+            console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
+            return null
+          }
+        } else {
+          console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
+          console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+          console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
+          // Ne pas retourner ce bloc, il y a une confusion d'index
+          return null
+        }
       }
 
       // Valider les corrections individuellement
