@@ -101,35 +101,35 @@ function analyzeChunkComplexity(blocks) {
 }
 
 /**
- * Détecte si un chunk nécessite une passe 2 pour ministères + formules de politesse
+ * Détecte si un chunk nécessite une passe 2 pour institutions + formatage
  * @param {Array} blocks - Blocs SRT à analyser
  * @returns {boolean} - true si le chunk nécessite une passe 2
  */
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 2 : Ministères + Monsieur/Madame/Mademoiselle
-  return (
-    /ministère/i.test(text) ||
-    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text)
-  )
-}
-
-/**
- * Détecte si un chunk nécessite une passe 3 pour les autres règles spécifiques
- * @param {Array} blocks - Blocs SRT à analyser
- * @returns {boolean} - true si le chunk nécessite une passe 3
- */
-function needsPass3(blocks) {
-  const text = blocks.map(b => b.text).join(' ')
-
-  // PASSE 3 : Les 4 règles restantes (ambiguïté genre maintenant en Pass 4)
+  // PASSE 2 : Institutions + espaces milliers + traits d'union + majuscules abusives
   return (
     /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
     /\d{4,}e/i.test(text) ||                        // Ordinaux (1000e)
     /\d{1,3}(\d{3})+(?!\s)/.test(text) ||           // Milliers (10000)
     /au dela|par dessus/i.test(text) ||             // Traits d'union
     /\b(la|le|de|du|des)\s+[A-Z][a-z]+/.test(text)  // Majuscules abusives
+  )
+}
+
+/**
+ * Détecte si un chunk nécessite une passe 3 pour ministères + formules de politesse
+ * @param {Array} blocks - Blocs SRT à analyser
+ * @returns {boolean} - true si le chunk nécessite une passe 3
+ */
+function needsPass3(blocks) {
+  const text = blocks.map(b => b.text).join(' ')
+
+  // PASSE 3 : Ministères + Monsieur/Madame/Mademoiselle
+  return (
+    /ministère/i.test(text) ||
+    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text)
   )
 }
 
@@ -672,19 +672,19 @@ async function processSRT(srtContent, modelType = 'haiku') {
   console.log(`[processSRT] ${chunksNeedingPass2.length}/${chunks.length} chunks need pass 2`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 2 : Correction ciblée (ministères + formules de politesse)
+  // PASSE 2 : Institutions + formatage
   // ═══════════════════════════════════════════════════════════════
   let blocksAfterPass2 = [...blocksAfterPass1]
 
   if (chunksNeedingPass2.length > 0) {
-    console.log(`[processSRT] === PASS 2: Ministries + politeness formulas on ${chunksNeedingPass2.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 2: Institutions + formatting on ${chunksNeedingPass2.length} chunks in parallel ===`)
 
     const pass2Results = await Promise.all(
       chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, modelType, 2))
     )
     const pass2Blocks = pass2Results.flat()
 
-    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with ministries + politeness corrections`)
+    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with institutions + formatting corrections`)
 
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner les corrections de la passe 1 et de la passe 2
@@ -720,19 +720,19 @@ async function processSRT(srtContent, modelType = 'haiku') {
   console.log(`[processSRT] ${chunksNeedingPass3.length}/${chunks.length} chunks need pass 3`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 3 : Correction ciblée (4 règles : institutions, milliers, traits d'union, majuscules)
+  // PASSE 3 : Ministères + formules de politesse (après institutions)
   // ═══════════════════════════════════════════════════════════════
   let blocksAfterPass3 = [...blocksAfterPass2]
 
   if (chunksNeedingPass3.length > 0) {
-    console.log(`[processSRT] === PASS 3: Institutions + formatting rules on ${chunksNeedingPass3.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 3: Ministries + politeness formulas on ${chunksNeedingPass3.length} chunks in parallel ===`)
 
     const pass3Results = await Promise.all(
       chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, modelType, 3))
     )
     const pass3Blocks = pass3Results.flat()
 
-    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with institutions + formatting corrections`)
+    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with ministries + politeness corrections`)
 
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner les corrections (passe 1 + 2 + 3)
@@ -818,8 +818,8 @@ async function processSRT(srtContent, modelType = 'haiku') {
   console.log(`[processSRT]   Total blocks: ${blocks.length}`)
   console.log(`[processSRT]   Pass 0 (regex): ${pass0CorrectionsCount} blocks`)
   console.log(`[processSRT]   Pass 1 (general): ${pass1Blocks.length} blocks`)
-  console.log(`[processSRT]   Pass 2 (ministries + politeness): ${chunksNeedingPass2.length} chunks`)
-  console.log(`[processSRT]   Pass 3 (institutions + formatting): ${chunksNeedingPass3.length} chunks`)
+  console.log(`[processSRT]   Pass 2 (institutions + formatting): ${chunksNeedingPass2.length} chunks`)
+  console.log(`[processSRT]   Pass 3 (ministries + politeness): ${chunksNeedingPass3.length} chunks`)
   console.log(`[processSRT]   Pass 4 (gender ambiguity ONLY): ${chunksNeedingPass4.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
@@ -979,9 +979,47 @@ Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
 /**
- * PASSE 2 : Ministères + Formules de politesse
+ * PASSE 2 : Institutions + formatage
  */
 function buildSystemPromptPass2() {
+  return `Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique ces règles :
+
+1. INSTITUTIONS :
+   ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
+   ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
+
+2. ESPACES MILLIERS + ORDINAUX :
+   ✗ 10000, 1000e
+   ✓ 10 000, 1 000 e
+
+3. TRAITS D'UNION :
+   ✗ au dela, par dessus
+   ✓ au-delà, par-dessus
+
+4. MAJUSCULES ABUSIVES :
+   ✗ la Plaque, le Bâtiment
+   ✓ la plaque, le bâtiment
+
+Format JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
+      "corrections": [
+        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"}
+      ]
+    }
+  ]
+}`
+}
+
+/**
+ * PASSE 3 : Ministères + Formules de politesse (après institutions)
+ */
+function buildSystemPromptPass3() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
 Applique CES DEUX règles :
 
@@ -1012,44 +1050,6 @@ Format JSON :
       "corrected": "texte corrigé",
       "corrections": [
         {"type": "major", "original": "...", "corrected": "...", "reason": "..."}
-      ]
-    }
-  ]
-}`
-}
-
-/**
- * PASSE 3 : Autres règles spécifiques (après ministères et formules de politesse)
- */
-function buildSystemPromptPass3() {
-  return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique ces règles :
-
-1. INSTITUTIONS :
-   ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
-   ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
-
-2. ESPACES MILLIERS + ORDINAUX :
-   ✗ 10000, 1000e
-   ✓ 10 000, 1 000 e
-
-3. TRAITS D'UNION :
-   ✗ au dela, par dessus
-   ✓ au-delà, par-dessus
-
-4. MAJUSCULES ABUSIVES :
-   ✗ la Plaque, le Bâtiment
-   ✓ la plaque, le bâtiment
-
-Format JSON :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte reçu",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"}
       ]
     }
   ]
