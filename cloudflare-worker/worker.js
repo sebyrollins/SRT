@@ -985,19 +985,20 @@ function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
 Applique ces règles :
 
-1. INSTITUTIONS :
+1. INSTITUTIONS (type: major) :
    ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
    ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
 
-2. ESPACES MILLIERS + ORDINAUX :
+2. ESPACES MILLIERS + ORDINAUX (type: minor) :
    ✗ 10000, 1000e
    ✓ 10 000, 1 000 e
 
-3. TRAITS D'UNION :
-   ✗ au dela, par dessus
-   ✓ au-delà, par-dessus
+3. TRAITS D'UNION - FAUTES D'ORTHOGRAPHE (type: major) :
+   ✗ au dela, par dessus, rendez vous, au dessus, en dessous
+   ✓ au-delà, par-dessus, rendez-vous, au-dessus, en-dessous
+   IMPORTANT : Les traits d'union manquants sont des FAUTES MAJEURES, pas de la typographie !
 
-4. MAJUSCULES ABUSIVES :
+4. MAJUSCULES ABUSIVES (type: minor) :
    ✗ la Plaque, le Bâtiment
    ✓ la plaque, le bâtiment
 
@@ -1009,11 +1010,18 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"}
+        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
+        {"type": "major", "original": "au dela", "corrected": "au-delà", "reason": "Trait d'union manquant"},
+        {"type": "minor", "original": "10000", "corrected": "10 000", "reason": "Espace milliers"}
       ]
     }
   ]
-}`
+}
+
+IMPORTANT :
+- Traits d'union manquants = type "major" (faute d'orthographe)
+- Espaces milliers/ordinaux = type "minor" (formatage)
+- Majuscules abusives = type "minor" (formatage)`
 }
 
 /**
