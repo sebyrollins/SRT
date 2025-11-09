@@ -841,8 +841,13 @@ function renderBlocksTable() {
             ? correction.alternative
             : correction.corrected
 
-          // Badge : afficher "MODIFIÉ" pour les corrections modifiées manuellement
-          const badgeText = correction.isManuallyEdited ? 'MODIFIÉ' : (correction.type === 'doubt' ? 'DOUTE' : 'FAUTE')
+          // Badge : afficher selon le type de correction
+          // - "MODIFIÉ" pour les corrections modifiées manuellement
+          // - "DOUTE" pour les doutes de genre (avec alternative)
+          // - "FAUTE" pour les autres
+          const badgeText = correction.isManuallyEdited
+            ? 'MODIFIÉ'
+            : (correction.type === 'doubt' && correction.alternative ? 'DOUTE' : 'FAUTE')
 
           cardEl.innerHTML = `
             <div class="validation-header">
@@ -863,8 +868,8 @@ function renderBlocksTable() {
           const actionsEl = document.createElement('div')
           actionsEl.className = 'validation-actions'
 
-          // Pour les corrections modifiées manuellement (garder le type original mais afficher bouton réinitialiser)
-          if (correction.isManuallyEdited && isValidated) {
+          // PRIORITÉ 1 : Corrections modifiées manuellement (validées ou non)
+          if (correction.isManuallyEdited) {
             // Bouton pour réinitialiser à la suggestion de Claude
             const resetBtn = document.createElement('button')
             resetBtn.className = 'btn-toggle-gender'
@@ -881,8 +886,8 @@ function renderBlocksTable() {
             editBtn.onclick = () => editCorrection(block.index, corrIndex)
             actionsEl.appendChild(editBtn)
           }
-          // Pour les corrections de type "doubt" (genre), logique différente
-          else if (correction.type === 'doubt' && !correction.isManuallyEdited) {
+          // PRIORITÉ 2 : Doutes de GENRE (avec champ alternative, pas modifiés manuellement)
+          else if (correction.type === 'doubt' && correction.alternative) {
             // Vérifier si le genre a été changé (forme alternative active)
             const isGenderSwitched = AppState.genderSwitched.has(correctionId)
 
@@ -902,7 +907,7 @@ function renderBlocksTable() {
             editBtn.onclick = () => editCorrection(block.index, corrIndex)
             actionsEl.appendChild(editBtn)
           }
-          // Pour les autres types de corrections (fault)
+          // PRIORITÉ 3 : Corrections normales (fault) non validées
           else if (!isValidated) {
             // Boutons Valider, Modifier et Rejeter : seulement si NON validé
             const validateBtn = document.createElement('button')
@@ -1104,8 +1109,9 @@ function toggleGender(blockIndex, corrIndex) {
   const correction = block.corrections[corrIndex]
   const correctionId = `${blockIndex}-${corrIndex}`
 
-  // Vérifier si c'est bien une correction de genre
-  if (correction.type !== 'doubt') {
+  // Vérifier si c'est bien une correction de genre (avec champ alternative)
+  if (correction.type !== 'doubt' || !correction.alternative) {
+    console.log(`[toggleGender] Not a gender doubt correction (no alternative field)`)
     return
   }
 
