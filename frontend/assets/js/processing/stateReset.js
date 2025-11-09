@@ -139,5 +139,5 @@ export function resetApp(DOM, resetFileInput) {
   }
 
   resetFileInput()
-  showSectionUI('upload')
+  showSectionUI('upload', DOM)
 }

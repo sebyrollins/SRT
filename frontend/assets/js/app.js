@@ -240,7 +240,7 @@ function handleFormSubmit(event) {
  * Traite un fichier uploadé (wrapper pour le module processing)
  */
 async function processUploadedFile(content, filename) {
-  await processUploadedFileModule(content, filename, AppState, SRTParser, showEditor)
+  await processUploadedFileModule(content, filename, DOM, AppState, SRTParser, showEditor)
 }
 
 

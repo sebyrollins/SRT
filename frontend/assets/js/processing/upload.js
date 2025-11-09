@@ -284,11 +284,12 @@ export function handleFormSubmit(event, DOM, processUploadedFile) {
  * Traite un fichier uploadé
  * @param {string} content - Contenu du fichier
  * @param {string} filename - Nom du fichier
+ * @param {Object} DOM - Références DOM
  * @param {Object} AppState - État de l'application
  * @param {Object} SRTParser - Parser SRT
  * @param {Function} showEditor - Fonction d'affichage de l'éditeur
  */
-export async function processUploadedFile(content, filename, AppState, SRTParser, showEditor) {
+export async function processUploadedFile(content, filename, DOM, AppState, SRTParser, showEditor) {
   // Valider le contenu
   const validation = SRTParser.validate(content)
 
@@ -300,7 +301,7 @@ export async function processUploadedFile(content, filename, AppState, SRTParser
   setOriginalFilename(filename)
 
   // Afficher la section de chargement
-  showSectionUI('loading')
+  showSectionUI('loading', DOM)
 
   // Estimer le temps de traitement
   const fileSizeKB = new Blob([content]).size / 1024
@@ -315,7 +316,7 @@ export async function processUploadedFile(content, filename, AppState, SRTParser
   const updateInterval = 100
   const progressIncrement = (targetProgress / estimatedTimeMs) * updateInterval
 
-  updateProgressUI(0, 'Veuillez patienter pendant l\'analyse...')
+  updateProgressUI(0, 'Veuillez patienter pendant l\'analyse...', DOM)
 
   const progressInterval = setInterval(() => {
     currentProgress += progressIncrement
@@ -323,7 +324,7 @@ export async function processUploadedFile(content, filename, AppState, SRTParser
       currentProgress = targetProgress
       clearInterval(progressInterval)
     }
-    updateProgressUI(Math.round(currentProgress), 'Veuillez patienter pendant l\'analyse...')
+    updateProgressUI(Math.round(currentProgress), 'Veuillez patienter pendant l\'analyse...', DOM)
   }, updateInterval)
 
   try {
@@ -385,11 +386,11 @@ export async function processUploadedFile(content, filename, AppState, SRTParser
         }
       }
 
-      updateProgressUI(roundedProgress, message)
+      updateProgressUI(roundedProgress, message, DOM)
       await new Promise(resolve => setTimeout(resolve, finalProgressInterval))
     }
 
-    updateProgressUI(100, 'Terminé !')
+    updateProgressUI(100, 'Terminé !', DOM)
 
     setTimeout(() => {
       showEditor()
@@ -399,7 +400,7 @@ export async function processUploadedFile(content, filename, AppState, SRTParser
     console.error('Erreur lors du traitement:', error)
     clearInterval(progressInterval)
     alert(`Erreur : ${error.message}`)
-    showSectionUI('upload')
+    showSectionUI('upload', DOM)
   }
 }
 
@@ -416,7 +417,7 @@ export async function processUploadedFile(content, filename, AppState, SRTParser
  * @param {Function} onResizeThrottled - Handler de resize throttled
  */
 export function showEditor(DOM, AppState, SRTParser, updateStats, renderBlocksTable, renderMinimap, updateMinimapCurrentPosition, onScrollThrottled, onResizeThrottled) {
-  showSectionUI('editor')
+  showSectionUI('editor', DOM)
 
   // Afficher la minimap
   if (DOM.navigationMinimap) {
