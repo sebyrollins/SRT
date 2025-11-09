@@ -2,14 +2,41 @@
  * SRT Corrector Pro - Main Application Logic
  */
 
-// État global de l'application
-const AppState = {
-  originalFilename: null,
-  blocks: [],
-  validatedCorrections: new Set(),
-  genderSwitched: new Set(), // Suit quelles corrections de genre sont en forme alternative
-  activeFilter: null // null = tous, 'minor', 'major', 'doubt', 'none' (sans correction)
-}
+// Imports des modules de gestion d'état
+import AppState, {
+  getState,
+  getBlocks,
+  getBlock,
+  getCorrection,
+  getOriginalFilename,
+  getActiveFilter,
+  isValidated,
+  isGenderSwitched,
+  isBlockFullyValidated
+} from './state/AppState.js'
+
+import {
+  setOriginalFilename,
+  setBlocks,
+  setActiveFilter,
+  toggleFilter,
+  validateCorrection,
+  unvalidateCorrection,
+  validateAllBlockCorrections as validateAllBlockCorrectionsState,
+  validateAllCorrections,
+  validateCorrectionsByType,
+  switchGender,
+  unswitchGender,
+  toggleGenderSwitch,
+  resetBlock,
+  resetAllValidations,
+  resetApp as resetAppState,
+  updateBlockCorrectedText,
+  updateCorrection,
+  removeCorrection,
+  addCorrection,
+  clearBlockCorrections
+} from './state/stateManager.js'
 
 // Éléments DOM
 const DOM = {
@@ -198,7 +225,7 @@ async function processUploadedFile(content, filename) {
     return
   }
 
-  AppState.originalFilename = filename
+  setOriginalFilename(filename)
 
   // Afficher la section de chargement
   showSection('loading')
@@ -252,7 +279,7 @@ async function processUploadedFile(content, filename) {
     cleanDoubtCorrectionsObjects(correctedBlocks)
 
     // Sauvegarder les blocs
-    AppState.blocks = correctedBlocks
+    setBlocks(correctedBlocks)
 
     // Valider automatiquement toutes les corrections de genre (doute)
     // Par défaut, elles sont validées avec l'orthographe originale
@@ -1833,7 +1860,7 @@ function resetToInitialState() {
   autoValidateDoubtCorrections()
 
   // Réinitialiser le filtre actif
-  AppState.activeFilter = null
+  setActiveFilter(null)
   document.querySelectorAll('.stat-filter').forEach(btn => {
     btn.classList.remove('active')
   })
@@ -1952,13 +1979,10 @@ function buildTextWithValidatedCorrections(block) {
  * Réinitialise l'application
  */
 function resetApp() {
-  AppState.originalFilename = null
-  AppState.blocks = []
-  AppState.validatedCorrections.clear()
-  AppState.genderSwitched.clear()
+  // Utiliser resetAppState du stateManager
+  resetAppState()
 
-  // Reset filter state
-  AppState.activeFilter = null
+  // Reset filter UI
   document.querySelectorAll('.stat-filter').forEach(btn => {
     btn.classList.remove('active')
   })
@@ -2161,22 +2185,16 @@ function handleFilterClick(event) {
   const filterBtn = event.currentTarget
   const filterType = filterBtn.dataset.filter
 
-  // Si on clique sur le filtre actif, on le désactive
-  if (AppState.activeFilter === filterType) {
-    AppState.activeFilter = null
-    filterBtn.classList.remove('active')
-  } else {
-    // Sinon, on active le nouveau filtre
-    // Désactiver tous les filtres
-    document.querySelectorAll('.stat-filter').forEach(btn => {
-      btn.classList.remove('active')
-    })
+  // Utiliser toggleFilter du stateManager
+  toggleFilter(filterType)
 
-    // Activer le filtre cliqué
-    AppState.activeFilter = filterType === 'all' ? null : filterType
-    if (filterType !== 'all') {
-      filterBtn.classList.add('active')
-    }
+  // Mettre à jour l'UI
+  document.querySelectorAll('.stat-filter').forEach(btn => {
+    btn.classList.remove('active')
+  })
+
+  if (getActiveFilter() && filterType !== 'all') {
+    filterBtn.classList.add('active')
   }
 
   // Re-render le tableau avec le filtre
