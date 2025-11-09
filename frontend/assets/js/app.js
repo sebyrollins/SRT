@@ -255,6 +255,10 @@ async function processUploadedFile(content, filename) {
     // Retirer les corrections de genre du texte (par défaut = original)
     removeDoubtCorrectionsFromText(correctedBlocks)
 
+    // Nettoyer les objets correction.corrected pour les corrections de doute
+    // (enlever les parenthèses et les bugs de l'ancien format)
+    cleanDoubtCorrectionsObjects(correctedBlocks)
+
     // Sauvegarder les blocs
     AppState.blocks = correctedBlocks
 
@@ -484,21 +488,77 @@ function removeDoubtCorrectionsFromText(blocks) {
       const doubtCorrections = block.corrections.filter(c => c.type === 'doubt')
 
       if (doubtCorrections.length > 0) {
-        // Pour chaque correction de genre, remplacer la forme avec parenthèses par l'original
+        // Pour chaque correction de genre, s'assurer que le texte contient l'original
         doubtCorrections.forEach(correction => {
-          // Extraire la forme alternative
-          const alternativeForm = extractAlternativeGender(correction)
-
-          // Si le texte corrigé contient la forme alternative, la remplacer par l'original
-          if (block.corrected.includes(alternativeForm)) {
-            block.corrected = block.corrected.replace(alternativeForm, correction.original)
+          // Si le texte contient déjà l'original, rien à faire
+          if (block.corrected.includes(correction.original)) {
+            return
           }
-          // Sinon, si le texte contient la forme avec parenthèses (cas normal, ancien format)
-          else if (block.corrected.includes(correction.corrected)) {
-            block.corrected = block.corrected.replace(correction.corrected, correction.original)
+
+          // Nouveau format : utiliser le champ alternative si disponible
+          if (correction.alternative) {
+            // Remplacer la forme alternative par l'original
+            if (block.corrected.includes(correction.alternative)) {
+              block.corrected = block.corrected.replace(correction.alternative, correction.original)
+              return
+            }
+          }
+
+          // Ancien format : chercher et remplacer les formes avec parenthèses
+          // Pattern : trouve le texte avec "(ou XXX)" ou variations bugées comme "attachéee (ou attaché)"
+          // On va chercher n'importe quel texte qui ressemble à correction.original avec des variations
+
+          // Extraire les mots de correction.original pour construire un pattern flexible
+          const originalWords = correction.original.split(/\s+/)
+          const lastWord = originalWords[originalWords.length - 1]
+
+          // Construire un pattern qui trouve le dernier mot avec potentiellement des lettres en trop
+          // puis suivi de "(ou ...)"
+          const escapedPrefix = originalWords.slice(0, -1).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+          const escapedLastWord = lastWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+          // Pattern flexible qui permet des variations du dernier mot (pour gérer les bugs comme "attachéee")
+          const pattern = new RegExp(
+            `${escapedPrefix}${escapedPrefix ? '\\s+' : ''}${escapedLastWord}e*\\s*\\(ou\\s+[^)]+\\)`,
+            'g'
+          )
+
+          const newText = block.corrected.replace(pattern, correction.original)
+          if (newText !== block.corrected) {
+            block.corrected = newText
+            console.log(`[removeDoubtCorrections] Nettoyé ancien format dans bloc #${block.index}: "${correction.original}"`)
           }
         })
       }
+    }
+  })
+}
+
+/**
+ * Nettoie les objets correction.corrected pour les corrections de doute
+ * Pour l'ancien format avec parenthèses ou bugs, remplace par correction.original
+ */
+function cleanDoubtCorrectionsObjects(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach(correction => {
+        if (correction.type === 'doubt') {
+          // Si nouveau format avec alternative, s'assurer que corrected = original
+          if (correction.alternative) {
+            correction.corrected = correction.original
+          }
+          // Si ancien format avec parenthèses, enlever les parenthèses et bugs
+          else if (correction.corrected.includes('(ou ')) {
+            // Enlever tout ce qui est après et incluant "(ou"
+            const withoutParentheses = correction.corrected.replace(/\s*\(ou\s+[^)]+\)/g, '').trim()
+
+            // S'assurer que ça correspond à l'original (gérer les bugs de lettres en trop)
+            // Si withoutParentheses est proche de original, utiliser original
+            correction.corrected = correction.original
+            console.log(`[cleanDoubtObjects] Nettoyé correction de doute dans bloc #${block.index}: "${correction.original}"`)
+          }
+        }
+      })
     }
   })
 }
