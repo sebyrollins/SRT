@@ -439,7 +439,14 @@ function cleanPhantomCorrections(blocks) {
           return true // Garder
         }
 
-        // Pour les autres types (major, doubt), vérifier si vraiment identiques
+        // Pour les corrections de type "doubt", c'est NORMAL que original === corrected
+        // (corrected = forme dans l'original, alternative = autre forme)
+        // Ne PAS les supprimer si elles ont un champ "alternative"
+        if (correction.type === 'doubt' && correction.alternative) {
+          return true // Garder les corrections de doute avec alternative
+        }
+
+        // Pour les autres types (major), vérifier si vraiment identiques
         const isPhantom = normalizedOriginal === normalizedCorrected
 
         if (isPhantom) {
