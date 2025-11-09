@@ -251,6 +251,9 @@ async function processUploadedFile(content, filename) {
     // Nettoyer les corrections fantômes (où original === corrected)
     cleanPhantomCorrections(correctedBlocks)
 
+    // Retirer les corrections de genre du texte (par défaut = original)
+    removeDoubtCorrectionsFromText(correctedBlocks)
+
     // Sauvegarder les blocs
     AppState.blocks = correctedBlocks
 
@@ -436,6 +439,37 @@ function cleanPhantomCorrections(blocks) {
       // Log si des corrections fantômes ont été supprimées
       if (removed.length > 0) {
         console.log(`Bloc #${block.index}: ${removed.length} correction(s) fantôme(s) supprimée(s):`, removed)
+      }
+    }
+  })
+}
+
+/**
+ * Retire les corrections de genre (doubt) du texte corrigé
+ * Par défaut, les corrections de genre ne sont PAS appliquées (on garde l'original)
+ * Elles ne sont appliquées que si l'utilisateur clique "Changer le genre"
+ */
+function removeDoubtCorrectionsFromText(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      // Chercher les corrections de type "doubt"
+      const doubtCorrections = block.corrections.filter(c => c.type === 'doubt')
+
+      if (doubtCorrections.length > 0) {
+        // Pour chaque correction de genre, remplacer la forme avec parenthèses par l'original
+        doubtCorrections.forEach(correction => {
+          // Extraire la forme alternative sans parenthèses
+          const alternativeForm = extractAlternativeGender(correction.corrected)
+
+          // Si le texte corrigé contient la forme alternative, la remplacer par l'original
+          if (block.corrected.includes(alternativeForm)) {
+            block.corrected = block.corrected.replace(alternativeForm, correction.original)
+          }
+          // Sinon, si le texte contient la forme avec parenthèses (cas normal)
+          else if (block.corrected.includes(correction.corrected)) {
+            block.corrected = block.corrected.replace(correction.corrected, correction.original)
+          }
+        })
       }
     }
   })
@@ -1508,12 +1542,19 @@ function resetBlockToInitialState(blockIndex) {
   })
 
   // Reconstruire block.corrected en appliquant toutes les corrections restaurées
+  // SAUF les corrections de type "doubt" qui ne sont PAS validées (par défaut = original)
   // On trie les corrections par position pour les appliquer dans l'ordre
   const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
   let correctedText = block.original
   let offset = 0
 
-  sortedCorrections.forEach(correction => {
+  sortedCorrections.forEach((correction, corrIndex) => {
+    // Pour les corrections "doubt", ne les appliquer QUE si validées
+    const correctionId = `${blockIndex}-${corrIndex}`
+    if (correction.type === 'doubt' && !AppState.validatedCorrections.has(correctionId)) {
+      return // Ne pas appliquer cette correction de genre
+    }
+
     const startPos = correction.position + offset
     const endPos = startPos + correction.original.length
 
