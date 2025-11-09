@@ -319,7 +319,7 @@ async function processUploadedFile(content, filename) {
 
 /**
  * Extrait la forme alternative du genre d'une correction de type "doubt"
- * Exemple : "je suis venu (ou venue)" → "je suis venue"
+ * Exemple : "je reste très attachée (ou attaché)" → "je reste très attaché"
  * @param {string} corrected - Texte corrigé avec parenthèses
  * @returns {string} - Forme alternative sans parenthèses
  */
@@ -331,9 +331,19 @@ function extractAlternativeGender(corrected) {
   }
 
   const alternative = match[1].trim()
-  const beforeParenthesis = corrected.substring(0, match.index).trim()
+  const withoutParens = corrected.substring(0, match.index).trim()
 
-  return beforeParenthesis + ' ' + alternative
+  // Compter les mots dans l'alternative
+  const alternativeWords = alternative.split(/\s+/)
+  const alternativeWordCount = alternativeWords.length
+
+  // Extraire les mots du texte avant parenthèses
+  const words = withoutParens.split(/\s+/)
+
+  // Remplacer les N derniers mots par l'alternative
+  const beforeWords = words.slice(0, -alternativeWordCount)
+
+  return [...beforeWords, ...alternativeWords].join(' ')
 }
 
 /**
