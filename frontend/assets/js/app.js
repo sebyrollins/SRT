@@ -55,6 +55,23 @@ import {
 } from './rendering/minimap.js'
 import { renderBlocksTable as renderBlocksTableModule } from './rendering/blocksTable.js'
 
+// Imports des modules d'actions
+import {
+  validateAllBlockCorrections as validateAllBlockCorrectionsModule,
+  validateSingleCorrection as validateSingleCorrectionModule,
+  validateCorrections as validateCorrectionsModule
+} from './actions/validation.js'
+import {
+  editBlockText as editBlockTextModule,
+  editCorrection as editCorrectionModule
+} from './actions/editing.js'
+import {
+  resetToOriginalSuggestion as resetToOriginalSuggestionModule,
+  resetBlockToInitialState as resetBlockToInitialStateModule,
+  rejectCorrection as rejectCorrectionModule,
+  toggleGender as toggleGenderModule
+} from './actions/reset.js'
+
 // Éléments DOM
 const DOM = {
   uploadSection: null,
@@ -372,49 +389,6 @@ async function processUploadedFile(content, filename) {
  * @param {Object} correction - Objet correction complet
  * @returns {string} - Forme alternative
  */
-function extractAlternativeGender(correction) {
-  // Nouveau format : champ "alternative" fourni directement par le worker
-  if (correction.alternative) {
-    return correction.alternative
-  }
-
-  // Ancien format : extraire "(ou XXX)" des parenthèses
-  const corrected = correction.corrected
-  const match = corrected.match(/\(ou\s+([^)]+)\)/)
-  if (!match) {
-    return corrected // Pas de forme alternative trouvée
-  }
-
-  const alternative = match[1].trim()
-  const withoutParens = corrected.substring(0, match.index).trim()
-
-  // Compter les mots dans l'alternative
-  const alternativeWords = alternative.split(/\s+/)
-  const alternativeWordCount = alternativeWords.length
-
-  // Extraire les mots du texte avant parenthèses
-  const words = withoutParens.split(/\s+/)
-
-  // Remplacer les N derniers mots par l'alternative
-  const beforeWords = words.slice(0, -alternativeWordCount)
-
-  return [...beforeWords, ...alternativeWords].join(' ')
-}
-
-/**
- * Convertit un texte en remplaçant apostrophes droites (') par courbes (')
- * SAUF les apostrophes doubles ('') qui sont préservées
- */
-function convertApostrophes(text) {
-  if (!text) return text
-  // Protéger les doubles apostrophes avec un placeholder temporaire
-  const placeholder = '\uFFFF' // Caractère Unicode privé jamais utilisé
-  return text
-    .replace(/''/g, placeholder)  // Protéger ''
-    .replace(/'/g, '\u2019')      // Convertir ' simple
-    .replace(new RegExp(placeholder, 'g'), "''") // Restaurer ''
-}
-
 /**
  * Convertit les apostrophes droites (') en apostrophes courbes (')
  * SAUF les apostrophes doubles ('') qui sont préservées
@@ -706,655 +680,66 @@ function renderBlocksTable() {
 }
 
 /**
- * Valide toutes les corrections d'un bloc en une seule fois
+ * Valide toutes les corrections d'un bloc (wrapper pour le module actions)
  */
 function validateAllBlockCorrections(blockIndex) {
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block || !block.corrections || block.corrections.length === 0) {
-    return
-  }
-
-  // Valider toutes les corrections du bloc
-  block.corrections.forEach((correction, corrIndex) => {
-    const correctionId = `${blockIndex}-${corrIndex}`
-    if (!AppState.validatedCorrections.has(correctionId)) {
-      AppState.validatedCorrections.add(correctionId)
-
-      // Appliquer la correction au texte du bloc
-      if (block.corrected.includes(correction.original)) {
-        block.corrected = block.corrected.replace(correction.original, correction.corrected)
-      }
-    }
-  })
-
-  // Mettre à jour les stats et la jauge
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-
-  // Re-render pour mettre à jour l'affichage
-  renderBlocksTable()
-  updateMinimap()
-
-  // Auto-scroll vers le prochain bloc non validé
-  setTimeout(() => {
-    const nextBlockIndex = findNextUnvalidatedBlock(blockIndex)
-    if (nextBlockIndex !== null) {
-      scrollToBlock(nextBlockIndex)
-    }
-  }, 300)
+  validateAllBlockCorrectionsModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap, scrollToBlock)
 }
 
 /**
- * Valide une correction unique
+ * Valide une correction unique (wrapper pour le module actions)
  */
 function validateSingleCorrection(blockIndex, corrIndex) {
-  const correctionId = `${blockIndex}-${corrIndex}`
-  AppState.validatedCorrections.add(correctionId)
-
-  // Trouver le bloc et la correction
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (block && block.corrections && block.corrections[corrIndex]) {
-    const correction = block.corrections[corrIndex]
-
-    // Appliquer la correction au texte du bloc
-    // Remplacer le texte original par le texte corrigé
-    if (block.corrected.includes(correction.original)) {
-      block.corrected = block.corrected.replace(correction.original, correction.corrected)
-    }
-  }
-
-  // Mettre à jour les stats et la jauge
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-
-  // Re-render pour mettre à jour le fond du bloc si toutes corrections validées
-  renderBlocksTable()
-  updateMinimap()
-
-  // Auto-scroll vers le prochain bloc non validé
-  setTimeout(() => {
-    // D'abord vérifier si le bloc actuel a encore des corrections non validées
-    const currentBlock = AppState.blocks.find(b => b.index === blockIndex)
-    if (currentBlock && currentBlock.corrections) {
-      const hasUnvalidatedInCurrentBlock = currentBlock.corrections.some((c, idx) => {
-        const corrId = `${blockIndex}-${idx}`
-        return !AppState.validatedCorrections.has(corrId)
-      })
-
-      // Si le bloc actuel a encore des corrections, ne pas scroller
-      if (hasUnvalidatedInCurrentBlock) {
-        return
-      }
-    }
-
-    // Sinon, chercher le prochain bloc avec des corrections non validées
-    const nextBlockIndex = findNextUnvalidatedBlock(blockIndex)
-    if (nextBlockIndex !== null) {
-      scrollToBlock(nextBlockIndex)
-    }
-  }, 300)
+  validateSingleCorrectionModule(blockIndex, corrIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap, scrollToBlock)
 }
 
 /**
- * Réinitialise une correction modifiée manuellement à la suggestion originale de Claude
- * @param {number} blockIndex - Index du bloc
- * @param {number} corrIndex - Index de la correction
+ * Réinitialise une correction à la suggestion originale (wrapper pour le module actions)
  */
 function resetToOriginalSuggestion(blockIndex, corrIndex) {
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block || !block.corrections || !block.corrections[corrIndex]) {
-    return
-  }
-
-  const correction = block.corrections[corrIndex]
-
-  // Récupérer la suggestion originale de Claude
-  const originalSuggestion = correction.originalSuggestion
-  if (!originalSuggestion) {
-    console.log(`[resetToOriginalSuggestion] Pas de suggestion originale pour bloc #${blockIndex}, correction #${corrIndex}`)
-    return
-  }
-
-  // Remplacer la valeur actuelle par la suggestion originale
-  const currentValue = correction.corrected
-  block.corrected = block.corrected.replace(currentValue, originalSuggestion)
-  correction.corrected = originalSuggestion
-
-  // Restaurer le type et la raison originale
-  if (correction.originalType) {
-    correction.type = correction.originalType
-  }
-  if (correction.originalReason) {
-    correction.reason = correction.originalReason
-  }
-
-  // Retirer de validatedCorrections pour revenir à l'état non validé
-  const correctionId = `${blockIndex}-${corrIndex}`
-  AppState.validatedCorrections.delete(correctionId)
-
-  // Retirer le flag de modification manuelle
-  correction.isManuallyEdited = false
-
-  console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex}, correction #${corrIndex} réinitialisée à "${originalSuggestion}"`)
-
-  // Mettre à jour les stats et la jauge
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-
-  // Mettre à jour l'affichage
-  renderBlocksTable()
-  updateMinimap()
+  resetToOriginalSuggestionModule(blockIndex, corrIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
- * Bascule entre les deux formes de genre pour une correction de type "doubt"
- * État 1 (défaut): texte original (ex: "je suis venu")
- * État 2: forme alternative (ex: "je suis venue")
- * @param {number} blockIndex - Index du bloc
- * @param {number} corrIndex - Index de la correction
+ * Bascule entre les formes de genre (wrapper pour le module actions)
  */
 function toggleGender(blockIndex, corrIndex) {
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block || !block.corrections || !block.corrections[corrIndex]) {
-    return
-  }
-
-  const correction = block.corrections[corrIndex]
-  const correctionId = `${blockIndex}-${corrIndex}`
-
-  // Vérifier si c'est bien une correction de genre (avec champ alternative)
-  if (correction.type !== 'doubt' || !correction.alternative) {
-    console.log(`[toggleGender] Not a gender doubt correction (no alternative field)`)
-    return
-  }
-
-  // Vérifier si le genre est déjà en forme alternative
-  const isGenderSwitched = AppState.genderSwitched.has(correctionId)
-
-  if (isGenderSwitched) {
-    // Revenir à l'original
-    AppState.genderSwitched.delete(correctionId)
-
-    // Extraire la forme alternative
-    const alternativeForm = extractAlternativeGender(correction)
-
-    // Remplacer la forme alternative par l'original dans le texte
-    if (block.corrected.includes(alternativeForm)) {
-      block.corrected = block.corrected.replace(alternativeForm, correction.original)
-    }
-  } else {
-    // Changer le genre : passer à la forme alternative
-    AppState.genderSwitched.add(correctionId)
-
-    // Extraire la forme alternative
-    const alternativeForm = extractAlternativeGender(correction)
-
-    // Remplacer l'original par la forme alternative
-    if (block.corrected.includes(correction.original)) {
-      block.corrected = block.corrected.replace(correction.original, alternativeForm)
-    }
-  }
-
-  // Note: la correction reste toujours dans validatedCorrections (validée par défaut)
-
-  // Mettre à jour les stats et l'affichage
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-  renderBlocksTable()
-  updateMinimap()
+  toggleGenderModule(blockIndex, corrIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
- * Trouve le prochain bloc avec des corrections non validées
- */
-function findNextUnvalidatedBlock(currentBlockIndex) {
-  // Commencer à partir du bloc suivant
-  const currentIdx = AppState.blocks.findIndex(b => b.index === currentBlockIndex)
-
-  // Chercher dans les blocs suivants
-  for (let i = currentIdx + 1; i < AppState.blocks.length; i++) {
-    const block = AppState.blocks[i]
-    if (!block.corrections || block.corrections.length === 0) continue
-
-    // Vérifier s'il y a au moins une correction non validée
-    const hasUnvalidated = block.corrections.some((c, idx) => {
-      const correctionId = `${block.index}-${idx}`
-      return !AppState.validatedCorrections.has(correctionId)
-    })
-
-    if (hasUnvalidated) {
-      return block.index
-    }
-  }
-
-  return null // Aucun bloc non validé trouvé
-}
-
-/**
- * Édite le texte complet d'un bloc sans corrections
+ * Édite le texte complet d'un bloc (wrapper pour le module actions)
  */
 function editBlockText(blockIndex) {
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block) return
-
-  // Sauvegarder la suggestion originale de Claude si pas déjà fait
-  if (!block.hasOwnProperty('originalCorrected')) {
-    block.originalCorrected = block.corrected
-  }
-
-  // Debug : afficher les codes des caractères pour vérifier les apostrophes
-  console.log('[editBlockText] Original:', block.original)
-  console.log('[editBlockText] Original codes:', Array.from(block.original).map(c => `${c}=${c.charCodeAt(0)}`).join(' '))
-  console.log('[editBlockText] Corrected:', block.corrected)
-  console.log('[editBlockText] Corrected codes:', Array.from(block.corrected).map(c => `${c}=${c.charCodeAt(0)}`).join(' '))
-
-  // Déterminer la suggestion à afficher
-  const suggestionToShow = block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined
-    ? block.originalCorrected
-    : block.corrected
-
-  // Callback de sauvegarde
-  const handleSave = (newValue) => {
-    const processedValue = convertApostrophes(newValue)
-    const oldCorrected = block.corrected
-
-    // Cas 1 : Aucun changement par rapport à la suggestion de Claude actuelle
-    if (processedValue === oldCorrected) {
-      return
-    }
-
-    // Cas 2 : Retour au texte original → Dévalider les corrections (ne pas les supprimer)
-    if (processedValue === block.original) {
-      // Dévalider toutes les corrections de ce bloc (mais les garder)
-      if (block.corrections && block.corrections.length > 0) {
-        block.corrections.forEach((_, idx) => {
-          const correctionId = `${block.index}-${idx}`
-          AppState.validatedCorrections.delete(correctionId)
-        })
-      }
-
-      // Restaurer le texte corrigé original de Claude (pas l'original avec fautes)
-      if (block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined) {
-        block.corrected = block.originalCorrected
-      }
-
-      // Mettre à jour les stats
-      const stats = SRTParser.calculateStats(AppState.blocks)
-      updateStats(stats)
-
-      // Re-render
-      renderBlocksTable()
-      updateMinimap()
-      return
-    }
-
-    // Cas 3 : Retour à la suggestion originale de Claude → Restaurer et valider
-    if (block.hasOwnProperty('originalCorrected') && processedValue === block.originalCorrected) {
-      // Valider toutes les corrections et restaurer leurs propriétés originales
-      if (block.corrections && block.corrections.length > 0) {
-        block.corrections.forEach((correction, idx) => {
-          const correctionId = `${block.index}-${idx}`
-
-          // Restaurer les types et raisons originaux si modifiés
-          if (correction.hasOwnProperty('originalSuggestion')) {
-            correction.corrected = correction.originalSuggestion
-            delete correction.originalSuggestion
-          }
-          if (correction.hasOwnProperty('originalType')) {
-            correction.type = correction.originalType
-            delete correction.originalType
-          }
-          if (correction.hasOwnProperty('originalReason')) {
-            correction.reason = correction.originalReason
-            delete correction.originalReason
-          }
-          if (correction.isManuallyEdited) {
-            correction.isManuallyEdited = false
-          }
-
-          // VALIDER la correction
-          AppState.validatedCorrections.add(correctionId)
-        })
-      }
-
-      // Restaurer le texte corrigé de Claude
-      block.corrected = block.originalCorrected
-
-      // Mettre à jour les stats
-      const stats = SRTParser.calculateStats(AppState.blocks)
-      updateStats(stats)
-
-      // Re-render
-      renderBlocksTable()
-      updateMinimap()
-      return
-    }
-
-    // Cas 4 : Modification du texte (différent de l'original et de la suggestion)
-    if (processedValue && processedValue !== block.original && processedValue !== oldCorrected) {
-      // Supprimer toutes les anciennes corrections de ce bloc
-      const oldCorrections = block.corrections ? [...block.corrections] : []
-      oldCorrections.forEach((_, idx) => {
-        const correctionId = `${block.index}-${idx}`
-        AppState.validatedCorrections.delete(correctionId)
-      })
-
-      // Déterminer le type original
-      const originalType = (oldCorrections.length > 0 && oldCorrections[0].originalType)
-        ? oldCorrections[0].originalType
-        : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
-      const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
-
-      // Remplacer par UNE SEULE correction
-      block.corrections = [{
-        type: originalType,
-        original: block.original,
-        corrected: processedValue,
-        reason: 'Modifié manuellement',
-        position: 0,
-        originalSuggestion: oldCorrected,
-        originalType: originalType,
-        originalReason: originalReason,
-        isManuallyEdited: true
-      }]
-
-      block.corrected = processedValue
-
-      // Valider automatiquement cette correction
-      AppState.validatedCorrections.add(`${block.index}-0`)
-
-      // Mettre à jour les stats
-      const stats = SRTParser.calculateStats(AppState.blocks)
-      updateStats(stats)
-
-      // Re-render
-      renderBlocksTable()
-      updateMinimap()
-    }
-  }
-
-  // Ouvrir le modal avec le système réutilisable
-  openEditModal({
-    originalText: block.original,
-    suggestedText: suggestionToShow,
-    currentValue: block.corrected,
-    showSuggestion: false, // Cacher la section suggestion pour l'édition de bloc entier
-    onSave: handleSave,
-    multiline: true // Mode textarea avec Ctrl+Enter
-  })
+  editBlockTextModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
- * Édite une correction avec modal moderne
+ * Édite une correction (wrapper pour le module actions)
  */
 function editCorrection(blockIndex, corrIndex) {
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block) return
-
-  const correction = block.corrections[corrIndex]
-  if (!correction) return
-
-  // ID de correction pour validation
-  const correctionId = `${blockIndex}-${corrIndex}`
-
-  // Sauvegarder la suggestion originale, le type original et la raison originale si pas déjà fait
-  if (!correction.hasOwnProperty('originalSuggestion')) {
-    correction.originalSuggestion = correction.corrected
-    correction.originalType = correction.type
-    correction.originalReason = correction.reason
-  }
-
-  // Déterminer la suggestion à afficher
-  const suggestionToShow = correction.hasOwnProperty('originalSuggestion') && correction.originalSuggestion !== undefined
-    ? correction.originalSuggestion
-    : correction.corrected
-
-  // Callback de sauvegarde
-  const handleSave = (newValue) => {
-    const processedValue = convertApostrophes(newValue)
-
-    if (processedValue) {
-      const oldCorrected = correction.corrected
-
-      // Mettre à jour la correction
-      correction.corrected = processedValue
-
-      // Mettre à jour le texte du bloc
-      block.corrected = block.corrected.replace(oldCorrected, processedValue)
-
-      // Vérifier si la modification est différente de la suggestion originale
-      const isDifferentFromSuggestion = processedValue !== correction.originalSuggestion
-
-      if (isDifferentFromSuggestion) {
-        // Modifié différemment → marquer comme modifié manuellement mais GARDER le type original
-        console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification manuelle détectée`)
-        console.log(`  Nouveau: "${processedValue}" (codes: ${Array.from(processedValue).map(c => c.charCodeAt(0)).join(',')})`)
-        console.log(`  Suggestion: "${correction.originalSuggestion}" (codes: ${Array.from(correction.originalSuggestion).map(c => c.charCodeAt(0)).join(',')})`)
-
-        // Sauvegarder le type et la raison originale si pas déjà fait
-        if (!correction.hasOwnProperty('originalType')) {
-          correction.originalType = correction.type
-        }
-        if (!correction.hasOwnProperty('originalReason')) {
-          correction.originalReason = correction.reason
-        }
-        // Marquer comme modifié manuellement SANS changer le type
-        correction.isManuallyEdited = true
-        correction.reason = 'Modifié manuellement'
-      } else {
-        // Remis comme la suggestion → repasser au type original
-        correction.type = correction.originalType || 'fault'
-        correction.reason = correction.originalReason
-        correction.isManuallyEdited = false
-      }
-
-      // Marquer la correction comme validée
-      AppState.validatedCorrections.add(correctionId)
-
-      // Mettre à jour les stats et la jauge
-      const stats = SRTParser.calculateStats(AppState.blocks)
-      updateStats(stats)
-
-      // Re-render
-      renderBlocksTable()
-      updateMinimap()
-    }
-  }
-
-  // Ouvrir le modal avec le système réutilisable
-  openEditModal({
-    originalText: correction.original,
-    suggestedText: suggestionToShow,
-    currentValue: correction.corrected,
-    showSuggestion: true, // Afficher la section suggestion pour l'édition de correction
-    onSave: handleSave,
-    multiline: false // Mode single line avec Enter
-  })
+  editCorrectionModule(blockIndex, corrIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
- * Rejette une correction et la convertit en doute validé
- * Garde le texte original (n'applique pas la correction)
+ * Rejette une correction (wrapper pour le module actions)
  */
 function rejectCorrection(blockIndex, corrIndex) {
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block) return
-
-  const correction = block.corrections[corrIndex]
-  if (!correction) return
-
-  // Sauvegarder la suggestion originale, le type et la raison si pas déjà fait
-  if (!correction.hasOwnProperty('originalSuggestion')) {
-    correction.originalSuggestion = correction.corrected
-    correction.originalType = correction.type
-    correction.originalReason = correction.reason
-  }
-
-  // Mettre à jour le texte du bloc pour garder l'original (défaire la correction)
-  // block.corrected contient déjà toutes les corrections appliquées par Claude
-  // On veut remplacer la suggestion par l'original
-  if (block.corrected.includes(correction.originalSuggestion)) {
-    block.corrected = block.corrected.replace(correction.originalSuggestion, correction.original)
-  }
-
-  // Mettre à jour la correction pour indiquer qu'on garde l'original
-  correction.corrected = correction.original
-  correction.reason = 'Rejeté (texte original conservé)'
-
-  // Convertir en doute
-  correction.type = 'doubt'
-
-  // Marquer la correction comme validée (en tant que doute)
-  const correctionId = `${blockIndex}-${corrIndex}`
-  AppState.validatedCorrections.add(correctionId)
-
-  // Mettre à jour les stats et la jauge
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-
-  // Re-render pour mettre à jour l'affichage avec couleur orange
-  renderBlocksTable()
-  updateMinimap()
+  rejectCorrectionModule(blockIndex, corrIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
- * Valide des corrections par type
+ * Valide des corrections par type (wrapper pour le module actions)
  */
 function validateCorrections(type) {
-  AppState.blocks.forEach(block => {
-    if (!block.corrections) return
-
-    block.corrections.forEach((correction, corrIndex) => {
-      if (type === 'all' ||
-          (type === 'fault' && correction.type === 'fault') ||
-          (type === 'doubt' && correction.type === 'doubt')) {
-
-        const correctionId = `${block.index}-${corrIndex}`
-        AppState.validatedCorrections.add(correctionId)
-      }
-    })
-  })
-
-  // Mettre à jour les stats et la jauge
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-
-  // Re-render pour mettre à jour l'affichage
-  renderBlocksTable()
-  updateMinimap()
+  validateCorrectionsModule(type, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
- * Réinitialise un bloc spécifique à son état initial
- * Supprime toutes les validations et restaure les types originaux pour ce bloc
+ * Réinitialise un bloc à son état initial (wrapper pour le module actions)
  */
 function resetBlockToInitialState(blockIndex) {
-  // Trouver le bloc
-  const block = AppState.blocks.find(b => b.index === blockIndex)
-  if (!block || !block.corrections || block.corrections.length === 0) {
-    return
-  }
-
-  // CAS SPÉCIAL : Si le bloc n'avait pas de corrections à l'origine,
-  // supprimer toutes les corrections créées manuellement
-  if (block.hadOriginalCorrections === false) {
-    // Supprimer toutes les validations et états de genre
-    block.corrections.forEach((_, corrIndex) => {
-      const correctionId = `${blockIndex}-${corrIndex}`
-      AppState.validatedCorrections.delete(correctionId)
-      AppState.genderSwitched.delete(correctionId)
-    })
-
-    // Supprimer toutes les corrections et restaurer le texte original
-    block.corrections = []
-    block.corrected = block.original
-
-    // Mettre à jour les stats et la jauge
-    const stats = SRTParser.calculateStats(AppState.blocks)
-    updateStats(stats)
-
-    // Re-render pour mettre à jour l'affichage
-    renderBlocksTable()
-    updateMinimap()
-    return
-  }
-
-  // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
-  // Supprimer toutes les validations pour ce bloc (sauf les corrections de type "doubt" de genre)
-  block.corrections.forEach((correction, corrIndex) => {
-    const correctionId = `${blockIndex}-${corrIndex}`
-
-    // Pour les corrections de doute de GENRE (pas modifiées manuellement), on garde la validation mais on revient à l'original
-    if (correction.type === 'doubt' && !correction.isManuallyEdited) {
-      AppState.genderSwitched.delete(correctionId)
-      // On garde dans validatedCorrections (reste validé)
-    } else {
-      // Pour les autres types (et corrections modifiées manuellement), retirer la validation
-      AppState.validatedCorrections.delete(correctionId)
-    }
-
-    // Restaurer la suggestion originale si elle a été modifiée ou rejetée
-    if (correction.hasOwnProperty('originalSuggestion')) {
-      correction.corrected = correction.originalSuggestion
-      delete correction.originalSuggestion
-    }
-
-    // Restaurer le type original si modifié
-    if (correction.hasOwnProperty('originalType')) {
-      correction.type = correction.originalType
-      delete correction.originalType
-    }
-    // Restaurer la raison originale si elle existe
-    if (correction.hasOwnProperty('originalReason')) {
-      correction.reason = correction.originalReason
-      delete correction.originalReason
-    }
-    // Retirer le flag de modification manuelle
-    if (correction.isManuallyEdited) {
-      correction.isManuallyEdited = false
-    }
-  })
-
-  // Reconstruire block.corrected en appliquant toutes les corrections restaurées
-  // SAUF les corrections de type "doubt" qui ne sont PAS validées (par défaut = original)
-  // On trie les corrections par position pour les appliquer dans l'ordre
-  const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
-  let correctedText = block.original
-  let offset = 0
-
-  sortedCorrections.forEach((correction, corrIndex) => {
-    const correctionId = `${blockIndex}-${corrIndex}`
-
-    // Pour les corrections "doubt" de GENRE (avec alternative), ne jamais les appliquer dans le rebuild
-    // Elles restent validées mais montrent l'original par défaut
-    // Elles seront appliquées seulement si on clique "Changer le genre"
-    // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
-    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
-      return // Ne pas appliquer les corrections de genre dans le rebuild
-    }
-
-    const startPos = correction.position + offset
-    const endPos = startPos + correction.original.length
-
-    // Vérifier que la position est valide
-    if (correctedText.substring(startPos, endPos) === correction.original) {
-      // Remplacer l'original par le corrigé
-      correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
-
-      // Ajuster l'offset pour les prochaines corrections
-      offset += correction.corrected.length - correction.original.length
-    }
-  })
-
-  block.corrected = correctedText
-
-  // Mettre à jour les stats et la jauge
-  const stats = SRTParser.calculateStats(AppState.blocks)
-  updateStats(stats)
-
-  // Re-render pour mettre à jour l'affichage
-  renderBlocksTable()
-  updateMinimap()
+  resetBlockToInitialStateModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
 }
 
 /**
