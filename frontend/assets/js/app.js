@@ -43,6 +43,18 @@ import { openEditModal } from './ui/modal.js'
 import { showSection as showSectionUI } from './ui/sections.js'
 import { updateProgress as updateProgressUI } from './ui/progress.js'
 
+// Imports des modules de rendu
+import { updateStats as updateStatsModule } from './rendering/stats.js'
+import {
+  renderMinimap as renderMinimapModule,
+  updateMinimap as updateMinimapModule,
+  scrollToBlock,
+  updateMinimapCurrentPosition,
+  onScrollThrottled,
+  onResizeThrottled
+} from './rendering/minimap.js'
+import { renderBlocksTable as renderBlocksTableModule } from './rendering/blocksTable.js'
+
 // Éléments DOM
 const DOM = {
   uploadSection: null,
@@ -75,6 +87,10 @@ const DOM = {
   navigationMinimap: null,
   minimapBlocks: null
 }
+
+// Exposer globalement pour les modules (fallback)
+window.AppState = AppState
+window.DOM = DOM
 
 /**
  * Initialisation de l'application
@@ -673,322 +689,19 @@ function showEditor() {
 /**
  * Affiche le tableau des blocs (texte + validations)
  */
+/**
+ * Affiche le tableau des blocs (wrapper pour le module rendering)
+ */
 function renderBlocksTable() {
-  DOM.blocksTableBody.innerHTML = ''
-
-  // Filtrer les blocs selon le filtre actif
-  let blocksToDisplay = AppState.blocks
-
-  if (AppState.activeFilter) {
-    blocksToDisplay = AppState.blocks.filter(block => {
-      if (!block.corrections || block.corrections.length === 0) {
-        return false // Pas de corrections
-      }
-
-      // Vérifier si le bloc contient le type de correction recherché
-      return block.corrections.some(c => c.type === AppState.activeFilter)
-    })
-  }
-
-  blocksToDisplay.forEach(block => {
-    // Vérifier si toutes les corrections sont validées
-    const allValidated = block.corrections && block.corrections.length > 0 &&
-      block.corrections.every((c, idx) => AppState.validatedCorrections.has(`${block.index}-${idx}`))
-
-    // Déterminer le type de correction dominant pour la classe CSS
-    // Les blocs où TOUTES les corrections sont validées n'ont PAS de fond coloré
-    // Priorité basée sur les corrections NON validées : fault > doubt
-    let rowClass = 'row-no-correction'
-    if (block.corrections && block.corrections.length > 0 && !allValidated) {
-      // Vérifier quelles corrections ne sont PAS validées
-      const hasUnvalidatedFault = block.corrections.some((c, idx) =>
-        c.type === 'fault' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-      )
-      const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
-        c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-      )
-
-      // Appliquer la couleur selon la priorité des corrections non validées
-      if (hasUnvalidatedFault) {
-        rowClass = 'row-has-fault'
-      } else if (hasUnvalidatedDoubt) {
-        rowClass = 'row-has-doubt'
-      }
-    }
-
-    // === LIGNE DE HEADER (2 cellules pour les 2 colonnes) ===
-    const headerRow = document.createElement('tr')
-    headerRow.className = 'block-header-row'
-
-    // Cellule gauche : numéro + timecode
-    const headerCellLeft = document.createElement('td')
-    headerCellLeft.className = 'block-header block-header-left'
-    headerCellLeft.innerHTML = `
-      <span class="block-index">Bloc #${block.index}</span>
-      <span class="block-timecode">${block.timecode}</span>
-    `
-
-    // Cellule droite : boutons d'action
-    const headerCellRight = document.createElement('td')
-    headerCellRight.className = 'block-header block-header-right'
-
-    const hasNoCorrections = !block.corrections || block.corrections.length === 0
-    const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
-    const hasCorrections = block.corrections && block.corrections.length > 0
-
-    // Vérifier si le bloc a au moins une correction validée
-    const hasValidatedCorrections = hasCorrections && block.corrections.some((correction, idx) =>
-      AppState.validatedCorrections.has(`${block.index}-${idx}`)
-    )
-
-    // Compter les corrections non validées
-    const unvalidatedCorrectionsCount = hasCorrections
-      ? block.corrections.filter((c, idx) => !AppState.validatedCorrections.has(`${block.index}-${idx}`)).length
-      : 0
-
-    // Container pour les boutons
-    const buttonsHtml = []
-
-    // Bouton "Valider tout" : afficher si 2+ corrections non validées
-    if (unvalidatedCorrectionsCount >= 2) {
-      buttonsHtml.push(`<button class="btn-header-validate-all" data-block-index="${block.index}" title="Valider toutes les corrections de ce bloc"><span>✓</span><span>tout</span></button>`)
-    }
-
-    if (shouldShowEditButton) {
-      buttonsHtml.push(`<button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>`)
-    }
-
-    // Bouton réinitialiser : afficher dès qu'une correction a été validée
-    if (hasValidatedCorrections) {
-      buttonsHtml.push(`<button class="btn-header-reset" data-block-index="${block.index}" title="Réinitialiser ce bloc">⟲</button>`)
-    }
-
-    if (buttonsHtml.length > 0) {
-      headerCellRight.innerHTML = `<div class="block-header-buttons">${buttonsHtml.join('')}</div>`
-
-      // Ajouter les événements aux boutons après insertion dans le DOM
-      setTimeout(() => {
-        const validateAllBtn = headerCellRight.querySelector('.btn-header-validate-all')
-        if (validateAllBtn) {
-          validateAllBtn.onclick = () => validateAllBlockCorrections(block.index)
-        }
-
-        const editBtn = headerCellRight.querySelector('.btn-header-edit')
-        if (editBtn) {
-          editBtn.onclick = () => editBlockText(block.index)
-        }
-
-        const resetBtn = headerCellRight.querySelector('.btn-header-reset')
-        if (resetBtn) {
-          resetBtn.onclick = () => resetBlockToInitialState(block.index)
-        }
-      }, 0)
-    }
-
-    headerRow.appendChild(headerCellLeft)
-    headerRow.appendChild(headerCellRight)
-
-    // === LIGNE DE CONTENU ===
-    const row = document.createElement('tr')
-    row.className = `block-row ${rowClass}`
-    row.id = `block-row-${block.index}`
-
-    // === COLONNE GAUCHE : Texte ===
-    const textCell = document.createElement('td')
-    textCell.className = 'cell-text'
-
-    // Original - Afficher le vrai texte original avec surlignage des erreurs
-    const originalEl = document.createElement('div')
-    originalEl.className = 'block-section block-original'
-    originalEl.innerHTML = `
-      <div class="block-label">ORIGINAL :</div>
-      <div class="block-content">${
-        block.corrections && block.corrections.length > 0
-          ? SRTParser.highlightOriginalErrors(block.original, block.corrections)
-          : SRTParser.escapeHtml(block.original)
-      }</div>
-    `
-
-    // Corrigé (gras si validé ou pas de correction, fond vert si non validé avec corrections)
-    // hasNoCorrections déjà déclaré ligne 549
-    const shouldBeBold = hasNoCorrections || allValidated
-    const correctedEl = document.createElement('div')
-    correctedEl.className = `block-section block-corrected ${shouldBeBold ? 'block-validated' : 'block-unvalidated'}`
-
-    // Utiliser block.corrected directement du worker (qui a déjà appliqué les corrections)
-    // Plus besoin de réappliquer les corrections avec les positions ici
-    const finalCorrectedText = block.corrected || block.original
-
-    correctedEl.innerHTML = `
-      <div class="block-label">CORRIGÉ :</div>
-      <div class="block-content">${SRTParser.escapeHtml(finalCorrectedText)}</div>
-    `
-
-    textCell.appendChild(originalEl)
-    textCell.appendChild(correctedEl)
-
-    // === COLONNE DROITE : Validations ===
-    const validationCell = document.createElement('td')
-    validationCell.className = 'cell-validation'
-
-    // Compter les corrections visibles (en tenant compte du filtre des mineures validées)
-    let visibleCorrections = 0
-    if (block.corrections && block.corrections.length > 0) {
-      visibleCorrections = block.corrections.length
-    }
-
-    if (visibleCorrections === 0) {
-      const emptyMessage = 'Aucune correction'
-
-      const emptyDiv = document.createElement('div')
-      emptyDiv.className = 'validation-empty'
-      emptyDiv.innerHTML = `
-        <span class="validation-empty-icon">✓</span>
-        <span class="validation-empty-text">${emptyMessage}</span>
-      `
-
-      validationCell.appendChild(emptyDiv)
-    } else {
-      // Vérifier si toutes les corrections du bloc sont validées
-      const allCorrectionsValidated = block.corrections.every((c, idx) =>
-        AppState.validatedCorrections.has(`${block.index}-${idx}`)
-      )
-
-      // Afficher les corrections visibles
-      block.corrections.forEach((correction, corrIndex) => {
-          const correctionId = `${block.index}-${corrIndex}`
-          const isValidated = AppState.validatedCorrections.has(correctionId)
-
-          const cardEl = document.createElement('div')
-          cardEl.className = `validation-card validation-${correction.type}`
-          cardEl.id = `validation-${correctionId}`
-
-          if (AppState.validatedCorrections.has(correctionId)) {
-            cardEl.classList.add('validated')
-          }
-
-          // Pour les corrections de doute de GENRE (pas manuelles), afficher "original → alternative"
-          // Pour les corrections modifiées manuellement, afficher "corrected"
-          const displayText = correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited
-            ? correction.alternative
-            : correction.corrected
-
-          // Badge : afficher selon le type de correction
-          // - "MODIFIÉ" pour les corrections modifiées manuellement
-          // - "DOUTE" pour les doutes de genre (avec alternative)
-          // - "FAUTE" pour les autres
-          const badgeText = correction.isManuallyEdited
-            ? 'MODIFIÉ'
-            : (correction.type === 'doubt' && correction.alternative ? 'DOUTE' : 'FAUTE')
-
-          cardEl.innerHTML = `
-            <div class="validation-header">
-              <span class="validation-type-badge badge-${correction.type}">
-                ${badgeText}
-              </span>
-            </div>
-            <div class="validation-correction">
-              <div class="validation-correction-text">
-                <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
-                →
-                <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
-              </div>
-              <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
-            </div>
-          `
-
-          const actionsEl = document.createElement('div')
-          actionsEl.className = 'validation-actions'
-
-          // PRIORITÉ 1 : Corrections modifiées manuellement (validées ou non)
-          if (correction.isManuallyEdited) {
-            // Bouton pour réinitialiser à la suggestion de Claude
-            const resetBtn = document.createElement('button')
-            resetBtn.className = 'btn-toggle-gender'
-            resetBtn.innerHTML = '↺ Réinitialiser'
-            resetBtn.title = 'Revenir à la suggestion de Claude'
-            resetBtn.onclick = () => resetToOriginalSuggestion(block.index, corrIndex)
-            actionsEl.appendChild(resetBtn)
-
-            // Bouton Modifier
-            const editBtn = document.createElement('button')
-            editBtn.className = 'btn-icon-only btn-icon-edit'
-            editBtn.innerHTML = '✏️'
-            editBtn.title = 'Modifier'
-            editBtn.onclick = () => editCorrection(block.index, corrIndex)
-            actionsEl.appendChild(editBtn)
-          }
-          // PRIORITÉ 2 : Doutes de GENRE (avec champ alternative, pas modifiés manuellement)
-          else if (correction.type === 'doubt' && correction.alternative) {
-            // Vérifier si le genre a été changé (forme alternative active)
-            const isGenderSwitched = AppState.genderSwitched.has(correctionId)
-
-            // Bouton bascule pour changer le genre
-            const toggleBtn = document.createElement('button')
-            toggleBtn.className = isGenderSwitched ? 'btn-toggle-gender btn-gender-changed' : 'btn-toggle-gender'
-            toggleBtn.innerHTML = isGenderSwitched ? '⟲ Revenir' : '⇄ Changer le genre'
-            toggleBtn.title = isGenderSwitched ? 'Revenir au genre d\'origine' : 'Changer le genre'
-            toggleBtn.onclick = () => toggleGender(block.index, corrIndex)
-            actionsEl.appendChild(toggleBtn)
-
-            // Bouton Modifier (optionnel, pour éditer manuellement)
-            const editBtn = document.createElement('button')
-            editBtn.className = 'btn-icon-only btn-icon-edit'
-            editBtn.innerHTML = '✏️'
-            editBtn.title = 'Modifier'
-            editBtn.onclick = () => editCorrection(block.index, corrIndex)
-            actionsEl.appendChild(editBtn)
-          }
-          // PRIORITÉ 3 : Corrections normales (fault) non validées
-          else if (!isValidated) {
-            // Boutons Valider, Modifier et Rejeter : seulement si NON validé
-            const validateBtn = document.createElement('button')
-            validateBtn.className = 'btn-icon-only btn-icon-validate'
-            validateBtn.innerHTML = '✓'
-            validateBtn.title = 'Valider'
-            validateBtn.onclick = () => validateSingleCorrection(block.index, corrIndex)
-
-            const editBtn = document.createElement('button')
-            editBtn.className = 'btn-icon-only btn-icon-edit'
-            editBtn.innerHTML = '✏️'
-            editBtn.title = 'Modifier'
-            editBtn.onclick = () => editCorrection(block.index, corrIndex)
-
-            const rejectBtn = document.createElement('button')
-            rejectBtn.className = 'btn-icon-only btn-icon-reject'
-            rejectBtn.innerHTML = '✕'
-            rejectBtn.title = 'Rejeter'
-            rejectBtn.onclick = () => rejectCorrection(block.index, corrIndex)
-
-            actionsEl.appendChild(validateBtn)
-            actionsEl.appendChild(editBtn)
-            actionsEl.appendChild(rejectBtn)
-          }
-          // Si validé et toutes les corrections validées : pas de bouton ici (il est dans le header)
-          // Si validé mais pas toutes validées : ajouter quand même le bouton Modifier
-          else if (!allCorrectionsValidated) {
-            const editBtn = document.createElement('button')
-            editBtn.className = 'btn-icon-only btn-icon-edit'
-            editBtn.innerHTML = '✏️'
-            editBtn.title = 'Modifier'
-            editBtn.onclick = () => editCorrection(block.index, corrIndex)
-            actionsEl.appendChild(editBtn)
-          }
-
-          // Ajouter les actions dans le header (sous le badge) seulement si non vide
-          if (actionsEl.children.length > 0) {
-            const headerEl = cardEl.querySelector('.validation-header')
-            headerEl.appendChild(actionsEl)
-          }
-
-          validationCell.appendChild(cardEl)
-        })
-    }
-
-    row.appendChild(textCell)
-    row.appendChild(validationCell)
-    DOM.blocksTableBody.appendChild(headerRow)
-    DOM.blocksTableBody.appendChild(row)
+  renderBlocksTableModule(DOM, AppState, SRTParser, {
+    validateAllBlockCorrections,
+    editBlockText,
+    resetBlockToInitialState,
+    validateSingleCorrection,
+    editCorrection,
+    rejectCorrection,
+    resetToOriginalSuggestion,
+    toggleGender
   })
 }
 
@@ -1881,152 +1594,10 @@ function updateProgress(percent, text) {
 }
 
 /**
- * Met à jour les statistiques et la jauge de progression
+ * Met à jour les statistiques et la jauge de progression (wrapper pour le module rendering)
  */
 function updateStats(stats) {
-  // Afficher le nombre total de blocs dans le fichier SRT
-  const totalBlocks = AppState.blocks.length
-
-  // Calculer le nombre de blocs avec corrections (pour les filtres)
-  let blocksWithCorrections = 0
-  AppState.blocks.forEach(block => {
-    if (block.corrections && block.corrections.length > 0) {
-      blocksWithCorrections++
-    }
-  })
-
-  if (DOM.statBlocks) DOM.statBlocks.textContent = totalBlocks
-  if (DOM.statTotal) DOM.statTotal.textContent = stats.total
-  if (DOM.statFault) DOM.statFault.textContent = stats.fault
-  if (DOM.statDoubt) DOM.statDoubt.textContent = stats.doubt
-
-  // Activer/désactiver les boutons de filtre selon les compteurs
-  document.querySelectorAll('.stat-filter').forEach(filterBtn => {
-    const filterType = filterBtn.dataset.filter
-    let count = 0
-
-    switch(filterType) {
-      case 'all':
-        count = blocksWithCorrections  // Utiliser le nombre de blocs au lieu du total de fautes
-        break
-      case 'fault':
-        count = stats.fault
-        break
-      case 'doubt':
-        count = stats.doubt
-        break
-    }
-
-    if (count === 0) {
-      filterBtn.classList.add('disabled')
-      filterBtn.style.pointerEvents = 'none'
-      filterBtn.style.opacity = '0.5'
-    } else {
-      filterBtn.classList.remove('disabled')
-      filterBtn.style.pointerEvents = 'auto'
-      filterBtn.style.opacity = '1'
-    }
-  })
-
-  // Calculer la progression (combien de corrections validées)
-  const totalCorrections = stats.total
-  const validatedCount = AppState.validatedCorrections.size
-  // Si 0 erreur, c'est 100% de corrections faites (rien à corriger)
-  const progressPercent = totalCorrections > 0 ? Math.round((validatedCount / totalCorrections) * 100) : 100
-
-  // Calculer combien de corrections validées sont en mode "doubt"
-  let validatedDoubtCount = 0
-  let validatedNonDoubtCount = 0
-
-  AppState.blocks.forEach(block => {
-    if (!block.corrections) return
-    block.corrections.forEach((correction, corrIndex) => {
-      const correctionId = `${block.index}-${corrIndex}`
-      if (AppState.validatedCorrections.has(correctionId)) {
-        if (correction.type === 'doubt') {
-          validatedDoubtCount++
-        } else {
-          validatedNonDoubtCount++
-        }
-      }
-    })
-  })
-
-  // Calculer les pourcentages pour chaque portion
-  const nonDoubtPercent = totalCorrections > 0 ? (validatedNonDoubtCount / totalCorrections) * 100 : 0
-  const doubtPercent = totalCorrections > 0 ? (validatedDoubtCount / totalCorrections) * 100 : 0
-
-  // Mettre à jour la jauge avec gradient
-  if (DOM.progressGaugeFill) {
-    DOM.progressGaugeFill.style.width = `${progressPercent}%`
-
-    // Appliquer le gradient uniquement si on a des corrections validées
-    if (validatedCount > 0) {
-      // Calculer la proportion de chaque couleur dans la barre
-      const nonDoubtProportion = (validatedNonDoubtCount / validatedCount) * 100
-      const doubtProportion = (validatedDoubtCount / validatedCount) * 100
-
-      if (validatedDoubtCount > 0 && validatedNonDoubtCount > 0) {
-        // Les deux types sont présents - utiliser un gradient
-        DOM.progressGaugeFill.style.background = `linear-gradient(to right, #10b981 0%, #10b981 ${nonDoubtProportion}%, #f59e0b ${nonDoubtProportion}%, #f59e0b 100%)`
-      } else if (validatedDoubtCount > 0) {
-        // Seulement des doutes - orange
-        DOM.progressGaugeFill.style.background = '#f59e0b'
-      } else {
-        // Seulement des non-doutes - vert
-        DOM.progressGaugeFill.style.background = '#10b981'
-      }
-    } else {
-      // Aucune correction validée - couleur par défaut
-      DOM.progressGaugeFill.style.background = '#10b981'
-    }
-  }
-  if (DOM.progressGaugeValue) {
-    DOM.progressGaugeValue.textContent = `${progressPercent}%`
-  }
-
-  // Mettre à jour l'état des boutons de validation
-  updateValidationButtonsState(stats)
-}
-
-/**
- * Met à jour l'état des boutons de validation (désactive si toutes corrections validées)
- */
-function updateValidationButtonsState(stats) {
-  // Compter combien de corrections de chaque type sont validées
-  let validatedFaultCount = 0
-  let validatedDoubtCount = 0
-
-  AppState.blocks.forEach(block => {
-    if (!block.corrections) return
-    block.corrections.forEach((correction, corrIndex) => {
-      const correctionId = `${block.index}-${corrIndex}`
-      if (AppState.validatedCorrections.has(correctionId)) {
-        if (correction.type === 'fault') validatedFaultCount++
-        else if (correction.type === 'doubt') validatedDoubtCount++
-      }
-    })
-  })
-
-  // Désactiver/activer les boutons en fonction
-  const allFaultValidated = stats.fault > 0 && validatedFaultCount === stats.fault
-  const allDoubtValidated = stats.doubt > 0 && validatedDoubtCount === stats.doubt
-  const allValidated = stats.total > 0 && AppState.validatedCorrections.size === stats.total
-
-  if (DOM.validateFaultBtn) {
-    DOM.validateFaultBtn.disabled = allFaultValidated || stats.fault === 0
-    DOM.validateFaultBtn.classList.toggle('btn-disabled', allFaultValidated || stats.fault === 0)
-  }
-
-  if (DOM.validateDoubtBtn) {
-    DOM.validateDoubtBtn.disabled = allDoubtValidated || stats.doubt === 0
-    DOM.validateDoubtBtn.classList.toggle('btn-disabled', allDoubtValidated || stats.doubt === 0)
-  }
-
-  if (DOM.validateAllBtn) {
-    DOM.validateAllBtn.disabled = allValidated
-    DOM.validateAllBtn.classList.toggle('btn-disabled', allValidated)
-  }
+  updateStatsModule(stats, AppState, DOM)
 }
 
 /**
@@ -2055,260 +1626,19 @@ function handleFilterClick(event) {
 /**
  * Génère la minimap de navigation
  */
+/**
+ * Génère la minimap de navigation (wrapper pour le module rendering)
+ */
 function renderMinimap() {
-  if (!DOM.minimapBlocks) return
-
-  // Attendre que le DOM soit prêt
-  setTimeout(() => {
-    rebuildMinimap()
-  }, 100)
+  renderMinimapModule(DOM)
 }
 
 /**
- * Reconstruit complètement la minimap
- */
-function rebuildMinimap() {
-  if (!DOM.minimapBlocks) return
-
-  // Vider la minimap
-  DOM.minimapBlocks.innerHTML = ''
-
-  // Récupérer les dimensions
-  const minimapHeight = DOM.minimapBlocks.offsetHeight
-
-  if (minimapHeight === 0) return
-
-  console.log(`[Minimap] Container height: ${minimapHeight}px`)
-  console.log(`[Minimap] Total blocks: ${AppState.blocks.length}`)
-
-  // Première passe : collecter les données des blocs
-  const blocksData = []
-
-  AppState.blocks.forEach((block) => {
-    const blockRow = document.getElementById(`block-row-${block.index}`)
-    if (!blockRow) {
-      console.warn(`[Minimap] Block row not found for block #${block.index}`)
-      return
-    }
-
-    const blockClass = getBlockMinimapClass(block)
-    const isHidden = blockClass === 'minimap-hidden'
-
-    blocksData.push({
-      block,
-      blockClass,
-      isHidden
-    })
-  })
-
-  // Compter les blocs visibles
-  const visibleBlocksCount = blocksData.filter(d => !d.isHidden).length
-
-  if (visibleBlocksCount === 0) return
-
-  // Déterminer le gap entre les blocs : plus il y a de blocs, plus le gap est réduit
-  let gap = 3 // Gap par défaut : 3px
-  if (visibleBlocksCount > 100) {
-    gap = 1 // Beaucoup de blocs : gap de 1px
-  } else if (visibleBlocksCount > 50) {
-    gap = 2 // Pas mal de blocs : gap de 2px
-  }
-
-  // Calculer l'espace total pour les gaps
-  const totalGapsHeight = Math.max(0, (visibleBlocksCount - 1) * gap)
-
-  // Calculer la hauteur disponible pour les blocs
-  const availableHeightForBlocks = minimapHeight - totalGapsHeight
-
-  // Hauteur uniforme pour chaque bloc (minimum 3px)
-  const uniformBlockHeight = Math.max(3, availableHeightForBlocks / visibleBlocksCount)
-
-  console.log(`[Minimap] ${visibleBlocksCount} visible blocks, gap: ${gap}px, uniform height: ${uniformBlockHeight.toFixed(1)}px`)
-
-  // Deuxième passe : créer les blocs avec taille uniforme
-  blocksData.forEach(({ block, blockClass, isHidden }) => {
-    const minimapBlock = document.createElement('div')
-    minimapBlock.className = 'minimap-block'
-    minimapBlock.dataset.blockIndex = block.index
-    minimapBlock.dataset.blockLabel = `Bloc #${block.index}`
-    minimapBlock.classList.add(blockClass)
-
-    if (!isHidden) {
-      minimapBlock.style.height = `${uniformBlockHeight}px`
-    } else {
-      minimapBlock.style.height = '0px'
-    }
-
-    minimapBlock.style.flexShrink = '0'
-    minimapBlock.style.marginBottom = `${gap}px`
-
-    // Clic pour naviguer
-    minimapBlock.addEventListener('click', () => {
-      scrollToBlock(block.index)
-    })
-
-    DOM.minimapBlocks.appendChild(minimapBlock)
-  })
-
-  console.log(`[Minimap] Created ${DOM.minimapBlocks.children.length} minimap blocks`)
-}
-
-/**
- * Détermine la classe CSS de la minimap pour un bloc
- */
-function getBlockMinimapClass(block) {
-  // Vérifier si toutes les corrections sont validées
-  const allValidated = block.corrections && block.corrections.length > 0 &&
-    block.corrections.every((c, idx) => AppState.validatedCorrections.has(`${block.index}-${idx}`))
-
-  // Pas de correction → afficher quand même dans la minimap
-  if (!block.corrections || block.corrections.length === 0) {
-    return 'minimap-no-correction'
-  }
-
-  // Si toutes validées, vérifier le type pour la couleur
-  // Priorité : fault > doubt
-  if (allValidated) {
-    const hasFault = block.corrections.some(c => c.type === 'fault')
-    const hasDoubt = block.corrections.some(c => c.type === 'doubt')
-
-    if (hasFault) {
-      return 'minimap-validated'
-    } else if (hasDoubt) {
-      return 'minimap-validated-doubt'
-    } else {
-      return 'minimap-validated'
-    }
-  }
-
-  // Non validées : déterminer le type dominant
-  // Priorité : fault non validée > doubt (validé ou non)
-  const hasUnvalidatedFault = block.corrections.some((c, idx) =>
-    c.type === 'fault' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-  )
-
-  // Si une faute non validée existe, priorité absolue
-  if (hasUnvalidatedFault) {
-    return 'minimap-fault'
-  }
-
-  // Sinon, vérifier si le bloc contient au moins un doute (validé ou non)
-  const hasDoubt = block.corrections.some(c => c.type === 'doubt')
-  if (hasDoubt) {
-    return 'minimap-doubt'
-  }
-
-  // Tout est validé
-  return 'minimap-validated'
-}
-
-/**
- * Met à jour la minimap (appelé après validation)
+ * Met à jour la minimap (wrapper pour le module rendering)
  */
 function updateMinimap() {
-  if (!DOM.minimapBlocks) return
-
-  AppState.blocks.forEach(block => {
-    const minimapBlock = DOM.minimapBlocks.querySelector(`[data-block-index="${block.index}"]`)
-    if (!minimapBlock) return
-
-    // Retirer toutes les classes d'état
-    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
-
-    // Ajouter la nouvelle classe
-    const blockClass = getBlockMinimapClass(block)
-    minimapBlock.classList.add(blockClass)
-  })
+  updateMinimapModule(DOM, AppState)
 }
 
-/**
- * Scroll vers un bloc spécifique
- */
-function scrollToBlock(blockIndex) {
-  const blockRow = document.getElementById(`block-row-${blockIndex}`)
-  if (blockRow) {
-    blockRow.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center'
-    })
-
-    // Effet visuel temporaire
-    blockRow.style.transition = 'background-color 0.3s ease'
-    const originalBg = blockRow.style.backgroundColor
-    blockRow.style.backgroundColor = 'rgba(79, 70, 229, 0.1)'
-
-    setTimeout(() => {
-      blockRow.style.backgroundColor = originalBg
-    }, 1000)
-
-    // Mettre à jour la position actuelle dans la minimap après le scroll
-    setTimeout(() => {
-      updateMinimapCurrentPosition()
-    }, 500)
-  }
-}
-
-/**
- * Met à jour l'indicateur de position actuelle dans la minimap
- */
-function updateMinimapCurrentPosition() {
-  if (!DOM.minimapBlocks) return
-
-  // Retirer l'ancienne classe current
-  const oldCurrent = DOM.minimapBlocks.querySelector('.minimap-current')
-  if (oldCurrent) {
-    oldCurrent.classList.remove('minimap-current')
-  }
-
-  // Trouver le bloc visible au centre de l'écran
-  const viewportCenter = window.scrollY + (window.innerHeight / 2)
-
-  let closestBlock = null
-  let closestDistance = Infinity
-
-  AppState.blocks.forEach(block => {
-    const blockRow = document.getElementById(`block-row-${block.index}`)
-    if (blockRow) {
-      const rect = blockRow.getBoundingClientRect()
-      const blockCenter = window.scrollY + rect.top + (rect.height / 2)
-      const distance = Math.abs(blockCenter - viewportCenter)
-
-      if (distance < closestDistance) {
-        closestDistance = distance
-        closestBlock = block
-      }
-    }
-  })
-
-  // Ajouter la classe current au bloc le plus proche
-  if (closestBlock) {
-    const minimapBlock = DOM.minimapBlocks.querySelector(`[data-block-index="${closestBlock.index}"]`)
-    if (minimapBlock) {
-      minimapBlock.classList.add('minimap-current')
-    }
-  }
-}
-
-// Throttle pour éviter trop d'appels lors du scroll
-let scrollTimeout = null
-function onScrollThrottled() {
-  if (scrollTimeout) return
-
-  scrollTimeout = setTimeout(() => {
-    updateMinimapCurrentPosition()
-    scrollTimeout = null
-  }, 100)
-}
-
-// Throttle pour éviter trop d'appels lors du resize
-let resizeTimeout = null
-function onResizeThrottled() {
-  if (resizeTimeout) return
-
-  resizeTimeout = setTimeout(() => {
-    console.log('[Minimap] Window resized, rebuilding minimap')
-    // Reconstruire complètement la minimap avec les nouvelles dimensions
-    rebuildMinimap()
-    resizeTimeout = null
-  }, 200)
-}
+// scrollToBlock, updateMinimapCurrentPosition, onScrollThrottled, et onResizeThrottled
+// sont désormais importés du module rendering/minimap.js
