@@ -152,7 +152,8 @@ function autoValidateDoubtCorrections(AppState) {
   AppState.blocks.forEach(block => {
     if (block.corrections && block.corrections.length > 0) {
       block.corrections.forEach((correction, corrIndex) => {
-        if (correction.type === 'doubt') {
+        // Ne valider que les VRAIS doutes de genre (avec alternative), pas les corrections rejetées
+        if (correction.type === 'doubt' && correction.alternative) {
           const correctionId = `${block.index}-${corrIndex}`
           AppState.validatedCorrections.add(correctionId)
         }

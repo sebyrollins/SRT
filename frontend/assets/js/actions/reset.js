@@ -254,12 +254,16 @@ export function resetBlockToInitialState(blockIndex, AppState, SRTParser, update
   block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
 
-    // Pour les corrections de doute de GENRE (pas modifiées manuellement), on garde la validation mais on revient à l'original
-    if (correction.type === 'doubt' && !correction.isManuallyEdited) {
+    // Distinguer les vrais doutes de genre des corrections rejetées
+    const isRealGenderDoubt = correction.type === 'doubt' && correction.alternative && !correction.hasOwnProperty('originalType')
+    const isRejectedCorrection = correction.type === 'doubt' && correction.hasOwnProperty('originalType')
+
+    // Pour les VRAIS doutes de GENRE (pas modifiées manuellement), on garde la validation
+    if (isRealGenderDoubt && !correction.isManuallyEdited) {
       AppState.genderSwitched.delete(correctionId)
       // On garde dans validatedCorrections (reste validé)
     } else {
-      // Pour les autres types (et corrections modifiées manuellement), retirer la validation
+      // Pour les autres types (corrections rejetées, corrections normales, et corrections modifiées manuellement), retirer la validation
       AppState.validatedCorrections.delete(correctionId)
     }
 
