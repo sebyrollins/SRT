@@ -1022,7 +1022,7 @@ function applyCorrections(originalText, corrections) {
  * Laisse Claude détecter les fautes évidentes sans surcharge
  */
 function buildSystemPromptPass1() {
-  return `Corrige toutes les fautes de français dans ce fichier SRT.
+  return `Corrige les sous-titres comme un professionnel de l'orthographe, conjugaison, grammaire et typographie, tout en respectant le parlé de la personne dans ce fichier SRT.
 
 Format de réponse JSON :
 {
