@@ -458,8 +458,23 @@ function deduplicateCorrections(corrections, blockIndex) {
     // Vérifier si cette correction est contenue dans une autre correction doubt plus longue
     const isContainedInLonger = doubtCorrections.some(other => {
       if (other === correction) return false
-      // Si l'autre correction contient celle-ci (texte plus long), alors celle-ci est un doublon
-      return other.original.includes(correction.original) && other.original.length > correction.original.length
+
+      // Construire les textes possibles pour chaque doute (original et alternative)
+      const otherTexts = [other.original]
+      if (other.alternative) otherTexts.push(other.alternative)
+
+      const correctionTexts = [correction.original]
+      if (correction.alternative) correctionTexts.push(correction.alternative)
+
+      // Vérifier si n'importe quel texte de 'other' contient n'importe quel texte de 'correction'
+      // ET que 'other' est plus long (plus de contexte)
+      const hasOverlap = otherTexts.some(otherText =>
+        correctionTexts.some(corrText =>
+          otherText.includes(corrText) && otherText.length > corrText.length
+        )
+      )
+
+      return hasOverlap
     })
 
     if (isContainedInLonger) {
@@ -480,10 +495,20 @@ function deduplicateCorrections(corrections, blockIndex) {
   otherCorrections.forEach(correction => {
     // Vérifier si cette correction fault est englobée par un doute de genre
     const isEnglobed = filteredDoubtCorrections.some(doubt => {
-      // Si le doute contient l'original de la fault, c'est un chevauchement
-      // Exemple: doubt "Je semble perdu" englobe fault "perdue"
-      return doubt.original.includes(correction.original) ||
-             (doubt.alternative && doubt.alternative.includes(correction.original))
+      // Si le doute contient l'original OU le corrected de la fault, c'est un chevauchement
+      // Exemple: doubt "Je semble perdu" englobe fault "perdue" → "perdu"
+      // Vérifie les deux sens possibles pour être robuste
+      const doubtTexts = [doubt.original]
+      if (doubt.alternative) {
+        doubtTexts.push(doubt.alternative)
+      }
+
+      const correctionTexts = [correction.original, correction.corrected]
+
+      // Vérifier si n'importe quel texte du doute contient n'importe quel texte de la correction
+      return doubtTexts.some(doubtText =>
+        correctionTexts.some(corrText => doubtText.includes(corrText))
+      )
     })
 
     if (isEnglobed) {
