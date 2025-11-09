@@ -63,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                 <div class="header-model-selector">
                     <label for="modelSelect" class="model-label">Modèle :</label>
                     <select id="modelSelect" class="model-select">
-                        <option value="haiku" selected>Basique - Haiku</option>
-                        <option value="sonnet">Pro - Sonnet 4.5</option>
+                        <option value="sonnet" selected>Pro - Sonnet 4.5</option>
+                        <option value="cleaning">Cleaning - Regex uniquement</option>
                     </select>
                 </div>
             </div>

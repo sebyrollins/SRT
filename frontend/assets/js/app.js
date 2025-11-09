@@ -1865,6 +1865,11 @@ function resetApp() {
     btn.classList.remove('active')
   })
 
+  // Reset minimap
+  if (DOM.minimapBlocks) {
+    DOM.minimapBlocks.innerHTML = ''
+  }
+
   resetFileInput()
   showSection('upload')
 }

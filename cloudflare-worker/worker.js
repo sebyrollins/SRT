@@ -43,8 +43,8 @@ async function handleRequest(request) {
       })
     }
 
-    // Déterminer le modèle à utiliser (haiku par défaut)
-    const modelType = model === 'sonnet' ? 'sonnet' : 'haiku'
+    // Déterminer le modèle à utiliser (sonnet par défaut)
+    const modelType = model === 'cleaning' ? 'cleaning' : (model === 'sonnet' ? 'sonnet' : 'sonnet')
     console.log(`[handleRequest] Using model: ${modelType}`)
 
     // Traitement du contenu SRT
@@ -558,9 +558,9 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 /**
  * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
  * @param {string} srtContent - Contenu du fichier SRT
- * @param {string} modelType - Type de modèle à utiliser : 'haiku' (rapide) ou 'sonnet' (qualité)
+ * @param {string} modelType - Type de modèle à utiliser : 'cleaning' (regex uniquement), 'sonnet' (qualité)
  */
-async function processSRT(srtContent, modelType = 'haiku') {
+async function processSRT(srtContent, modelType = 'sonnet') {
   // Tableau de logs pour debugging (sera renvoyé au frontend)
   const debugLogs = []
 
@@ -597,6 +597,18 @@ async function processSRT(srtContent, modelType = 'haiku') {
 
   const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
   console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
+
+  // ═══════════════════════════════════════════════════════════════
+  // MODE CLEANING : Retourner uniquement les corrections regex
+  // ═══════════════════════════════════════════════════════════════
+  if (modelType === 'cleaning') {
+    const totalTime = Date.now() - startTime
+    console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
+    return {
+      blocks: blocksAfterPass0,
+      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`]
+    }
+  }
 
   // Recréer les chunks avec les blocs prétraités
   const preprocessedChunks = []
