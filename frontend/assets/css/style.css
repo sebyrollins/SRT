@@ -1149,6 +1149,36 @@ body {
   background: #5a67d8;
 }
 
+/* Bouton pour changer le genre (corrections de type "doubt") */
+.btn-toggle-gender {
+  background: var(--color-warning);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn-toggle-gender:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.btn-toggle-gender.btn-gender-changed {
+  background: #6b7280;
+}
+
+.btn-toggle-gender.btn-gender-changed:hover {
+  background: #4b5563;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
   .editor-grid {

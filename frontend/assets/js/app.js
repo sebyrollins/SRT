@@ -313,6 +313,26 @@ async function processUploadedFile(content, filename) {
  * Convertit les apostrophes droites (') en apostrophes typographiques courbées (')
  * dans block.corrected et correction.corrected
  */
+
+/**
+ * Extrait la forme alternative du genre d'une correction de type "doubt"
+ * Exemple : "je suis venu (ou venue)" → "je suis venue"
+ * @param {string} corrected - Texte corrigé avec parenthèses
+ * @returns {string} - Forme alternative sans parenthèses
+ */
+function extractAlternativeGender(corrected) {
+  // Pattern pour extraire "(ou XXX)" ou "(ou YYY ZZZ)"
+  const match = corrected.match(/\(ou\s+([^)]+)\)/)
+  if (!match) {
+    return corrected // Pas de forme alternative trouvée
+  }
+
+  const alternative = match[1].trim()
+  const beforeParenthesis = corrected.substring(0, match.index).trim()
+
+  return beforeParenthesis + ' ' + alternative
+}
+
 /**
  * Convertit un texte en remplaçant apostrophes droites (') par courbes (')
  * SAUF les apostrophes doubles ('') qui sont préservées
@@ -738,7 +758,26 @@ function renderBlocksTable() {
           const actionsEl = document.createElement('div')
           actionsEl.className = 'validation-actions'
 
-          if (!isValidated) {
+          // Pour les corrections de type "doubt" (genre), logique différente
+          if (correction.type === 'doubt') {
+            // Bouton bascule pour changer le genre
+            const toggleBtn = document.createElement('button')
+            toggleBtn.className = isValidated ? 'btn-toggle-gender btn-gender-changed' : 'btn-toggle-gender'
+            toggleBtn.innerHTML = isValidated ? '⟲ Revenir' : '⇄ Changer le genre'
+            toggleBtn.title = isValidated ? 'Revenir au genre d\'origine' : 'Changer le genre'
+            toggleBtn.onclick = () => toggleGender(block.index, corrIndex)
+            actionsEl.appendChild(toggleBtn)
+
+            // Bouton Modifier (optionnel, pour éditer manuellement)
+            const editBtn = document.createElement('button')
+            editBtn.className = 'btn-icon-only btn-icon-edit'
+            editBtn.innerHTML = '✏️'
+            editBtn.title = 'Modifier'
+            editBtn.onclick = () => editCorrection(block.index, corrIndex)
+            actionsEl.appendChild(editBtn)
+          }
+          // Pour les autres types de corrections (major, minor)
+          else if (!isValidated) {
             // Boutons Valider, Modifier et Rejeter : seulement si NON validé
             const validateBtn = document.createElement('button')
             validateBtn.className = 'btn-icon-only btn-icon-validate'
@@ -878,6 +917,61 @@ function validateSingleCorrection(blockIndex, corrIndex) {
       scrollToBlock(nextBlockIndex)
     }
   }, 300)
+}
+
+/**
+ * Bascule entre les deux formes de genre pour une correction de type "doubt"
+ * État 1 (défaut): texte original (ex: "je suis venu")
+ * État 2: forme alternative (ex: "je suis venue")
+ * @param {number} blockIndex - Index du bloc
+ * @param {number} corrIndex - Index de la correction
+ */
+function toggleGender(blockIndex, corrIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || !block.corrections[corrIndex]) {
+    return
+  }
+
+  const correction = block.corrections[corrIndex]
+  const correctionId = `${blockIndex}-${corrIndex}`
+
+  // Vérifier si c'est bien une correction de genre
+  if (correction.type !== 'doubt') {
+    return
+  }
+
+  // Vérifier si le genre est déjà changé (correction déjà appliquée)
+  const isGenderChanged = AppState.validatedCorrections.has(correctionId)
+
+  if (isGenderChanged) {
+    // Revenir à l'original : retirer la correction
+    AppState.validatedCorrections.delete(correctionId)
+
+    // Extraire la forme alternative pour pouvoir la remplacer
+    const alternativeForm = extractAlternativeGender(correction.corrected)
+
+    // Remplacer la forme alternative par l'original dans le texte
+    if (block.corrected.includes(alternativeForm)) {
+      block.corrected = block.corrected.replace(alternativeForm, correction.original)
+    }
+  } else {
+    // Changer le genre : appliquer la forme alternative
+    AppState.validatedCorrections.add(correctionId)
+
+    // Extraire la forme alternative sans parenthèses
+    const alternativeForm = extractAlternativeGender(correction.corrected)
+
+    // Remplacer l'original par la forme alternative
+    if (block.corrected.includes(correction.original)) {
+      block.corrected = block.corrected.replace(correction.original, alternativeForm)
+    }
+  }
+
+  // Mettre à jour les stats et l'affichage
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
+  renderBlocksTable()
+  updateMinimap()
 }
 
 /**
