@@ -7,6 +7,7 @@ const AppState = {
   originalFilename: null,
   blocks: [],
   validatedCorrections: new Set(),
+  genderSwitched: new Set(), // Suit quelles corrections de genre sont en forme alternative
   activeFilter: null // null = tous, 'minor', 'major', 'doubt', 'none' (sans correction)
 }
 
@@ -27,14 +28,12 @@ const DOM = {
   statsBar: null,
   statBlocks: null,
   statTotal: null,
-  statMinor: null,
-  statMajor: null,
+  statFault: null,
   statDoubt: null,
   progressGaugeFill: null,
   progressGaugeValue: null,
   validateAllBtn: null,
-  validateMinorBtn: null,
-  validateMajorBtn: null,
+  validateFaultBtn: null,
   validateDoubtBtn: null,
   resetStateBtn: null,
   downloadSrtBtn: null,
@@ -77,14 +76,12 @@ function initDOM() {
   DOM.statsBar = document.getElementById('statsBar')
   DOM.statBlocks = document.getElementById('statBlocks')
   DOM.statTotal = document.getElementById('statTotal')
-  DOM.statMinor = document.getElementById('statMinor')
-  DOM.statMajor = document.getElementById('statMajor')
+  DOM.statFault = document.getElementById('statFault')
   DOM.statDoubt = document.getElementById('statDoubt')
   DOM.progressGaugeFill = document.getElementById('progressGaugeFill')
   DOM.progressGaugeValue = document.getElementById('progressGaugeValue')
   DOM.validateAllBtn = document.getElementById('validateAllBtn')
-  DOM.validateMinorBtn = document.getElementById('validateMinorBtn')
-  DOM.validateMajorBtn = document.getElementById('validateMajorBtn')
+  DOM.validateFaultBtn = document.getElementById('validateFaultBtn')
   DOM.validateDoubtBtn = document.getElementById('validateDoubtBtn')
   DOM.resetStateBtn = document.getElementById('resetStateBtn')
   DOM.downloadSrtBtn = document.getElementById('downloadSrtBtn')
@@ -113,12 +110,8 @@ function initEventListeners() {
     DOM.validateAllBtn.addEventListener('click', () => validateCorrections('all'))
   }
 
-  if (DOM.validateMinorBtn) {
-    DOM.validateMinorBtn.addEventListener('click', () => validateCorrections('minor'))
-  }
-
-  if (DOM.validateMajorBtn) {
-    DOM.validateMajorBtn.addEventListener('click', () => validateCorrections('major'))
+  if (DOM.validateFaultBtn) {
+    DOM.validateFaultBtn.addEventListener('click', () => validateCorrections('fault'))
   }
 
   if (DOM.validateDoubtBtn) {
@@ -251,8 +244,19 @@ async function processUploadedFile(content, filename) {
     // Nettoyer les corrections fantômes (où original === corrected)
     cleanPhantomCorrections(correctedBlocks)
 
+    // Retirer les corrections de genre du texte (par défaut = original)
+    removeDoubtCorrectionsFromText(correctedBlocks)
+
+    // Nettoyer les objets correction.corrected pour les corrections de doute
+    // (enlever les parenthèses et les bugs de l'ancien format)
+    cleanDoubtCorrectionsObjects(correctedBlocks)
+
     // Sauvegarder les blocs
     AppState.blocks = correctedBlocks
+
+    // Valider automatiquement toutes les corrections de genre (doute)
+    // Par défaut, elles sont validées avec l'orthographe originale
+    autoValidateDoubtCorrections()
 
     // Sauvegarder la suggestion originale de Claude pour chaque bloc (avant toute modification)
     AppState.blocks.forEach(block => {
@@ -313,6 +317,42 @@ async function processUploadedFile(content, filename) {
  * Convertit les apostrophes droites (') en apostrophes typographiques courbées (')
  * dans block.corrected et correction.corrected
  */
+
+/**
+ * Extrait la forme alternative du genre d'une correction de type "doubt"
+ * Utilise le champ "alternative" si disponible (nouveau format), sinon parse les parenthèses (ancien format)
+ * @param {Object} correction - Objet correction complet
+ * @returns {string} - Forme alternative
+ */
+function extractAlternativeGender(correction) {
+  // Nouveau format : champ "alternative" fourni directement par le worker
+  if (correction.alternative) {
+    return correction.alternative
+  }
+
+  // Ancien format : extraire "(ou XXX)" des parenthèses
+  const corrected = correction.corrected
+  const match = corrected.match(/\(ou\s+([^)]+)\)/)
+  if (!match) {
+    return corrected // Pas de forme alternative trouvée
+  }
+
+  const alternative = match[1].trim()
+  const withoutParens = corrected.substring(0, match.index).trim()
+
+  // Compter les mots dans l'alternative
+  const alternativeWords = alternative.split(/\s+/)
+  const alternativeWordCount = alternativeWords.length
+
+  // Extraire les mots du texte avant parenthèses
+  const words = withoutParens.split(/\s+/)
+
+  // Remplacer les N derniers mots par l'alternative
+  const beforeWords = words.slice(0, -alternativeWordCount)
+
+  return [...beforeWords, ...alternativeWords].join(' ')
+}
+
 /**
  * Convertit un texte en remplaçant apostrophes droites (') par courbes (')
  * SAUF les apostrophes doubles ('') qui sont préservées
@@ -363,39 +403,14 @@ function cleanPhantomCorrections(blocks) {
         const normalizedOriginal = correction.original.normalize('NFC').trim()
         const normalizedCorrected = correction.corrected.normalize('NFC').trim()
 
-        // Si c'est une correction typographique (minor) et que les textes sont identiques,
-        // forcer la correction réelle
-        if (correction.type === 'minor' && normalizedOriginal === normalizedCorrected) {
-          // Appliquer les corrections typographiques que l'IA n'a pas faites
-          let fixed = correction.corrected
-
-          // Apostrophe droite → courbe (U+2019)
-          fixed = fixed.replace(/'/g, '\u2019')
-
-          // Guillemets droits → français
-          fixed = fixed.replace(/"([^"]+)"/g, '\u00AB $1 \u00BB')
-
-          // Trois points → ellipsis (U+2026)
-          fixed = fixed.replace(/\.\.\./g, '\u2026')
-
-          // Si après correction le texte est toujours identique, c'est un vrai fantôme
-          if (fixed === normalizedOriginal) {
-            removed.push({
-              original: correction.original,
-              corrected: correction.corrected,
-              type: correction.type,
-              reason: correction.reason + ' (phantom - vraiment identique)'
-            })
-            return false // Supprimer
-          }
-
-          // Sinon, appliquer la correction forcée
-          correction.corrected = fixed
-          console.log(`Bloc #${block.index}: Correction typographique forcée: "${correction.original}" → "${fixed}"`)
-          return true // Garder
+        // Pour les corrections de type "doubt", c'est NORMAL que original === corrected
+        // (corrected = forme dans l'original, alternative = autre forme)
+        // Ne PAS les supprimer si elles ont un champ "alternative"
+        if (correction.type === 'doubt' && correction.alternative) {
+          return true // Garder les corrections de doute avec alternative
         }
 
-        // Pour les autres types (major, doubt), vérifier si vraiment identiques
+        // Pour les autres types (fault), vérifier si vraiment identiques
         const isPhantom = normalizedOriginal === normalizedCorrected
 
         if (isPhantom) {
@@ -422,6 +437,112 @@ function cleanPhantomCorrections(blocks) {
 }
 
 /**
+ * Retire les corrections de genre (doubt) du texte corrigé
+ * Par défaut, les corrections de genre ne sont PAS appliquées (on garde l'original)
+ * Elles ne sont appliquées que si l'utilisateur clique "Changer le genre"
+ */
+function removeDoubtCorrectionsFromText(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      // Chercher les corrections de type "doubt"
+      const doubtCorrections = block.corrections.filter(c => c.type === 'doubt')
+
+      if (doubtCorrections.length > 0) {
+        // Pour chaque correction de genre, s'assurer que le texte contient l'original
+        doubtCorrections.forEach(correction => {
+          // Si le texte contient déjà l'original, rien à faire
+          if (block.corrected.includes(correction.original)) {
+            return
+          }
+
+          // Nouveau format : utiliser le champ alternative si disponible
+          if (correction.alternative) {
+            // Remplacer la forme alternative par l'original
+            if (block.corrected.includes(correction.alternative)) {
+              block.corrected = block.corrected.replace(correction.alternative, correction.original)
+              return
+            }
+          }
+
+          // Ancien format : chercher et remplacer les formes avec parenthèses
+          // Pattern : trouve le texte avec "(ou XXX)" ou variations bugées comme "attachéee (ou attaché)"
+          // On va chercher n'importe quel texte qui ressemble à correction.original avec des variations
+
+          // Extraire les mots de correction.original pour construire un pattern flexible
+          const originalWords = correction.original.split(/\s+/)
+          const lastWord = originalWords[originalWords.length - 1]
+
+          // Construire un pattern qui trouve le dernier mot avec potentiellement des lettres en trop
+          // puis suivi de "(ou ...)"
+          const escapedPrefix = originalWords.slice(0, -1).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+          const escapedLastWord = lastWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+          // Pattern flexible qui permet des variations du dernier mot (pour gérer les bugs comme "attachéee")
+          const pattern = new RegExp(
+            `${escapedPrefix}${escapedPrefix ? '\\s+' : ''}${escapedLastWord}e*\\s*\\(ou\\s+[^)]+\\)`,
+            'g'
+          )
+
+          const newText = block.corrected.replace(pattern, correction.original)
+          if (newText !== block.corrected) {
+            block.corrected = newText
+            console.log(`[removeDoubtCorrections] Nettoyé ancien format dans bloc #${block.index}: "${correction.original}"`)
+          }
+        })
+      }
+    }
+  })
+}
+
+/**
+ * Nettoie les objets correction.corrected pour les corrections de doute
+ * Pour l'ancien format avec parenthèses ou bugs, remplace par correction.original
+ */
+function cleanDoubtCorrectionsObjects(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach(correction => {
+        if (correction.type === 'doubt') {
+          // Si nouveau format avec alternative, s'assurer que corrected = original
+          if (correction.alternative) {
+            correction.corrected = correction.original
+          }
+          // Si ancien format avec parenthèses, enlever les parenthèses et bugs
+          else if (correction.corrected.includes('(ou ')) {
+            // Enlever tout ce qui est après et incluant "(ou"
+            const withoutParentheses = correction.corrected.replace(/\s*\(ou\s+[^)]+\)/g, '').trim()
+
+            // S'assurer que ça correspond à l'original (gérer les bugs de lettres en trop)
+            // Si withoutParentheses est proche de original, utiliser original
+            correction.corrected = correction.original
+            console.log(`[cleanDoubtObjects] Nettoyé correction de doute dans bloc #${block.index}: "${correction.original}"`)
+          }
+        }
+      })
+    }
+  })
+}
+
+/**
+ * Valide automatiquement toutes les corrections de doute (genre)
+ * Par défaut, les corrections de genre sont validées avec l'orthographe originale
+ */
+function autoValidateDoubtCorrections() {
+  AppState.blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach((correction, corrIndex) => {
+        if (correction.type === 'doubt') {
+          const correctionId = `${block.index}-${corrIndex}`
+          // Ajouter à validatedCorrections (validé avec forme originale par défaut)
+          AppState.validatedCorrections.add(correctionId)
+        }
+      })
+    }
+  })
+  console.log('[Doubt] Corrections de genre auto-validées:', AppState.validatedCorrections.size)
+}
+
+/**
  * Envoie le contenu au Cloudflare Worker
  */
 async function sendToWorker(content, filename) {
@@ -430,6 +551,10 @@ async function sendToWorker(content, filename) {
     throw new Error(`⚠️ Le Worker Cloudflare n'est pas encore configuré.\n\nÉtapes :\n1. Déployez le Worker sur Cloudflare\n2. Modifiez l'URL dans frontend/lib/config.php\n\nConsultez le README.md pour les instructions.`)
   }
 
+  // Récupérer le modèle sélectionné
+  const modelSelect = document.getElementById('modelSelect')
+  const selectedModel = modelSelect ? modelSelect.value : 'haiku'
+
   const response = await fetch(window.APP_CONFIG.workerUrl, {
     method: 'POST',
     headers: {
@@ -437,7 +562,8 @@ async function sendToWorker(content, filename) {
     },
     body: JSON.stringify({
       srtContent: content,
-      fileName: filename
+      fileName: filename,
+      model: selectedModel
     })
   })
 
@@ -450,6 +576,30 @@ async function sendToWorker(content, filename) {
 
   if (!result.success) {
     throw new Error(result.error || 'Erreur inconnue')
+  }
+
+  // Afficher les logs de debug si présents
+  if (result.debugLogs && result.debugLogs.length > 0) {
+    console.log('=== DEBUG LOGS FROM WORKER ===')
+    result.debugLogs.forEach((log, index) => {
+      console.log(`\n[${index + 1}] ${log.type} (${log.timestamp}):`)
+      if (log.type === 'pass4_user_prompt') {
+        console.log('User Prompt:', log.content)
+      } else if (log.type === 'pass4_claude_response') {
+        console.log('Claude Response:', log.content)
+        console.log('Blocks Count:', log.blocksCount)
+      } else if (log.type === 'pass4_validation') {
+        console.log(`Block #${log.blockIndex}:`)
+        console.log(`  Correction: "${log.correctionOriginal}"`)
+        console.log(`  Block text: "${log.blockText}"`)
+        console.log(`  Contains: ${log.contains}`)
+      } else if (log.type === 'pass4_rejection') {
+        console.log(`❌ REJECTED - Block #${log.blockIndex}:`)
+        console.log(`  Correction: "${log.correctionOriginal}" → "${log.correctionCorrected}"`)
+        console.log(`  Block text: "${log.blockText}"`)
+      }
+    })
+    console.log('=== END DEBUG LOGS ===\n')
   }
 
   return result.data
@@ -515,27 +665,22 @@ function renderBlocksTable() {
 
     // Déterminer le type de correction dominant pour la classe CSS
     // Les blocs où TOUTES les corrections sont validées n'ont PAS de fond coloré
-    // Priorité basée sur les corrections NON validées : majeur > doute > mineur
+    // Priorité basée sur les corrections NON validées : fault > doubt
     let rowClass = 'row-no-correction'
     if (block.corrections && block.corrections.length > 0 && !allValidated) {
       // Vérifier quelles corrections ne sont PAS validées
-      const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
-        c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+      const hasUnvalidatedFault = block.corrections.some((c, idx) =>
+        c.type === 'fault' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
       )
       const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
         c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
       )
-      const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
-        c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-      )
 
       // Appliquer la couleur selon la priorité des corrections non validées
-      if (hasUnvalidatedMajor) {
-        rowClass = 'row-has-major'
+      if (hasUnvalidatedFault) {
+        rowClass = 'row-has-fault'
       } else if (hasUnvalidatedDoubt) {
         rowClass = 'row-has-doubt'
-      } else if (hasUnvalidatedMinor) {
-        rowClass = 'row-has-minor'
       }
     }
 
@@ -690,17 +835,31 @@ function renderBlocksTable() {
             cardEl.classList.add('validated')
           }
 
+          // Pour les corrections de doute de GENRE (pas manuelles), afficher "original → alternative"
+          // Pour les corrections modifiées manuellement, afficher "corrected"
+          const displayText = correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited
+            ? correction.alternative
+            : correction.corrected
+
+          // Badge : afficher selon le type de correction
+          // - "MODIFIÉ" pour les corrections modifiées manuellement
+          // - "DOUTE" pour les doutes de genre (avec alternative)
+          // - "FAUTE" pour les autres
+          const badgeText = correction.isManuallyEdited
+            ? 'MODIFIÉ'
+            : (correction.type === 'doubt' && correction.alternative ? 'DOUTE' : 'FAUTE')
+
           cardEl.innerHTML = `
             <div class="validation-header">
               <span class="validation-type-badge badge-${correction.type}">
-                ${correction.type === 'major' ? 'MAJEURE' : correction.type === 'doubt' ? 'DOUTE' : 'MINEURE'}
+                ${badgeText}
               </span>
             </div>
             <div class="validation-correction">
               <div class="validation-correction-text">
                 <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
                 →
-                <span class="corrected">${SRTParser.escapeHtml(correction.corrected)}</span>
+                <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
               </div>
               <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
             </div>
@@ -709,7 +868,47 @@ function renderBlocksTable() {
           const actionsEl = document.createElement('div')
           actionsEl.className = 'validation-actions'
 
-          if (!isValidated) {
+          // PRIORITÉ 1 : Corrections modifiées manuellement (validées ou non)
+          if (correction.isManuallyEdited) {
+            // Bouton pour réinitialiser à la suggestion de Claude
+            const resetBtn = document.createElement('button')
+            resetBtn.className = 'btn-toggle-gender'
+            resetBtn.innerHTML = '↺ Réinitialiser'
+            resetBtn.title = 'Revenir à la suggestion de Claude'
+            resetBtn.onclick = () => resetToOriginalSuggestion(block.index, corrIndex)
+            actionsEl.appendChild(resetBtn)
+
+            // Bouton Modifier
+            const editBtn = document.createElement('button')
+            editBtn.className = 'btn-icon-only btn-icon-edit'
+            editBtn.innerHTML = '✏️'
+            editBtn.title = 'Modifier'
+            editBtn.onclick = () => editCorrection(block.index, corrIndex)
+            actionsEl.appendChild(editBtn)
+          }
+          // PRIORITÉ 2 : Doutes de GENRE (avec champ alternative, pas modifiés manuellement)
+          else if (correction.type === 'doubt' && correction.alternative) {
+            // Vérifier si le genre a été changé (forme alternative active)
+            const isGenderSwitched = AppState.genderSwitched.has(correctionId)
+
+            // Bouton bascule pour changer le genre
+            const toggleBtn = document.createElement('button')
+            toggleBtn.className = isGenderSwitched ? 'btn-toggle-gender btn-gender-changed' : 'btn-toggle-gender'
+            toggleBtn.innerHTML = isGenderSwitched ? '⟲ Revenir' : '⇄ Changer le genre'
+            toggleBtn.title = isGenderSwitched ? 'Revenir au genre d\'origine' : 'Changer le genre'
+            toggleBtn.onclick = () => toggleGender(block.index, corrIndex)
+            actionsEl.appendChild(toggleBtn)
+
+            // Bouton Modifier (optionnel, pour éditer manuellement)
+            const editBtn = document.createElement('button')
+            editBtn.className = 'btn-icon-only btn-icon-edit'
+            editBtn.innerHTML = '✏️'
+            editBtn.title = 'Modifier'
+            editBtn.onclick = () => editCorrection(block.index, corrIndex)
+            actionsEl.appendChild(editBtn)
+          }
+          // PRIORITÉ 3 : Corrections normales (fault) non validées
+          else if (!isValidated) {
             // Boutons Valider, Modifier et Rejeter : seulement si NON validé
             const validateBtn = document.createElement('button')
             validateBtn.className = 'btn-icon-only btn-icon-validate'
@@ -849,6 +1048,107 @@ function validateSingleCorrection(blockIndex, corrIndex) {
       scrollToBlock(nextBlockIndex)
     }
   }, 300)
+}
+
+/**
+ * Réinitialise une correction modifiée manuellement à la suggestion originale de Claude
+ * @param {number} blockIndex - Index du bloc
+ * @param {number} corrIndex - Index de la correction
+ */
+function resetToOriginalSuggestion(blockIndex, corrIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || !block.corrections[corrIndex]) {
+    return
+  }
+
+  const correction = block.corrections[corrIndex]
+
+  // Récupérer la suggestion originale de Claude
+  const originalSuggestion = correction.originalSuggestion
+  if (!originalSuggestion) {
+    console.log(`[resetToOriginalSuggestion] Pas de suggestion originale pour bloc #${blockIndex}, correction #${corrIndex}`)
+    return
+  }
+
+  // Remplacer la valeur actuelle par la suggestion originale
+  const currentValue = correction.corrected
+  block.corrected = block.corrected.replace(currentValue, originalSuggestion)
+  correction.corrected = originalSuggestion
+
+  // Restaurer le type et la raison originale
+  if (correction.originalType) {
+    correction.type = correction.originalType
+  }
+  if (correction.originalReason) {
+    correction.reason = correction.originalReason
+  }
+
+  // Retirer le flag de modification manuelle
+  correction.isManuallyEdited = false
+
+  console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex}, correction #${corrIndex} réinitialisée à "${originalSuggestion}"`)
+
+  // Mettre à jour l'affichage
+  renderBlocksTable()
+  updateMinimap()
+}
+
+/**
+ * Bascule entre les deux formes de genre pour une correction de type "doubt"
+ * État 1 (défaut): texte original (ex: "je suis venu")
+ * État 2: forme alternative (ex: "je suis venue")
+ * @param {number} blockIndex - Index du bloc
+ * @param {number} corrIndex - Index de la correction
+ */
+function toggleGender(blockIndex, corrIndex) {
+  const block = AppState.blocks.find(b => b.index === blockIndex)
+  if (!block || !block.corrections || !block.corrections[corrIndex]) {
+    return
+  }
+
+  const correction = block.corrections[corrIndex]
+  const correctionId = `${blockIndex}-${corrIndex}`
+
+  // Vérifier si c'est bien une correction de genre (avec champ alternative)
+  if (correction.type !== 'doubt' || !correction.alternative) {
+    console.log(`[toggleGender] Not a gender doubt correction (no alternative field)`)
+    return
+  }
+
+  // Vérifier si le genre est déjà en forme alternative
+  const isGenderSwitched = AppState.genderSwitched.has(correctionId)
+
+  if (isGenderSwitched) {
+    // Revenir à l'original
+    AppState.genderSwitched.delete(correctionId)
+
+    // Extraire la forme alternative
+    const alternativeForm = extractAlternativeGender(correction)
+
+    // Remplacer la forme alternative par l'original dans le texte
+    if (block.corrected.includes(alternativeForm)) {
+      block.corrected = block.corrected.replace(alternativeForm, correction.original)
+    }
+  } else {
+    // Changer le genre : passer à la forme alternative
+    AppState.genderSwitched.add(correctionId)
+
+    // Extraire la forme alternative
+    const alternativeForm = extractAlternativeGender(correction)
+
+    // Remplacer l'original par la forme alternative
+    if (block.corrected.includes(correction.original)) {
+      block.corrected = block.corrected.replace(correction.original, alternativeForm)
+    }
+  }
+
+  // Note: la correction reste toujours dans validatedCorrections (validée par défaut)
+
+  // Mettre à jour les stats et l'affichage
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
+  renderBlocksTable()
+  updateMinimap()
 }
 
 /**
@@ -1017,6 +1317,10 @@ function editBlockText(blockIndex) {
             correction.reason = correction.originalReason
             delete correction.originalReason
           }
+          // Retirer le flag de modification manuelle
+          if (correction.isManuallyEdited) {
+            correction.isManuallyEdited = false
+          }
 
           // VALIDER la correction
           AppState.validatedCorrections.add(correctionId)
@@ -1046,16 +1350,23 @@ function editBlockText(blockIndex) {
         AppState.validatedCorrections.delete(correctionId)
       })
 
-      // Remplacer par UNE SEULE correction "doubt"
+      // Déterminer le type original (fault par défaut, ou le type de la première correction si elle existe)
+      const originalType = (oldCorrections.length > 0 && oldCorrections[0].originalType)
+        ? oldCorrections[0].originalType
+        : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
+      const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
+
+      // Remplacer par UNE SEULE correction avec le type original et flag isManuallyEdited
       block.corrections = [{
-        type: 'doubt',
+        type: originalType,
         original: block.original,
         corrected: newValue,
         reason: 'Modifié manuellement',
         position: 0,
         originalSuggestion: oldCorrected,
-        originalType: 'doubt',
-        originalReason: 'Modifié manuellement'
+        originalType: originalType,
+        originalReason: originalReason,
+        isManuallyEdited: true
       }]
 
       block.corrected = newValue
@@ -1197,7 +1508,7 @@ function editCorrection(blockIndex, corrIndex) {
       const isDifferentFromSuggestion = newValue !== correction.originalSuggestion
 
       if (isDifferentFromSuggestion) {
-        // Modifié différemment → passer SEULEMENT CETTE CORRECTION en mode "doubt"
+        // Modifié différemment → marquer comme modifié manuellement mais GARDER le type original
         console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification manuelle détectée`)
         console.log(`  Nouveau: "${newValue}" (codes: ${Array.from(newValue).map(c => c.charCodeAt(0)).join(',')})`)
         console.log(`  Suggestion: "${correction.originalSuggestion}" (codes: ${Array.from(correction.originalSuggestion).map(c => c.charCodeAt(0)).join(',')})`)
@@ -1209,14 +1520,16 @@ function editCorrection(blockIndex, corrIndex) {
         if (!correction.hasOwnProperty('originalReason')) {
           correction.originalReason = correction.reason
         }
-        // Passer SEULEMENT cette correction en doute
-        correction.type = 'doubt'
+        // Marquer comme modifié manuellement SANS changer le type
+        correction.isManuallyEdited = true
         correction.reason = 'Modifié manuellement'
       } else {
         // Remis comme la suggestion → repasser au type original
-        correction.type = correction.originalType || 'major'
+        correction.type = correction.originalType || 'fault'
         // Restaurer la raison originale
         correction.reason = correction.originalReason
+        // Retirer le flag de modification manuelle
+        correction.isManuallyEdited = false
       }
 
       // Marquer la correction comme validée
@@ -1307,8 +1620,7 @@ function validateCorrections(type) {
 
     block.corrections.forEach((correction, corrIndex) => {
       if (type === 'all' ||
-          (type === 'minor' && correction.type === 'minor') ||
-          (type === 'major' && correction.type === 'major') ||
+          (type === 'fault' && correction.type === 'fault') ||
           (type === 'doubt' && correction.type === 'doubt')) {
 
         const correctionId = `${block.index}-${corrIndex}`
@@ -1340,10 +1652,11 @@ function resetBlockToInitialState(blockIndex) {
   // CAS SPÉCIAL : Si le bloc n'avait pas de corrections à l'origine,
   // supprimer toutes les corrections créées manuellement
   if (block.hadOriginalCorrections === false) {
-    // Supprimer toutes les validations
+    // Supprimer toutes les validations et états de genre
     block.corrections.forEach((_, corrIndex) => {
       const correctionId = `${blockIndex}-${corrIndex}`
       AppState.validatedCorrections.delete(correctionId)
+      AppState.genderSwitched.delete(correctionId)
     })
 
     // Supprimer toutes les corrections et restaurer le texte original
@@ -1361,10 +1674,18 @@ function resetBlockToInitialState(blockIndex) {
   }
 
   // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
-  // Supprimer toutes les validations pour ce bloc
+  // Supprimer toutes les validations pour ce bloc (sauf les corrections de type "doubt" de genre)
   block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
-    AppState.validatedCorrections.delete(correctionId)
+
+    // Pour les corrections de doute de GENRE (pas modifiées manuellement), on garde la validation mais on revient à l'original
+    if (correction.type === 'doubt' && !correction.isManuallyEdited) {
+      AppState.genderSwitched.delete(correctionId)
+      // On garde dans validatedCorrections (reste validé)
+    } else {
+      // Pour les autres types (et corrections modifiées manuellement), retirer la validation
+      AppState.validatedCorrections.delete(correctionId)
+    }
 
     // Restaurer la suggestion originale si elle a été modifiée ou rejetée
     if (correction.hasOwnProperty('originalSuggestion')) {
@@ -1382,15 +1703,30 @@ function resetBlockToInitialState(blockIndex) {
       correction.reason = correction.originalReason
       delete correction.originalReason
     }
+    // Retirer le flag de modification manuelle
+    if (correction.isManuallyEdited) {
+      correction.isManuallyEdited = false
+    }
   })
 
   // Reconstruire block.corrected en appliquant toutes les corrections restaurées
+  // SAUF les corrections de type "doubt" qui ne sont PAS validées (par défaut = original)
   // On trie les corrections par position pour les appliquer dans l'ordre
   const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
   let correctedText = block.original
   let offset = 0
 
-  sortedCorrections.forEach(correction => {
+  sortedCorrections.forEach((correction, corrIndex) => {
+    const correctionId = `${blockIndex}-${corrIndex}`
+
+    // Pour les corrections "doubt" de GENRE (avec alternative), ne jamais les appliquer dans le rebuild
+    // Elles restent validées mais montrent l'original par défaut
+    // Elles seront appliquées seulement si on clique "Changer le genre"
+    // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
+    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
+      return // Ne pas appliquer les corrections de genre dans le rebuild
+    }
+
     const startPos = correction.position + offset
     const endPos = startPos + correction.original.length
 
@@ -1420,8 +1756,9 @@ function resetBlockToInitialState(blockIndex) {
  * Garde les corrections mineures pré-validées
  */
 function resetToInitialState() {
-  // Vider toutes les validations
+  // Vider toutes les validations et remettre les genres à l'original
   AppState.validatedCorrections.clear()
+  AppState.genderSwitched.clear()
 
   // Restaurer les types originaux et supprimer les modifications
   AppState.blocks.forEach(block => {
@@ -1460,6 +1797,13 @@ function resetToInitialState() {
       let offset = 0
 
       sortedCorrections.forEach(correction => {
+        // Pour les corrections "doubt" de GENRE, ne jamais les appliquer dans le rebuild
+        // Elles seront re-validées après mais montrent l'original par défaut
+        // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
+        if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
+          return
+        }
+
         const startPos = correction.position + offset
         const endPos = startPos + correction.original.length
 
@@ -1476,6 +1820,9 @@ function resetToInitialState() {
       block.corrected = correctedText
     }
   })
+
+  // Re-valider automatiquement toutes les corrections de doute (genre)
+  autoValidateDoubtCorrections()
 
   // Réinitialiser le filtre actif
   AppState.activeFilter = null
@@ -1557,7 +1904,29 @@ function buildTextWithValidatedCorrections(block) {
   let result = block.original
   let offset = 0
 
-  sortedCorrections.forEach(correction => {
+  sortedCorrections.forEach((correction) => {
+    // Trouver l'index original de cette correction dans block.corrections
+    const originalCorrIndex = block.corrections.indexOf(correction)
+    const correctionId = `${block.index}-${originalCorrIndex}`
+
+    // Pour les corrections "doubt" de GENRE (avec alternative, pas modifiées manuellement)
+    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
+      // Si le genre a été changé, appliquer la forme alternative
+      if (AppState.genderSwitched.has(correctionId)) {
+        const alternativeForm = extractAlternativeGender(correction)
+        const startPos = correction.position + offset
+        const endPos = startPos + correction.original.length
+
+        if (result.substring(startPos, endPos) === correction.original) {
+          result = result.substring(0, startPos) + alternativeForm + result.substring(endPos)
+          offset += alternativeForm.length - correction.original.length
+        }
+      }
+      // Sinon, garder l'original (ne rien faire)
+      return
+    }
+
+    // Pour les autres types de corrections (fault, et corrections modifiées manuellement)
     const startPos = correction.position + offset
     const endPos = startPos + correction.original.length
 
@@ -1578,12 +1947,18 @@ function resetApp() {
   AppState.originalFilename = null
   AppState.blocks = []
   AppState.validatedCorrections.clear()
+  AppState.genderSwitched.clear()
 
   // Reset filter state
   AppState.activeFilter = null
   document.querySelectorAll('.stat-filter').forEach(btn => {
     btn.classList.remove('active')
   })
+
+  // Reset minimap
+  if (DOM.minimapBlocks) {
+    DOM.minimapBlocks.innerHTML = ''
+  }
 
   resetFileInput()
   showSection('upload')
@@ -1639,8 +2014,7 @@ function updateStats(stats) {
 
   if (DOM.statBlocks) DOM.statBlocks.textContent = totalBlocks
   if (DOM.statTotal) DOM.statTotal.textContent = stats.total
-  if (DOM.statMinor) DOM.statMinor.textContent = stats.minor
-  if (DOM.statMajor) DOM.statMajor.textContent = stats.major
+  if (DOM.statFault) DOM.statFault.textContent = stats.fault
   if (DOM.statDoubt) DOM.statDoubt.textContent = stats.doubt
 
   // Activer/désactiver les boutons de filtre selon les compteurs
@@ -1652,11 +2026,8 @@ function updateStats(stats) {
       case 'all':
         count = blocksWithCorrections  // Utiliser le nombre de blocs au lieu du total de fautes
         break
-      case 'minor':
-        count = stats.minor
-        break
-      case 'major':
-        count = stats.major
+      case 'fault':
+        count = stats.fault
         break
       case 'doubt':
         count = stats.doubt
@@ -1740,8 +2111,7 @@ function updateStats(stats) {
  */
 function updateValidationButtonsState(stats) {
   // Compter combien de corrections de chaque type sont validées
-  let validatedMinorCount = 0
-  let validatedMajorCount = 0
+  let validatedFaultCount = 0
   let validatedDoubtCount = 0
 
   AppState.blocks.forEach(block => {
@@ -1749,27 +2119,20 @@ function updateValidationButtonsState(stats) {
     block.corrections.forEach((correction, corrIndex) => {
       const correctionId = `${block.index}-${corrIndex}`
       if (AppState.validatedCorrections.has(correctionId)) {
-        if (correction.type === 'minor') validatedMinorCount++
-        else if (correction.type === 'major') validatedMajorCount++
+        if (correction.type === 'fault') validatedFaultCount++
         else if (correction.type === 'doubt') validatedDoubtCount++
       }
     })
   })
 
   // Désactiver/activer les boutons en fonction
-  const allMinorValidated = stats.minor > 0 && validatedMinorCount === stats.minor
-  const allMajorValidated = stats.major > 0 && validatedMajorCount === stats.major
+  const allFaultValidated = stats.fault > 0 && validatedFaultCount === stats.fault
   const allDoubtValidated = stats.doubt > 0 && validatedDoubtCount === stats.doubt
   const allValidated = stats.total > 0 && AppState.validatedCorrections.size === stats.total
 
-  if (DOM.validateMinorBtn) {
-    DOM.validateMinorBtn.disabled = allMinorValidated || stats.minor === 0
-    DOM.validateMinorBtn.classList.toggle('btn-disabled', allMinorValidated || stats.minor === 0)
-  }
-
-  if (DOM.validateMajorBtn) {
-    DOM.validateMajorBtn.disabled = allMajorValidated || stats.major === 0
-    DOM.validateMajorBtn.classList.toggle('btn-disabled', allMajorValidated || stats.major === 0)
+  if (DOM.validateFaultBtn) {
+    DOM.validateFaultBtn.disabled = allFaultValidated || stats.fault === 0
+    DOM.validateFaultBtn.classList.toggle('btn-disabled', allFaultValidated || stats.fault === 0)
   }
 
   if (DOM.validateDoubtBtn) {
@@ -1927,32 +2290,29 @@ function getBlockMinimapClass(block) {
   }
 
   // Si toutes validées, vérifier le type pour la couleur
-  // Priorité : majeur > doute > mineur
+  // Priorité : fault > doubt
   if (allValidated) {
-    const hasMajor = block.corrections.some(c => c.type === 'major')
+    const hasFault = block.corrections.some(c => c.type === 'fault')
     const hasDoubt = block.corrections.some(c => c.type === 'doubt')
-    const hasMinor = block.corrections.some(c => c.type === 'minor')
 
-    if (hasMajor) {
+    if (hasFault) {
       return 'minimap-validated'
     } else if (hasDoubt) {
       return 'minimap-validated-doubt'
-    } else if (hasMinor) {
-      return 'minimap-validated-minor'
     } else {
       return 'minimap-validated'
     }
   }
 
   // Non validées : déterminer le type dominant
-  // Nouvelle priorité : majeure non validée > doute (validé ou non) > mineure
-  const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
-    c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+  // Priorité : fault non validée > doubt (validé ou non)
+  const hasUnvalidatedFault = block.corrections.some((c, idx) =>
+    c.type === 'fault' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
   )
 
-  // Si une majeure non validée existe, priorité absolue
-  if (hasUnvalidatedMajor) {
-    return 'minimap-major'
+  // Si une faute non validée existe, priorité absolue
+  if (hasUnvalidatedFault) {
+    return 'minimap-fault'
   }
 
   // Sinon, vérifier si le bloc contient au moins un doute (validé ou non)
@@ -1961,15 +2321,7 @@ function getBlockMinimapClass(block) {
     return 'minimap-doubt'
   }
 
-  // Sinon, vérifier s'il reste des mineures non validées
-  const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
-    c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-  )
-  if (hasUnvalidatedMinor) {
-    return 'minimap-minor'
-  }
-
-  // Tout est validé (aucune majeure non validée, aucun doute, aucune mineure non validée)
+  // Tout est validé
   return 'minimap-validated'
 }
 
@@ -1984,7 +2336,7 @@ function updateMinimap() {
     if (!minimapBlock) return
 
     // Retirer toutes les classes d'état
-    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-validated-minor', 'minimap-no-correction', 'minimap-major', 'minimap-doubt', 'minimap-minor')
+    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
 
     // Ajouter la nouvelle classe
     const blockClass = getBlockMinimapClass(block)

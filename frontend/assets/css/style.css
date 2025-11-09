@@ -22,11 +22,8 @@
   --color-danger: #ef4444;
 
   /* Couleurs de correction */
-  --color-minor: #3b82f6;
-  --color-minor-bg: #dbeafe;
-
-  --color-major: #10b981;
-  --color-major-bg: #d1fae5;
+  --color-fault: #10b981;
+  --color-fault-bg: #d1fae5;
 
   --color-doubt: #f59e0b;
   --color-doubt-bg: #fef3c7;
@@ -144,6 +141,42 @@ body {
   font-size: 1.125rem;
   opacity: 0.95;
   font-weight: 400;
+}
+
+.header-model-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-left: auto;
+}
+
+.model-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.model-select {
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  background-color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.model-select:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.model-select:focus {
+  border-color: white;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
 }
 
 /* ===== Footer ===== */
@@ -535,8 +568,8 @@ body {
   border-left: 4px solid var(--color-minor);
 }
 
-.stat-major {
-  border-left: 4px solid var(--color-major);
+.stat-fault {
+  border-left: 4px solid var(--color-fault);
 }
 
 .stat-doubt {
@@ -588,7 +621,7 @@ body {
 }
 
 .btn-stat-success {
-  background: var(--color-major);
+  background: var(--color-fault);
   color: white;
 }
 
@@ -886,9 +919,9 @@ body {
   color: var(--color-minor);
 }
 
-.correction-major {
-  background-color: var(--color-major-bg);
-  color: var(--color-major);
+.correction-fault {
+  background-color: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .correction-doubt {
@@ -959,8 +992,8 @@ body {
   border-left-color: var(--color-minor);
 }
 
-.validation-card.validation-major {
-  border-left-color: var(--color-major);
+.validation-card.validation-fault {
+  border-left-color: var(--color-fault);
 }
 
 .validation-card.validation-doubt {
@@ -1014,9 +1047,9 @@ body {
   color: var(--color-minor);
 }
 
-.validation-type-badge.badge-major {
-  background: var(--color-major-bg);
-  color: var(--color-major);
+.validation-type-badge.badge-fault {
+  background: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .validation-type-badge.badge-doubt {
@@ -1111,6 +1144,36 @@ body {
 
 .btn-icon-edit:hover {
   background: #5a67d8;
+}
+
+/* Bouton pour changer le genre (corrections de type "doubt") */
+.btn-toggle-gender {
+  background: var(--color-warning);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn-toggle-gender:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.btn-toggle-gender.btn-gender-changed {
+  background: #6b7280;
+}
+
+.btn-toggle-gender.btn-gender-changed:hover {
+  background: #4b5563;
 }
 
 /* ===== Responsive ===== */
@@ -1224,7 +1287,7 @@ body {
 }
 
 /* BLOCS AVEC CORRECTIONS MAJEURES - Rouge brillant clair */
-.block-row.row-has-major {
+.block-row.row-has-fault {
   background-color: #ffcdd2;
 }
 
@@ -1397,8 +1460,8 @@ body {
 }
 
 .block-corrected.block-unvalidated {
-  background: var(--color-major-bg); /* Fond vert majeur pour blocs non validés */
-  border: 1px solid var(--color-major);
+  background: var(--color-fault-bg); /* Fond vert majeur pour blocs non validés */
+  border: 1px solid var(--color-fault);
 }
 
 .block-label {
@@ -1432,9 +1495,9 @@ body {
   color: var(--color-minor);
 }
 
-.correction-major {
-  background-color: var(--color-major-bg);
-  color: var(--color-major);
+.correction-fault {
+  background-color: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .correction-doubt {
@@ -1457,9 +1520,9 @@ body {
   text-decoration-style: wavy;
 }
 
-.error-highlight-major {
-  background-color: var(--color-major-bg);
-  color: var(--color-major);
+.error-highlight-fault {
+  background-color: var(--color-fault-bg);
+  color: var(--color-fault);
   text-decoration: underline;
   text-decoration-style: wavy;
 }
@@ -1482,8 +1545,8 @@ body {
   border-left: 3px solid var(--color-border);
 }
 
-.validation-card.validation-major {
-  border-left-color: var(--color-major);
+.validation-card.validation-fault {
+  border-left-color: var(--color-fault);
 }
 
 .validation-card.validation-doubt {
@@ -1523,9 +1586,9 @@ body {
   letter-spacing: 0.05em;
 }
 
-.validation-type-badge.badge-major {
-  background: var(--color-major-bg);
-  color: var(--color-major);
+.validation-type-badge.badge-fault {
+  background: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .validation-type-badge.badge-doubt {
@@ -1869,11 +1932,6 @@ body {
   opacity: 0.7;
 }
 
-.minimap-block.minimap-validated-minor {
-  background: #bbdefb;
-  opacity: 0.7;
-}
-
 .minimap-block.minimap-hidden {
   display: none;
 }
@@ -1883,16 +1941,12 @@ body {
   opacity: 0.3;
 }
 
-.minimap-block.minimap-major {
-  background: #ef5350;
+.minimap-block.minimap-fault {
+  background: var(--color-fault);
 }
 
 .minimap-block.minimap-doubt {
   background: #ff9800;
-}
-
-.minimap-block.minimap-minor {
-  background: #42a5f5;
 }
 
 /* Indicateur de position actuelle (bloc cliqué) - DOIT venir après les couleurs */
@@ -1908,24 +1962,16 @@ body {
 }
 
 /* Forcer les couleurs à rester visibles même quand le bloc est sélectionné */
-.minimap-block.minimap-current.minimap-major {
-  background: #ef5350 !important;
+.minimap-block.minimap-current.minimap-fault {
+  background: var(--color-fault) !important;
 }
 
 .minimap-block.minimap-current.minimap-doubt {
   background: #ff9800 !important;
 }
 
-.minimap-block.minimap-current.minimap-minor {
-  background: #42a5f5 !important;
-}
-
 .minimap-block.minimap-current.minimap-validated-doubt {
   background: #ffe0b2 !important;
-}
-
-.minimap-block.minimap-current.minimap-validated-minor {
-  background: #bbdefb !important;
 }
 
 /* Tooltip au survol */

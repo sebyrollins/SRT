@@ -34,7 +34,7 @@ async function handleRequest(request) {
 
   try {
     const data = await request.json()
-    const { srtContent, fileName } = data
+    const { srtContent, fileName, model } = data
 
     if (!srtContent) {
       return new Response(JSON.stringify({ error: 'Contenu SRT manquant' }), {
@@ -43,12 +43,17 @@ async function handleRequest(request) {
       })
     }
 
+    // Déterminer le modèle à utiliser (sonnet par défaut)
+    const modelType = model === 'cleaning' ? 'cleaning' : (model === 'sonnet' ? 'sonnet' : 'sonnet')
+    console.log(`[handleRequest] Using model: ${modelType}`)
+
     // Traitement du contenu SRT
-    const result = await processSRT(srtContent)
+    const result = await processSRT(srtContent, modelType)
 
     return new Response(JSON.stringify({
       success: true,
-      data: result,
+      data: result.blocks,
+      debugLogs: result.debugLogs,
       fileName: fileName
     }), {
       status: 200,
@@ -96,29 +101,14 @@ function analyzeChunkComplexity(blocks) {
 }
 
 /**
- * Détecte si un chunk nécessite une passe 2 pour ministères + formules de politesse
+ * Détecte si un chunk nécessite une passe 2 pour institutions + formatage
  * @param {Array} blocks - Blocs SRT à analyser
  * @returns {boolean} - true si le chunk nécessite une passe 2
  */
 function needsSecondPass(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 2 : Ministères + Monsieur/Madame/Mademoiselle
-  return (
-    /ministère/i.test(text) ||
-    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text)
-  )
-}
-
-/**
- * Détecte si un chunk nécessite une passe 3 pour les autres règles spécifiques
- * @param {Array} blocks - Blocs SRT à analyser
- * @returns {boolean} - true si le chunk nécessite une passe 3
- */
-function needsPass3(blocks) {
-  const text = blocks.map(b => b.text).join(' ')
-
-  // PASSE 3 : Les 4 règles restantes (ambiguïté genre maintenant en Pass 4)
+  // PASSE 2 : Institutions + espaces milliers + traits d'union + majuscules abusives
   return (
     /gouvernement|assemblée|sénat|parlement/i.test(text) || // Institutions
     /\d{4,}e/i.test(text) ||                        // Ordinaux (1000e)
@@ -129,16 +119,18 @@ function needsPass3(blocks) {
 }
 
 /**
- * Détecte si un chunk nécessite une passe 4 pour l'ambiguïté de genre
+ * Détecte si un chunk nécessite une passe 3 pour ministères + formules de politesse
  * @param {Array} blocks - Blocs SRT à analyser
- * @returns {boolean} - true si le chunk nécessite une passe 4
+ * @returns {boolean} - true si le chunk nécessite une passe 3
  */
-function needsPass4(blocks) {
+function needsPass3(blocks) {
   const text = blocks.map(b => b.text).join(' ')
 
-  // PASSE 4 : UNIQUEMENT ambiguïté de genre
-  // Détecter "je suis" + participe passé (terminaisons: é/ée/és/ées, i/ie/is/ies, u/ue/us/ues, t/te/ts/tes, s/se)
-  return /\bje suis \w+(é|ée|és|ées|i|ie|is|ies|u|ue|us|ues|t|te|ts|tes|s|se)\b/i.test(text)
+  // PASSE 3 : Ministères + Monsieur/Madame/Mademoiselle
+  return (
+    /ministère/i.test(text) ||
+    /\b(monsieur|madame|mademoiselle|mesdames|messieurs)/i.test(text)
+  )
 }
 
 /**
@@ -155,7 +147,7 @@ function preProcessWithRegex(text) {
   const trimmed = corrected.trim()
   if (trimmed !== corrected) {
     corrections.push({
-      type: 'minor',
+      type: 'fault',
       original: corrected,
       corrected: trimmed,
       reason: 'Espaces en début/fin'
@@ -168,7 +160,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/\.\.\./g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: '...',
         corrected: '…',
         reason: 'Ellipsis typographique'
@@ -182,7 +174,7 @@ function preProcessWithRegex(text) {
     const beforeSpaces = corrected.match(/ {2,}/g)
     if (beforeSpaces && beforeSpaces.length > 0) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: beforeSpaces[0],
         corrected: ' ',
         reason: 'Espaces multiples'
@@ -196,7 +188,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/ ([,.])/g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].trim(),
         reason: 'Espace avant ponctuation'
@@ -211,7 +203,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/([;:!?]) /g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(' ', '\u00A0'),
         reason: 'Espace insécable après ponctuation haute'
@@ -225,7 +217,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/"([^"]+)"/g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(/"/g, '«').replace(/«([^«]+)«/g, '«\u00A0$1\u00A0»'),
         reason: 'Guillemets français'
@@ -239,7 +231,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/\b([ldnjmtsc])'\s+/gi)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(/'\s+/, "'"),
         reason: 'Espace après apostrophe'
@@ -253,7 +245,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/([,;])\1/g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0][0],
         reason: 'Ponctuation doublée'
@@ -300,7 +292,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(pattern)
     if (matches && matches.length > 0) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(pattern, replacement),
         reason: `Espace insécable avant unité (${unit})`
@@ -445,6 +437,8 @@ function detectContradictoryCorrections(pass1Corrections, pass2Corrections, true
 /**
  * Déduplique les corrections identiques (même original → même corrected)
  * Garde la première occurrence et supprime les doublons
+ * Pour les corrections de type "doubt", garde la plus longue (qui englobe les autres)
+ * Supprime les corrections "fault" qui sont englobées par des corrections "doubt"
  * @param {Array} corrections - Liste de corrections
  * @param {number} blockIndex - Index du bloc pour les logs
  * @returns {Array} Liste dédupliquée
@@ -454,7 +448,59 @@ function deduplicateCorrections(corrections, blockIndex) {
   const deduplicated = []
   const duplicates = []
 
-  corrections.forEach(correction => {
+  // Séparer les corrections "doubt" des autres
+  const doubtCorrections = corrections.filter(c => c.type === 'doubt')
+  const otherCorrections = corrections.filter(c => c.type !== 'doubt')
+
+  // Pour les corrections "doubt", garder seulement la plus longue quand il y a chevauchement
+  const filteredDoubtCorrections = []
+  doubtCorrections.forEach(correction => {
+    // Vérifier si cette correction est contenue dans une autre correction doubt plus longue
+    const isContainedInLonger = doubtCorrections.some(other => {
+      if (other === correction) return false
+      // Si l'autre correction contient celle-ci (texte plus long), alors celle-ci est un doublon
+      return other.original.includes(correction.original) && other.original.length > correction.original.length
+    })
+
+    if (isContainedInLonger) {
+      console.log(`[deduplicateCorrections] Block #${blockIndex} - Removing nested doubt: "${correction.original}" (contained in longer correction)`)
+      duplicates.push({
+        original: correction.original,
+        corrected: correction.corrected,
+        reason: correction.reason,
+        firstReason: 'Nested in longer correction'
+      })
+    } else {
+      filteredDoubtCorrections.push(correction)
+    }
+  })
+
+  // Filtrer les corrections "fault" qui sont englobées par des corrections "doubt"
+  const filteredOtherCorrections = []
+  otherCorrections.forEach(correction => {
+    // Vérifier si cette correction fault est englobée par un doute de genre
+    const isEnglobed = filteredDoubtCorrections.some(doubt => {
+      // Si le doute contient l'original de la fault, c'est un chevauchement
+      // Exemple: doubt "Je semble perdu" englobe fault "perdue"
+      return doubt.original.includes(correction.original) ||
+             (doubt.alternative && doubt.alternative.includes(correction.original))
+    })
+
+    if (isEnglobed) {
+      console.log(`[deduplicateCorrections] Block #${blockIndex} - Removing fault englobed by doubt: "${correction.original}" → "${correction.corrected}"`)
+      duplicates.push({
+        original: correction.original,
+        corrected: correction.corrected,
+        reason: correction.reason,
+        firstReason: 'Englobed by gender doubt correction'
+      })
+    } else {
+      filteredOtherCorrections.push(correction)
+    }
+  })
+
+  // Dédupliquer les corrections fault restantes (logique normale)
+  filteredOtherCorrections.forEach(correction => {
     // Créer une clé unique basée sur original → corrected (normalisé)
     const key = `${correction.original.trim().toLowerCase()} → ${correction.corrected.trim().toLowerCase()}`
 
@@ -476,11 +522,14 @@ function deduplicateCorrections(corrections, blockIndex) {
     }
   })
 
+  // Combiner les résultats
+  const result = [...deduplicated, ...filteredDoubtCorrections]
+
   if (duplicates.length > 0) {
     console.log(`[deduplicateCorrections] Block #${blockIndex} - Removed ${duplicates.length} duplicate correction(s)`)
   }
 
-  return deduplicated
+  return result
 }
 
 /**
@@ -505,7 +554,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
     // Si ce bloc n'a pas été traité par la passe 2, valider quand même les corrections de passe 1
     if (!blockPass2) {
       const originalBlock = originalMap.get(blockPass1.index)
-      const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
+      const trueOriginal = originalBlock ? (originalBlock.text || originalBlock.original) : blockPass1.original
 
       // Valider les corrections de passe 1
       const validPass1Corrections = (blockPass1.corrections || []).filter(corr =>
@@ -525,7 +574,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
     // FUSION : Ce bloc a été traité par les deux passes
     const originalBlock = originalMap.get(blockPass1.index)
-    const trueOriginal = originalBlock ? originalBlock.text : blockPass1.original
+    const trueOriginal = originalBlock ? (originalBlock.text || originalBlock.original) : blockPass1.original
 
     console.log(`[mergePass1AndPass2] Merging block #${blockPass1.index}`)
     console.log(`  - True original: "${trueOriginal.substring(0, 60)}..."`)
@@ -565,9 +614,13 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
 /**
  * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
- * Utilise Sonnet pour garantir la qualité maximale sur toutes les règles
+ * @param {string} srtContent - Contenu du fichier SRT
+ * @param {string} modelType - Type de modèle à utiliser : 'cleaning' (regex uniquement), 'sonnet' (qualité)
  */
-async function processSRT(srtContent) {
+async function processSRT(srtContent, modelType = 'sonnet') {
+  // Tableau de logs pour debugging (sera renvoyé au frontend)
+  const debugLogs = []
+
   // Parse les blocs SRT
   const blocks = parseSRTBlocks(srtContent)
 
@@ -602,6 +655,18 @@ async function processSRT(srtContent) {
   const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
   console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
 
+  // ═══════════════════════════════════════════════════════════════
+  // MODE CLEANING : Retourner uniquement les corrections regex
+  // ═══════════════════════════════════════════════════════════════
+  if (modelType === 'cleaning') {
+    const totalTime = Date.now() - startTime
+    console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
+    return {
+      blocks: blocksAfterPass0,
+      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`]
+    }
+  }
+
   // Recréer les chunks avec les blocs prétraités
   const preprocessedChunks = []
   for (let i = 0; i < blocksAfterPass0.length; i += maxBlocksPerChunk) {
@@ -620,7 +685,7 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] === PASS 1: General corrections on ${preprocessedChunks.length} chunks in parallel ===`)
 
   const pass1Chunks = await Promise.all(
-    preprocessedChunks.map(chunk => correctWithClaude(chunk, 'sonnet', 1))
+    preprocessedChunks.map(chunk => correctWithClaude(chunk, modelType, 1))
   )
   const pass1Blocks = pass1Chunks.flat()
 
@@ -676,19 +741,19 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] ${chunksNeedingPass2.length}/${chunks.length} chunks need pass 2`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 2 : Correction ciblée (ministères + formules de politesse)
+  // PASSE 2 : Institutions + formatage
   // ═══════════════════════════════════════════════════════════════
   let blocksAfterPass2 = [...blocksAfterPass1]
 
   if (chunksNeedingPass2.length > 0) {
-    console.log(`[processSRT] === PASS 2: Ministries + politeness formulas on ${chunksNeedingPass2.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 2: Institutions + formatting on ${chunksNeedingPass2.length} chunks in parallel ===`)
 
     const pass2Results = await Promise.all(
-      chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 2))
+      chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, modelType, 2))
     )
     const pass2Blocks = pass2Results.flat()
 
-    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with ministries + politeness corrections`)
+    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with institutions + formatting corrections`)
 
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner les corrections de la passe 1 et de la passe 2
@@ -724,19 +789,19 @@ async function processSRT(srtContent) {
   console.log(`[processSRT] ${chunksNeedingPass3.length}/${chunks.length} chunks need pass 3`)
 
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 3 : Correction ciblée (4 règles : institutions, milliers, traits d'union, majuscules)
+  // PASSE 3 : Ministères + formules de politesse (après institutions)
   // ═══════════════════════════════════════════════════════════════
   let blocksAfterPass3 = [...blocksAfterPass2]
 
   if (chunksNeedingPass3.length > 0) {
-    console.log(`[processSRT] === PASS 3: Institutions + formatting rules on ${chunksNeedingPass3.length} chunks in parallel ===`)
+    console.log(`[processSRT] === PASS 3: Ministries + politeness formulas on ${chunksNeedingPass3.length} chunks in parallel ===`)
 
     const pass3Results = await Promise.all(
-      chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 3))
+      chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, modelType, 3))
     )
     const pass3Blocks = pass3Results.flat()
 
-    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with institutions + formatting corrections`)
+    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with ministries + politeness corrections`)
 
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner les corrections (passe 1 + 2 + 3)
@@ -749,27 +814,35 @@ async function processSRT(srtContent) {
   // ═══════════════════════════════════════════════════════════════
   const chunksNeedingPass4 = []
 
+  // Filtrer pour n'envoyer que les chunks contenant "je/Je/J'/j'"
+  // Économise les appels API en excluant les chunks sans "je"
   chunks.forEach((originalChunk, chunkIndex) => {
-    if (needsPass4(originalChunk)) {
-      // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
-      const correctedChunk = originalChunk.map(originalBlock => {
-        const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
-        if (!blockAfterPass3) {
-          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 3!`)
-          return originalBlock
-        }
-        // Créer un bloc avec le texte corrigé de la passe 3 comme "texte d'entrée"
-        return {
-          index: blockAfterPass3.index,
-          timecode: blockAfterPass3.timecode,
-          text: blockAfterPass3.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
-        }
-      })
-      chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
+    // Vérifier si le chunk contient "je" (toute casse : je/Je/JE) ou "j'" (apostrophe droite/courbe)
+    const chunkText = originalChunk.map(b => b.text).join(' ')
+    const containsJe = /\bje\b|\bj['\u2019]/i.test(chunkText)
+
+    if (!containsJe) {
+      return // Skip ce chunk, pas de "je"
     }
+
+    // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
+    const correctedChunk = originalChunk.map(originalBlock => {
+      const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
+      if (!blockAfterPass3) {
+        console.error(`[processSRT] Block ${originalBlock.index} not found after pass 3!`)
+        return originalBlock
+      }
+      // Créer un bloc avec le texte corrigé de la passe 3 comme "texte d'entrée"
+      return {
+        index: blockAfterPass3.index,
+        timecode: blockAfterPass3.timecode,
+        text: blockAfterPass3.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+      }
+    })
+    chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
   })
 
-  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks need pass 4`)
+  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks sent to pass 4 (filtered by "je")`)
 
   // ═══════════════════════════════════════════════════════════════
   // PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée)
@@ -779,17 +852,33 @@ async function processSRT(srtContent) {
   if (chunksNeedingPass4.length > 0) {
     console.log(`[processSRT] === PASS 4: Gender ambiguity ONLY on ${chunksNeedingPass4.length} chunks in parallel ===`)
 
+    // DEBUG: Afficher le contenu des chunks envoyés à Pass 4
+    console.log(`[DEBUG Pass 4] First chunk content:`, chunksNeedingPass4[0]?.chunk.slice(0, 3).map(b => b.text))
+
     const pass4Results = await Promise.all(
-      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, 'sonnet', 4))
+      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4, debugLogs))
     )
     const pass4Blocks = pass4Results.flat()
 
     console.log(`[processSRT] Pass 4 completed: ${pass4Blocks.length} blocks with gender ambiguity suggestions`)
 
+    // DEBUG: Afficher les corrections détectées par Pass 4
+    const blocksWithCorrections = pass4Blocks.filter(b => b.corrections && b.corrections.length > 0)
+    console.log(`[DEBUG Pass 4] Blocks with corrections: ${blocksWithCorrections.length}/${pass4Blocks.length}`)
+    if (blocksWithCorrections.length > 0) {
+      console.log(`[DEBUG Pass 4] First correction example:`, JSON.stringify(blocksWithCorrections[0], null, 2))
+    } else {
+      console.log(`[DEBUG Pass 4] No corrections found - checking first 3 blocks:`)
+      pass4Blocks.slice(0, 3).forEach(b => {
+        console.log(`  Block #${b.index}: "${b.original}" -> corrections: ${b.corrections?.length || 0}`)
+      })
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // FUSION : Combiner toutes les corrections (passe 1 + 2 + 3 + 4)
     // ═══════════════════════════════════════════════════════════════
-    finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, blocks)
+    // IMPORTANT : Pass 4 travaille sur le texte APRÈS Pass 3, donc on valide contre blocksAfterPass3, pas blocks original
+    finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, blocksAfterPass3)
   }
 
   const endTime = Date.now()
@@ -798,13 +887,16 @@ async function processSRT(srtContent) {
   console.log(`[processSRT]   Total blocks: ${blocks.length}`)
   console.log(`[processSRT]   Pass 0 (regex): ${pass0CorrectionsCount} blocks`)
   console.log(`[processSRT]   Pass 1 (general): ${pass1Blocks.length} blocks`)
-  console.log(`[processSRT]   Pass 2 (ministries + politeness): ${chunksNeedingPass2.length} chunks`)
-  console.log(`[processSRT]   Pass 3 (institutions + formatting): ${chunksNeedingPass3.length} chunks`)
+  console.log(`[processSRT]   Pass 2 (institutions + formatting): ${chunksNeedingPass2.length} chunks`)
+  console.log(`[processSRT]   Pass 3 (ministries + politeness): ${chunksNeedingPass3.length} chunks`)
   console.log(`[processSRT]   Pass 4 (gender ambiguity ONLY): ${chunksNeedingPass4.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
-  return finalBlocks
+  return {
+    blocks: finalBlocks,
+    debugLogs: debugLogs
+  }
 }
 
 /**
@@ -940,7 +1032,7 @@ Format de réponse JSON :
       "original": "texte EXACT du bloc (non modifié)",
       "corrected": "texte du bloc avec TOUTES les corrections APPLIQUÉES",
       "corrections": [
-        {"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}
+        {"type": "fault", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}
       ]
     }
   ]
@@ -951,14 +1043,56 @@ IMPORTANT:
 - "corrected" = texte avec TOUTES les fautes corrigées
 - "corrections" = liste des corrections individuelles
 
-Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté)
+Types : "fault" (faute à corriger), "doubt" (ambiguïté)
 Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
 /**
- * PASSE 2 : Ministères + Formules de politesse
+ * PASSE 2 : Institutions + formatage
  */
 function buildSystemPromptPass2() {
+  return `Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique ces règles :
+
+1. INSTITUTIONS :
+   ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
+   ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
+
+2. ESPACES MILLIERS + ORDINAUX :
+   ✗ 10000, 1000e
+   ✓ 10 000, 1 000 e
+
+3. TRAITS D'UNION :
+   ✗ au dela, par dessus, rendez vous, au dessus, en dessous
+   ✓ au-delà, par-dessus, rendez-vous, au-dessus, en-dessous
+
+4. MAJUSCULES ABUSIVES :
+   ✗ la Plaque, le Bâtiment
+   ✓ la plaque, le bâtiment
+
+Format JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
+      "corrections": [
+        {"type": "fault", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
+        {"type": "fault", "original": "au dela", "corrected": "au-delà", "reason": "Trait d'union manquant"},
+        {"type": "fault", "original": "10000", "corrected": "10 000", "reason": "Espace milliers"}
+      ]
+    }
+  ]
+}
+
+IMPORTANT : Toutes les corrections sont de type "fault"`
+}
+
+/**
+ * PASSE 3 : Ministères + Formules de politesse (après institutions)
+ */
+function buildSystemPromptPass3() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
 Applique CES DEUX règles :
 
@@ -988,92 +1122,60 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "...", "corrected": "...", "reason": "..."}
+        {"type": "fault", "original": "...", "corrected": "...", "reason": "..."}
       ]
     }
   ]
-}`
 }
 
-/**
- * PASSE 3 : Autres règles spécifiques (après ministères et formules de politesse)
- */
-function buildSystemPromptPass3() {
-  return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique ces règles :
-
-1. INSTITUTIONS :
-   ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
-   ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
-
-2. ESPACES MILLIERS + ORDINAUX :
-   ✗ 10000, 1000e
-   ✓ 10 000, 1 000 e
-
-3. TRAITS D'UNION :
-   ✗ au dela, par dessus
-   ✓ au-delà, par-dessus
-
-4. MAJUSCULES ABUSIVES :
-   ✗ la Plaque, le Bâtiment
-   ✓ la plaque, le bâtiment
-
-Format JSON :
-{
-  "blocks": [
-    {
-      "index": 1,
-      "original": "texte reçu",
-      "corrected": "texte corrigé",
-      "corrections": [
-        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"}
-      ]
-    }
-  ]
-}`
+IMPORTANT : Toutes les corrections sont de type "fault"`
 }
 
 /**
  * PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée pour fiabilité)
  */
 function buildSystemPromptPass4() {
-  return `Tu reçois un texte DÉJÀ CORRIGÉ.
-Applique UNIQUEMENT cette règle :
+  return `Tu corriges des sous-titres français.
 
-AMBIGUÏTÉ DE GENRE :
-TYPE OBLIGATOIRE: "doubt" (PAS "major" !)
-NE PAS corriger, SUGGÉRER l'autre forme avec "ou"
+RÈGLE UNIQUE À APPLIQUER :
+Quand tu vois "je" + verbe d'état (être, devenir, rester, paraître, sembler, etc.) + adjectif/participe passé accordable,
+tu DOIS créer UNE SEULE correction de type "doubt" qui englobe TOUTE l'expression "je + verbe + adjectif".
 
-Quand tu vois "je" + participe passé, ajoute l'AUTRE forme entre parenthèses :
-- je suis engagé → je suis engagé (ou engagée)
-- je suis venue → je suis venue (ou venu)
-- je suis allé → je suis allé (ou allée)
-- je suis parti → je suis parti (ou partie)
-- je suis arrivé → je suis arrivé (ou arrivée)
+IMPORTANT : Ne crée qu'UNE SEULE correction par ambiguïté détectée, pas plusieurs variations du même cas.
 
-✗ INCORRECT : je suis venu → je suis venue (correction)
-✓ CORRECT : je suis venu → je suis venu (ou venue) (suggestion)
+POURQUOI ? Dans un sous-titre, on ne sait pas si "je" est un homme ou une femme.
 
-C'est une SUGGESTION, pas une correction !
+EXEMPLES :
+- "je suis venu" → corrected: "je suis venu", alternative: "je suis venue"
+- "je suis engagée" → corrected: "je suis engagée", alternative: "je suis engagé"
+- "je reste très attachée" → corrected: "je reste très attachée", alternative: "je reste très attaché"
+- "je ne suis plus compétitrice" → corrected: "je ne suis plus compétitrice", alternative: "je ne suis plus compétiteur"
+- "Je semble perdue" → corrected: "Je semble perdue", alternative: "Je semble perdu"
 
-Format JSON :
+FORMAT DE RÉPONSE :
 {
   "blocks": [
     {
       "index": 1,
-      "original": "texte reçu",
-      "corrected": "texte corrigé",
+      "original": "texte exact reçu",
+      "corrected": "texte exact reçu",
       "corrections": [
-        {"type": "doubt", "original": "je suis engagé", "corrected": "je suis engagé (ou engagée)", "reason": "Ambiguïté de genre"}
+        {
+          "type": "doubt",
+          "original": "je suis venu",
+          "corrected": "je suis venu",
+          "alternative": "je suis venue",
+          "reason": "Genre du locuteur inconnu"
+        }
       ]
     }
   ]
 }
 
-RAPPEL CRITIQUE:
-- Type = "doubt" (JAMAIS "major")
-- Ajouter "(ou ...)" à la fin
-- NE PAS remplacer, COMPLÉTER`
+NOTES :
+- "corrected" doit être identique à "original" (forme du texte)
+- "alternative" doit contenir l'autre forme de genre
+- Si aucune ambiguïté trouvée : {"blocks": []}`
 }
 
 /**
@@ -1127,10 +1229,10 @@ async function fetchWithRetry(url, options, maxRetries = 4) {
 /**
  * Correction avec Claude + Prompt Caching
  * @param {Array} blocks - Blocs SRT à corriger
- * @param {string} modelType - Type de modèle : 'sonnet' (qualité max) ou 'haiku' (vitesse max)
+ * @param {string} modelType - Type de modèle : 'haiku' (rapide, par défaut) ou 'sonnet' (qualité max)
  * @param {number} pass - Numéro de passe : 1 (général), 2 (ministères + politesse), 3 (4 règles), 4 (genre UNIQUEMENT)
  */
-async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
+async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLogs = null) {
   // Choisir le modèle selon le type
   const modelConfig = {
     sonnet: {
@@ -1152,6 +1254,21 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
                        buildSystemPromptPass4()
 
   console.log(`[correctWithClaude] Pass ${pass} - Using model: ${config.name} for ${blocks.length} blocks`)
+
+  // DEBUG Pass 4 : Log du user prompt pour voir ce qu'on envoie
+  if (pass === 4) {
+    const userPrompt = buildUserPrompt(blocks)
+    console.log(`[DEBUG Pass 4] User prompt (first 1000 chars):`, userPrompt.substring(0, 1000))
+    // Ajouter aux logs de debug pour le frontend
+    if (debugLogs) {
+      debugLogs.push({
+        type: 'pass4_user_prompt',
+        content: userPrompt,
+        blocksCount: blocks.length,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
 
   const response = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -1195,6 +1312,20 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
 
   // Log de la réponse brute pour debugging (premiers 500 caractères)
   console.log(`[correctWithClaude] Pass ${pass} - Raw response preview: ${content.substring(0, 500)}...`)
+
+  // DEBUG Pass 4 : Log complet de la réponse pour comprendre pourquoi aucune correction
+  if (pass === 4) {
+    console.log(`[DEBUG Pass 4] FULL Claude response:`, content)
+    // Ajouter aux logs de debug pour le frontend
+    if (debugLogs) {
+      debugLogs.push({
+        type: 'pass4_claude_response',
+        content: content,
+        blocksCount: blocks.length,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
 
   // Nettoyer la réponse (enlever les balises markdown si présentes)
   // Claude Sonnet 4.5 retourne parfois ```json ... ``` au lieu de JSON pur
@@ -1302,7 +1433,7 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
 
     // Réinjecter les timecodes et valider les corrections
     const validatedBlocks = correctedBlocks.map(correctedBlock => {
-      const originalBlock = blocks.find(b => b.index === correctedBlock.index)
+      let originalBlock = blocks.find(b => b.index === correctedBlock.index)
 
       // VALIDATION CRITIQUE : Vérifier que le bloc retourné par Claude correspond bien
       if (!originalBlock) {
@@ -1312,14 +1443,45 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
 
       // Valider que l'original retourné par Claude correspond au texte du bloc
       const normalizedClaudeOriginal = correctedBlock.original?.toLowerCase().trim()
-      const normalizedBlockText = originalBlock.text.toLowerCase().trim()
+      let normalizedBlockText = originalBlock.text.toLowerCase().trim()
 
       if (normalizedClaudeOriginal && normalizedClaudeOriginal !== normalizedBlockText) {
-        console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
-        console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
-        console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
-        // Ne pas retourner ce bloc, il y a une confusion d'index
-        return null
+        // Pour Pass 4, Claude peut se tromper d'index de ±1 car il y a beaucoup de blocs
+        // Cherchons le bon bloc dans les blocs adjacents
+        if (pass === 4) {
+          const adjacentBlocks = [
+            blocks.find(b => b.index === correctedBlock.index - 1),
+            blocks.find(b => b.index === correctedBlock.index + 1)
+          ].filter(Boolean)
+
+          let foundCorrectBlock = null
+          for (const adjacentBlock of adjacentBlocks) {
+            const normalizedAdjacent = adjacentBlock.text.toLowerCase().trim()
+            if (normalizedAdjacent === normalizedClaudeOriginal) {
+              foundCorrectBlock = adjacentBlock
+              console.log(`[correctWithClaude] Pass 4 - Block #${correctedBlock.index}: Index mismatch, found correct text in block #${adjacentBlock.index}`)
+              break
+            }
+          }
+
+          if (foundCorrectBlock) {
+            // Utiliser le bon bloc et corriger l'index
+            originalBlock = foundCorrectBlock
+            normalizedBlockText = foundCorrectBlock.text.toLowerCase().trim()
+            correctedBlock.index = foundCorrectBlock.index
+          } else {
+            console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text and no adjacent match found`)
+            console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+            console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
+            return null
+          }
+        } else {
+          console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
+          console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+          console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
+          // Ne pas retourner ce bloc, il y a une confusion d'index
+          return null
+        }
       }
 
       // Valider les corrections individuellement
@@ -1333,17 +1495,54 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
 
           // VALIDATION : Vérifier que la correction appartient bien à ce bloc
           const blockTextToCheck = pass === 1 ? originalBlock.text : originalBlock.text  // Pour pass 2, on vérifie contre le texte d'entrée
+
+          // DEBUG Pass 4 : Log validation
+          if (pass === 4) {
+            const validationInfo = {
+              blockIndex: correctedBlock.index,
+              correctionOriginal: correction.original,
+              blockText: blockTextToCheck,
+              contains: blockTextToCheck.toLowerCase().includes(correction.original.toLowerCase())
+            }
+            console.log(`[DEBUG Pass 4 Validation] Block #${correctedBlock.index}:`)
+            console.log(`  - Correction original: "${correction.original}"`)
+            console.log(`  - Block text to check: "${blockTextToCheck}"`)
+            console.log(`  - Does block contain correction? ${validationInfo.contains}`)
+
+            if (debugLogs) {
+              debugLogs.push({
+                type: 'pass4_validation',
+                ...validationInfo,
+                timestamp: new Date().toISOString()
+              })
+            }
+          }
+
           if (!validateCorrectionBelongsToBlock(correction, blockTextToCheck, correctedBlock.index)) {
             console.warn(`[correctWithClaude] Pass ${pass} - Rejecting correction from block #${correctedBlock.index}: "${correction.original}" → "${correction.corrected}"`)
+            if (pass === 4) {
+              console.log(`[DEBUG Pass 4] REJECTED - Block text: "${blockTextToCheck}"`)
+              if (debugLogs) {
+                debugLogs.push({
+                  type: 'pass4_rejection',
+                  blockIndex: correctedBlock.index,
+                  correctionOriginal: correction.original,
+                  correctionCorrected: correction.corrected,
+                  blockText: blockTextToCheck,
+                  timestamp: new Date().toISOString()
+                })
+              }
+            }
             return false
           }
 
           return true
         }).map(correction => {
           // Nettoyer les annotations dans les corrections individuelles
+          // SAUF pour Pass 4 où les parenthèses font partie de la correction (genre)
           return {
             ...correction,
-            corrected: cleanAnnotations(correction.corrected)
+            corrected: pass === 4 ? correction.corrected : cleanAnnotations(correction.corrected)
           }
         })
       }
@@ -1373,6 +1572,20 @@ async function correctWithClaude(blocks, modelType = 'sonnet', pass = 1) {
     // Log le nombre de blocs rejetés
     if (validatedBlocks.length < correctedBlocks.length) {
       console.log(`[correctWithClaude] Pass ${pass} - Rejected ${correctedBlocks.length - validatedBlocks.length} blocks due to validation failures`)
+    }
+
+    // DEBUG Pass 4 : Log final des corrections retournées
+    if (pass === 4) {
+      const totalCorrections = validatedBlocks.reduce((sum, block) => sum + (block.corrections?.length || 0), 0)
+      console.log(`[DEBUG Pass 4] Returning ${validatedBlocks.length} blocks with ${totalCorrections} total corrections`)
+      validatedBlocks.forEach(block => {
+        if (block.corrections && block.corrections.length > 0) {
+          console.log(`  Block #${block.index}: ${block.corrections.length} correction(s)`)
+          block.corrections.forEach(c => {
+            console.log(`    - "${c.original}" → "${c.corrected}"`)
+          })
+        }
+      })
     }
 
     return validatedBlocks

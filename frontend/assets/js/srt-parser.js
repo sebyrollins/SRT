@@ -272,22 +272,20 @@ const SRTParser = {
    */
   calculateStats(blocks) {
     let total = 0
-    let minor = 0
-    let major = 0
+    let fault = 0
     let doubt = 0
 
     blocks.forEach(block => {
       if (block.corrections && block.corrections.length > 0) {
         block.corrections.forEach(correction => {
           total++
-          if (correction.type === 'minor') minor++
-          else if (correction.type === 'major') major++
+          if (correction.type === 'fault') fault++
           else if (correction.type === 'doubt') doubt++
         })
       }
     })
 
-    return { total, minor, major, doubt }
+    return { total, fault, doubt }
   },
 
   /**
