@@ -147,7 +147,7 @@ function preProcessWithRegex(text) {
   const trimmed = corrected.trim()
   if (trimmed !== corrected) {
     corrections.push({
-      type: 'minor',
+      type: 'fault',
       original: corrected,
       corrected: trimmed,
       reason: 'Espaces en début/fin'
@@ -160,7 +160,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/\.\.\./g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: '...',
         corrected: '…',
         reason: 'Ellipsis typographique'
@@ -174,7 +174,7 @@ function preProcessWithRegex(text) {
     const beforeSpaces = corrected.match(/ {2,}/g)
     if (beforeSpaces && beforeSpaces.length > 0) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: beforeSpaces[0],
         corrected: ' ',
         reason: 'Espaces multiples'
@@ -188,7 +188,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/ ([,.])/g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].trim(),
         reason: 'Espace avant ponctuation'
@@ -203,7 +203,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/([;:!?]) /g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(' ', '\u00A0'),
         reason: 'Espace insécable après ponctuation haute'
@@ -217,7 +217,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/"([^"]+)"/g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(/"/g, '«').replace(/«([^«]+)«/g, '«\u00A0$1\u00A0»'),
         reason: 'Guillemets français'
@@ -231,7 +231,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/\b([ldnjmtsc])'\s+/gi)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(/'\s+/, "'"),
         reason: 'Espace après apostrophe'
@@ -245,7 +245,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(/([,;])\1/g)
     if (matches) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0][0],
         reason: 'Ponctuation doublée'
@@ -292,7 +292,7 @@ function preProcessWithRegex(text) {
     const matches = corrected.match(pattern)
     if (matches && matches.length > 0) {
       corrections.push({
-        type: 'minor',
+        type: 'fault',
         original: matches[0],
         corrected: matches[0].replace(pattern, replacement),
         reason: `Espace insécable avant unité (${unit})`
@@ -963,7 +963,7 @@ Format de réponse JSON :
       "original": "texte EXACT du bloc (non modifié)",
       "corrected": "texte du bloc avec TOUTES les corrections APPLIQUÉES",
       "corrections": [
-        {"type": "major", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}
+        {"type": "fault", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}
       ]
     }
   ]
@@ -974,7 +974,7 @@ IMPORTANT:
 - "corrected" = texte avec TOUTES les fautes corrigées
 - "corrections" = liste des corrections individuelles
 
-Types : "major" (fautes importantes), "minor" (typographie), "doubt" (ambiguïté)
+Types : "fault" (faute à corriger), "doubt" (ambiguïté)
 Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.`
 }
 
@@ -985,20 +985,19 @@ function buildSystemPromptPass2() {
   return `Tu reçois un texte DÉJÀ CORRIGÉ.
 Applique ces règles :
 
-1. INSTITUTIONS (type: major) :
+1. INSTITUTIONS :
    ✗ le gouvernement, l'assemblée nationale, le sénat, le parlement
    ✓ le Gouvernement, l'Assemblée nationale, le Sénat, le Parlement
 
-2. ESPACES MILLIERS + ORDINAUX (type: minor) :
+2. ESPACES MILLIERS + ORDINAUX :
    ✗ 10000, 1000e
    ✓ 10 000, 1 000 e
 
-3. TRAITS D'UNION - FAUTES D'ORTHOGRAPHE (type: major) :
+3. TRAITS D'UNION :
    ✗ au dela, par dessus, rendez vous, au dessus, en dessous
    ✓ au-delà, par-dessus, rendez-vous, au-dessus, en-dessous
-   IMPORTANT : Les traits d'union manquants sont des FAUTES MAJEURES, pas de la typographie !
 
-4. MAJUSCULES ABUSIVES (type: minor) :
+4. MAJUSCULES ABUSIVES :
    ✗ la Plaque, le Bâtiment
    ✓ la plaque, le bâtiment
 
@@ -1010,18 +1009,15 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
-        {"type": "major", "original": "au dela", "corrected": "au-delà", "reason": "Trait d'union manquant"},
-        {"type": "minor", "original": "10000", "corrected": "10 000", "reason": "Espace milliers"}
+        {"type": "fault", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
+        {"type": "fault", "original": "au dela", "corrected": "au-delà", "reason": "Trait d'union manquant"},
+        {"type": "fault", "original": "10000", "corrected": "10 000", "reason": "Espace milliers"}
       ]
     }
   ]
 }
 
-IMPORTANT :
-- Traits d'union manquants = type "major" (faute d'orthographe)
-- Espaces milliers/ordinaux = type "minor" (formatage)
-- Majuscules abusives = type "minor" (formatage)`
+IMPORTANT : Toutes les corrections sont de type "fault"`
 }
 
 /**
@@ -1057,11 +1053,13 @@ Format JSON :
       "original": "texte reçu",
       "corrected": "texte corrigé",
       "corrections": [
-        {"type": "major", "original": "...", "corrected": "...", "reason": "..."}
+        {"type": "fault", "original": "...", "corrected": "...", "reason": "..."}
       ]
     }
   ]
-}`
+}
+
+IMPORTANT : Toutes les corrections sont de type "fault"`
 }
 
 /**

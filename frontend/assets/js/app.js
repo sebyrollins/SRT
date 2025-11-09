@@ -28,14 +28,12 @@ const DOM = {
   statsBar: null,
   statBlocks: null,
   statTotal: null,
-  statMinor: null,
-  statMajor: null,
+  statFault: null,
   statDoubt: null,
   progressGaugeFill: null,
   progressGaugeValue: null,
   validateAllBtn: null,
-  validateMinorBtn: null,
-  validateMajorBtn: null,
+  validateFaultBtn: null,
   validateDoubtBtn: null,
   resetStateBtn: null,
   downloadSrtBtn: null,
@@ -78,14 +76,12 @@ function initDOM() {
   DOM.statsBar = document.getElementById('statsBar')
   DOM.statBlocks = document.getElementById('statBlocks')
   DOM.statTotal = document.getElementById('statTotal')
-  DOM.statMinor = document.getElementById('statMinor')
-  DOM.statMajor = document.getElementById('statMajor')
+  DOM.statFault = document.getElementById('statFault')
   DOM.statDoubt = document.getElementById('statDoubt')
   DOM.progressGaugeFill = document.getElementById('progressGaugeFill')
   DOM.progressGaugeValue = document.getElementById('progressGaugeValue')
   DOM.validateAllBtn = document.getElementById('validateAllBtn')
-  DOM.validateMinorBtn = document.getElementById('validateMinorBtn')
-  DOM.validateMajorBtn = document.getElementById('validateMajorBtn')
+  DOM.validateFaultBtn = document.getElementById('validateFaultBtn')
   DOM.validateDoubtBtn = document.getElementById('validateDoubtBtn')
   DOM.resetStateBtn = document.getElementById('resetStateBtn')
   DOM.downloadSrtBtn = document.getElementById('downloadSrtBtn')
@@ -114,12 +110,8 @@ function initEventListeners() {
     DOM.validateAllBtn.addEventListener('click', () => validateCorrections('all'))
   }
 
-  if (DOM.validateMinorBtn) {
-    DOM.validateMinorBtn.addEventListener('click', () => validateCorrections('minor'))
-  }
-
-  if (DOM.validateMajorBtn) {
-    DOM.validateMajorBtn.addEventListener('click', () => validateCorrections('major'))
+  if (DOM.validateFaultBtn) {
+    DOM.validateFaultBtn.addEventListener('click', () => validateCorrections('fault'))
   }
 
   if (DOM.validateDoubtBtn) {
@@ -411,38 +403,6 @@ function cleanPhantomCorrections(blocks) {
         const normalizedOriginal = correction.original.normalize('NFC').trim()
         const normalizedCorrected = correction.corrected.normalize('NFC').trim()
 
-        // Si c'est une correction typographique (minor) et que les textes sont identiques,
-        // forcer la correction réelle
-        if (correction.type === 'minor' && normalizedOriginal === normalizedCorrected) {
-          // Appliquer les corrections typographiques que l'IA n'a pas faites
-          let fixed = correction.corrected
-
-          // Apostrophe droite → courbe (U+2019)
-          fixed = fixed.replace(/'/g, '\u2019')
-
-          // Guillemets droits → français
-          fixed = fixed.replace(/"([^"]+)"/g, '\u00AB $1 \u00BB')
-
-          // Trois points → ellipsis (U+2026)
-          fixed = fixed.replace(/\.\.\./g, '\u2026')
-
-          // Si après correction le texte est toujours identique, c'est un vrai fantôme
-          if (fixed === normalizedOriginal) {
-            removed.push({
-              original: correction.original,
-              corrected: correction.corrected,
-              type: correction.type,
-              reason: correction.reason + ' (phantom - vraiment identique)'
-            })
-            return false // Supprimer
-          }
-
-          // Sinon, appliquer la correction forcée
-          correction.corrected = fixed
-          console.log(`Bloc #${block.index}: Correction typographique forcée: "${correction.original}" → "${fixed}"`)
-          return true // Garder
-        }
-
         // Pour les corrections de type "doubt", c'est NORMAL que original === corrected
         // (corrected = forme dans l'original, alternative = autre forme)
         // Ne PAS les supprimer si elles ont un champ "alternative"
@@ -450,7 +410,7 @@ function cleanPhantomCorrections(blocks) {
           return true // Garder les corrections de doute avec alternative
         }
 
-        // Pour les autres types (major), vérifier si vraiment identiques
+        // Pour les autres types (fault), vérifier si vraiment identiques
         const isPhantom = normalizedOriginal === normalizedCorrected
 
         if (isPhantom) {
@@ -705,27 +665,22 @@ function renderBlocksTable() {
 
     // Déterminer le type de correction dominant pour la classe CSS
     // Les blocs où TOUTES les corrections sont validées n'ont PAS de fond coloré
-    // Priorité basée sur les corrections NON validées : majeur > doute > mineur
+    // Priorité basée sur les corrections NON validées : fault > doubt
     let rowClass = 'row-no-correction'
     if (block.corrections && block.corrections.length > 0 && !allValidated) {
       // Vérifier quelles corrections ne sont PAS validées
-      const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
-        c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+      const hasUnvalidatedFault = block.corrections.some((c, idx) =>
+        c.type === 'fault' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
       )
       const hasUnvalidatedDoubt = block.corrections.some((c, idx) =>
         c.type === 'doubt' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
       )
-      const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
-        c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-      )
 
       // Appliquer la couleur selon la priorité des corrections non validées
-      if (hasUnvalidatedMajor) {
-        rowClass = 'row-has-major'
+      if (hasUnvalidatedFault) {
+        rowClass = 'row-has-fault'
       } else if (hasUnvalidatedDoubt) {
         rowClass = 'row-has-doubt'
-      } else if (hasUnvalidatedMinor) {
-        rowClass = 'row-has-minor'
       }
     }
 
@@ -888,7 +843,7 @@ function renderBlocksTable() {
           cardEl.innerHTML = `
             <div class="validation-header">
               <span class="validation-type-badge badge-${correction.type}">
-                ${correction.type === 'major' ? 'MAJEURE' : correction.type === 'doubt' ? 'DOUTE' : 'MINEURE'}
+                ${correction.type === 'doubt' ? 'DOUTE' : 'FAUTE'}
               </span>
             </div>
             <div class="validation-correction">
@@ -1488,7 +1443,7 @@ function editCorrection(blockIndex, corrIndex) {
         correction.reason = 'Modifié manuellement'
       } else {
         // Remis comme la suggestion → repasser au type original
-        correction.type = correction.originalType || 'major'
+        correction.type = correction.originalType || 'fault'
         // Restaurer la raison originale
         correction.reason = correction.originalReason
       }
@@ -1581,8 +1536,7 @@ function validateCorrections(type) {
 
     block.corrections.forEach((correction, corrIndex) => {
       if (type === 'all' ||
-          (type === 'minor' && correction.type === 'minor') ||
-          (type === 'major' && correction.type === 'major') ||
+          (type === 'fault' && correction.type === 'fault') ||
           (type === 'doubt' && correction.type === 'doubt')) {
 
         const correctionId = `${block.index}-${corrIndex}`
@@ -1965,8 +1919,7 @@ function updateStats(stats) {
 
   if (DOM.statBlocks) DOM.statBlocks.textContent = totalBlocks
   if (DOM.statTotal) DOM.statTotal.textContent = stats.total
-  if (DOM.statMinor) DOM.statMinor.textContent = stats.minor
-  if (DOM.statMajor) DOM.statMajor.textContent = stats.major
+  if (DOM.statFault) DOM.statFault.textContent = stats.fault
   if (DOM.statDoubt) DOM.statDoubt.textContent = stats.doubt
 
   // Activer/désactiver les boutons de filtre selon les compteurs
@@ -1978,11 +1931,8 @@ function updateStats(stats) {
       case 'all':
         count = blocksWithCorrections  // Utiliser le nombre de blocs au lieu du total de fautes
         break
-      case 'minor':
-        count = stats.minor
-        break
-      case 'major':
-        count = stats.major
+      case 'fault':
+        count = stats.fault
         break
       case 'doubt':
         count = stats.doubt
@@ -2066,8 +2016,7 @@ function updateStats(stats) {
  */
 function updateValidationButtonsState(stats) {
   // Compter combien de corrections de chaque type sont validées
-  let validatedMinorCount = 0
-  let validatedMajorCount = 0
+  let validatedFaultCount = 0
   let validatedDoubtCount = 0
 
   AppState.blocks.forEach(block => {
@@ -2075,27 +2024,20 @@ function updateValidationButtonsState(stats) {
     block.corrections.forEach((correction, corrIndex) => {
       const correctionId = `${block.index}-${corrIndex}`
       if (AppState.validatedCorrections.has(correctionId)) {
-        if (correction.type === 'minor') validatedMinorCount++
-        else if (correction.type === 'major') validatedMajorCount++
+        if (correction.type === 'fault') validatedFaultCount++
         else if (correction.type === 'doubt') validatedDoubtCount++
       }
     })
   })
 
   // Désactiver/activer les boutons en fonction
-  const allMinorValidated = stats.minor > 0 && validatedMinorCount === stats.minor
-  const allMajorValidated = stats.major > 0 && validatedMajorCount === stats.major
+  const allFaultValidated = stats.fault > 0 && validatedFaultCount === stats.fault
   const allDoubtValidated = stats.doubt > 0 && validatedDoubtCount === stats.doubt
   const allValidated = stats.total > 0 && AppState.validatedCorrections.size === stats.total
 
-  if (DOM.validateMinorBtn) {
-    DOM.validateMinorBtn.disabled = allMinorValidated || stats.minor === 0
-    DOM.validateMinorBtn.classList.toggle('btn-disabled', allMinorValidated || stats.minor === 0)
-  }
-
-  if (DOM.validateMajorBtn) {
-    DOM.validateMajorBtn.disabled = allMajorValidated || stats.major === 0
-    DOM.validateMajorBtn.classList.toggle('btn-disabled', allMajorValidated || stats.major === 0)
+  if (DOM.validateFaultBtn) {
+    DOM.validateFaultBtn.disabled = allFaultValidated || stats.fault === 0
+    DOM.validateFaultBtn.classList.toggle('btn-disabled', allFaultValidated || stats.fault === 0)
   }
 
   if (DOM.validateDoubtBtn) {
@@ -2253,32 +2195,29 @@ function getBlockMinimapClass(block) {
   }
 
   // Si toutes validées, vérifier le type pour la couleur
-  // Priorité : majeur > doute > mineur
+  // Priorité : fault > doubt
   if (allValidated) {
-    const hasMajor = block.corrections.some(c => c.type === 'major')
+    const hasFault = block.corrections.some(c => c.type === 'fault')
     const hasDoubt = block.corrections.some(c => c.type === 'doubt')
-    const hasMinor = block.corrections.some(c => c.type === 'minor')
 
-    if (hasMajor) {
+    if (hasFault) {
       return 'minimap-validated'
     } else if (hasDoubt) {
       return 'minimap-validated-doubt'
-    } else if (hasMinor) {
-      return 'minimap-validated-minor'
     } else {
       return 'minimap-validated'
     }
   }
 
   // Non validées : déterminer le type dominant
-  // Nouvelle priorité : majeure non validée > doute (validé ou non) > mineure
-  const hasUnvalidatedMajor = block.corrections.some((c, idx) =>
-    c.type === 'major' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
+  // Priorité : fault non validée > doubt (validé ou non)
+  const hasUnvalidatedFault = block.corrections.some((c, idx) =>
+    c.type === 'fault' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
   )
 
-  // Si une majeure non validée existe, priorité absolue
-  if (hasUnvalidatedMajor) {
-    return 'minimap-major'
+  // Si une faute non validée existe, priorité absolue
+  if (hasUnvalidatedFault) {
+    return 'minimap-fault'
   }
 
   // Sinon, vérifier si le bloc contient au moins un doute (validé ou non)
@@ -2287,15 +2226,7 @@ function getBlockMinimapClass(block) {
     return 'minimap-doubt'
   }
 
-  // Sinon, vérifier s'il reste des mineures non validées
-  const hasUnvalidatedMinor = block.corrections.some((c, idx) =>
-    c.type === 'minor' && !AppState.validatedCorrections.has(`${block.index}-${idx}`)
-  )
-  if (hasUnvalidatedMinor) {
-    return 'minimap-minor'
-  }
-
-  // Tout est validé (aucune majeure non validée, aucun doute, aucune mineure non validée)
+  // Tout est validé
   return 'minimap-validated'
 }
 
@@ -2310,7 +2241,7 @@ function updateMinimap() {
     if (!minimapBlock) return
 
     // Retirer toutes les classes d'état
-    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-validated-minor', 'minimap-no-correction', 'minimap-major', 'minimap-doubt', 'minimap-minor')
+    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
 
     // Ajouter la nouvelle classe
     const blockClass = getBlockMinimapClass(block)

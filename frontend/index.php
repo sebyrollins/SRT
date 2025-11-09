@@ -174,22 +174,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                                 </button>
                             </div>
                         </div>
-                        <div class="stat-item stat-minor">
-                            <div class="stat-filter-zone stat-filter" data-filter="minor">
-                                <span class="stat-label">Mineures</span>
-                                <span class="stat-value" id="statMinor">0</span>
+                        <div class="stat-item stat-fault">
+                            <div class="stat-filter-zone stat-filter" data-filter="fault">
+                                <span class="stat-label">Fautes</span>
+                                <span class="stat-value" id="statFault">0</span>
                             </div>
-                            <button class="btn-stat btn-stat-blue" id="validateMinorBtn" title="Valider les corrections mineures">
-                                <span class="btn-icon">✓</span>
-                                Valider
-                            </button>
-                        </div>
-                        <div class="stat-item stat-major">
-                            <div class="stat-filter-zone stat-filter" data-filter="major">
-                                <span class="stat-label">Majeures</span>
-                                <span class="stat-value" id="statMajor">0</span>
-                            </div>
-                            <button class="btn-stat btn-stat-success" id="validateMajorBtn" title="Valider les corrections majeures">
+                            <button class="btn-stat btn-stat-success" id="validateFaultBtn" title="Valider les fautes">
                                 <span class="btn-icon">✓</span>
                                 Valider
                             </button>

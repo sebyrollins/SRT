@@ -22,11 +22,8 @@
   --color-danger: #ef4444;
 
   /* Couleurs de correction */
-  --color-minor: #3b82f6;
-  --color-minor-bg: #dbeafe;
-
-  --color-major: #10b981;
-  --color-major-bg: #d1fae5;
+  --color-fault: #10b981;
+  --color-fault-bg: #d1fae5;
 
   --color-doubt: #f59e0b;
   --color-doubt-bg: #fef3c7;
@@ -571,8 +568,8 @@ body {
   border-left: 4px solid var(--color-minor);
 }
 
-.stat-major {
-  border-left: 4px solid var(--color-major);
+.stat-fault {
+  border-left: 4px solid var(--color-fault);
 }
 
 .stat-doubt {
@@ -624,7 +621,7 @@ body {
 }
 
 .btn-stat-success {
-  background: var(--color-major);
+  background: var(--color-fault);
   color: white;
 }
 
@@ -922,9 +919,9 @@ body {
   color: var(--color-minor);
 }
 
-.correction-major {
-  background-color: var(--color-major-bg);
-  color: var(--color-major);
+.correction-fault {
+  background-color: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .correction-doubt {
@@ -995,8 +992,8 @@ body {
   border-left-color: var(--color-minor);
 }
 
-.validation-card.validation-major {
-  border-left-color: var(--color-major);
+.validation-card.validation-fault {
+  border-left-color: var(--color-fault);
 }
 
 .validation-card.validation-doubt {
@@ -1050,9 +1047,9 @@ body {
   color: var(--color-minor);
 }
 
-.validation-type-badge.badge-major {
-  background: var(--color-major-bg);
-  color: var(--color-major);
+.validation-type-badge.badge-fault {
+  background: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .validation-type-badge.badge-doubt {
@@ -1290,7 +1287,7 @@ body {
 }
 
 /* BLOCS AVEC CORRECTIONS MAJEURES - Rouge brillant clair */
-.block-row.row-has-major {
+.block-row.row-has-fault {
   background-color: #ffcdd2;
 }
 
@@ -1463,8 +1460,8 @@ body {
 }
 
 .block-corrected.block-unvalidated {
-  background: var(--color-major-bg); /* Fond vert majeur pour blocs non validés */
-  border: 1px solid var(--color-major);
+  background: var(--color-fault-bg); /* Fond vert majeur pour blocs non validés */
+  border: 1px solid var(--color-fault);
 }
 
 .block-label {
@@ -1498,9 +1495,9 @@ body {
   color: var(--color-minor);
 }
 
-.correction-major {
-  background-color: var(--color-major-bg);
-  color: var(--color-major);
+.correction-fault {
+  background-color: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .correction-doubt {
@@ -1523,9 +1520,9 @@ body {
   text-decoration-style: wavy;
 }
 
-.error-highlight-major {
-  background-color: var(--color-major-bg);
-  color: var(--color-major);
+.error-highlight-fault {
+  background-color: var(--color-fault-bg);
+  color: var(--color-fault);
   text-decoration: underline;
   text-decoration-style: wavy;
 }
@@ -1548,8 +1545,8 @@ body {
   border-left: 3px solid var(--color-border);
 }
 
-.validation-card.validation-major {
-  border-left-color: var(--color-major);
+.validation-card.validation-fault {
+  border-left-color: var(--color-fault);
 }
 
 .validation-card.validation-doubt {
@@ -1589,9 +1586,9 @@ body {
   letter-spacing: 0.05em;
 }
 
-.validation-type-badge.badge-major {
-  background: var(--color-major-bg);
-  color: var(--color-major);
+.validation-type-badge.badge-fault {
+  background: var(--color-fault-bg);
+  color: var(--color-fault);
 }
 
 .validation-type-badge.badge-doubt {
