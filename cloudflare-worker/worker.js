@@ -1077,8 +1077,8 @@ POURQUOI ? Dans un sous-titre, on ne sait pas si "je" est un homme ou une femme.
 EXEMPLES :
 - "je suis venu" → corrected: "je suis venu", alternative: "je suis venue"
 - "je suis engagée" → corrected: "je suis engagée", alternative: "je suis engagé"
-- "je deviens fatigué" → corrected: "je deviens fatigué", alternative: "je deviens fatiguée"
-- "je reste convaincu" → corrected: "je reste convaincu", alternative: "je reste convaincue"
+- "je reste très attachée" → corrected: "je reste très attachée", alternative: "je reste très attaché"
+- "je ne suis plus compétitrice" → corrected: "je ne suis plus compétitrice", alternative: "je ne suis plus compétiteur"
 
 FORMAT DE RÉPONSE :
 {
@@ -1086,7 +1086,7 @@ FORMAT DE RÉPONSE :
     {
       "index": 1,
       "original": "texte exact reçu",
-      "corrected": "texte exact reçu (identique à original)",
+      "corrected": "texte exact reçu",
       "corrections": [
         {
           "type": "doubt",
@@ -1100,12 +1100,10 @@ FORMAT DE RÉPONSE :
   ]
 }
 
-IMPORTANT :
-- Type = TOUJOURS "doubt"
-- "corrected" = la forme présente dans le texte original (celle à valider par défaut)
-- "alternative" = l'autre forme de genre (SANS parenthèses)
-- Le champ "alternative" est OBLIGATOIRE pour les corrections de type "doubt"
-- Si aucune ambiguïté de genre trouvée, retourner {"blocks": []}`
+NOTES :
+- "corrected" doit être identique à "original" (forme du texte)
+- "alternative" doit contenir l'autre forme de genre
+- Si aucune ambiguïté trouvée : {"blocks": []}`
 }
 
 /**

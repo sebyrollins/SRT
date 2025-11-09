@@ -1932,11 +1932,6 @@ body {
   opacity: 0.7;
 }
 
-.minimap-block.minimap-validated-minor {
-  background: #bbdefb;
-  opacity: 0.7;
-}
-
 .minimap-block.minimap-hidden {
   display: none;
 }
@@ -1946,16 +1941,12 @@ body {
   opacity: 0.3;
 }
 
-.minimap-block.minimap-major {
-  background: #ef5350;
+.minimap-block.minimap-fault {
+  background: var(--color-fault);
 }
 
 .minimap-block.minimap-doubt {
   background: #ff9800;
-}
-
-.minimap-block.minimap-minor {
-  background: #42a5f5;
 }
 
 /* Indicateur de position actuelle (bloc cliqué) - DOIT venir après les couleurs */
@@ -1971,24 +1962,16 @@ body {
 }
 
 /* Forcer les couleurs à rester visibles même quand le bloc est sélectionné */
-.minimap-block.minimap-current.minimap-major {
-  background: #ef5350 !important;
+.minimap-block.minimap-current.minimap-fault {
+  background: var(--color-fault) !important;
 }
 
 .minimap-block.minimap-current.minimap-doubt {
   background: #ff9800 !important;
 }
 
-.minimap-block.minimap-current.minimap-minor {
-  background: #42a5f5 !important;
-}
-
 .minimap-block.minimap-current.minimap-validated-doubt {
   background: #ffe0b2 !important;
-}
-
-.minimap-block.minimap-current.minimap-validated-minor {
-  background: #bbdefb !important;
 }
 
 /* Tooltip au survol */
