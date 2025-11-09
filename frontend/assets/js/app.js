@@ -467,6 +467,15 @@ async function sendToWorker(content, filename) {
       } else if (log.type === 'pass4_claude_response') {
         console.log('Claude Response:', log.content)
         console.log('Blocks Count:', log.blocksCount)
+      } else if (log.type === 'pass4_validation') {
+        console.log(`Block #${log.blockIndex}:`)
+        console.log(`  Correction: "${log.correctionOriginal}"`)
+        console.log(`  Block text: "${log.blockText}"`)
+        console.log(`  Contains: ${log.contains}`)
+      } else if (log.type === 'pass4_rejection') {
+        console.log(`❌ REJECTED - Block #${log.blockIndex}:`)
+        console.log(`  Correction: "${log.correctionOriginal}" → "${log.correctionCorrected}"`)
+        console.log(`  Block text: "${log.blockText}"`)
       }
     })
     console.log('=== END DEBUG LOGS ===\n')

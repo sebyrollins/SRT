@@ -1385,8 +1385,44 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
           // VALIDATION : Vérifier que la correction appartient bien à ce bloc
           const blockTextToCheck = pass === 1 ? originalBlock.text : originalBlock.text  // Pour pass 2, on vérifie contre le texte d'entrée
+
+          // DEBUG Pass 4 : Log validation
+          if (pass === 4) {
+            const validationInfo = {
+              blockIndex: correctedBlock.index,
+              correctionOriginal: correction.original,
+              blockText: blockTextToCheck,
+              contains: blockTextToCheck.toLowerCase().includes(correction.original.toLowerCase())
+            }
+            console.log(`[DEBUG Pass 4 Validation] Block #${correctedBlock.index}:`)
+            console.log(`  - Correction original: "${correction.original}"`)
+            console.log(`  - Block text to check: "${blockTextToCheck}"`)
+            console.log(`  - Does block contain correction? ${validationInfo.contains}`)
+
+            if (debugLogs) {
+              debugLogs.push({
+                type: 'pass4_validation',
+                ...validationInfo,
+                timestamp: new Date().toISOString()
+              })
+            }
+          }
+
           if (!validateCorrectionBelongsToBlock(correction, blockTextToCheck, correctedBlock.index)) {
             console.warn(`[correctWithClaude] Pass ${pass} - Rejecting correction from block #${correctedBlock.index}: "${correction.original}" → "${correction.corrected}"`)
+            if (pass === 4) {
+              console.log(`[DEBUG Pass 4] REJECTED - Block text: "${blockTextToCheck}"`)
+              if (debugLogs) {
+                debugLogs.push({
+                  type: 'pass4_rejection',
+                  blockIndex: correctedBlock.index,
+                  correctionOriginal: correction.original,
+                  correctionCorrected: correction.corrected,
+                  blockText: blockTextToCheck,
+                  timestamp: new Date().toISOString()
+                })
+              }
+            }
             return false
           }
 
@@ -1426,6 +1462,20 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
     // Log le nombre de blocs rejetés
     if (validatedBlocks.length < correctedBlocks.length) {
       console.log(`[correctWithClaude] Pass ${pass} - Rejected ${correctedBlocks.length - validatedBlocks.length} blocks due to validation failures`)
+    }
+
+    // DEBUG Pass 4 : Log final des corrections retournées
+    if (pass === 4) {
+      const totalCorrections = validatedBlocks.reduce((sum, block) => sum + (block.corrections?.length || 0), 0)
+      console.log(`[DEBUG Pass 4] Returning ${validatedBlocks.length} blocks with ${totalCorrections} total corrections`)
+      validatedBlocks.forEach(block => {
+        if (block.corrections && block.corrections.length > 0) {
+          console.log(`  Block #${block.index}: ${block.corrections.length} correction(s)`)
+          block.corrections.forEach(c => {
+            console.log(`    - "${c.original}" → "${c.corrected}"`)
+          })
+        }
+      })
     }
 
     return validatedBlocks
