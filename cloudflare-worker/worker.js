@@ -1069,10 +1069,10 @@ tu DOIS créer une correction de type "doubt" qui suggère l'autre genre.
 POURQUOI ? Dans un sous-titre, on ne sait pas si "je" est un homme ou une femme.
 
 EXEMPLES :
-- "je suis venu" → type: "doubt", corrected: "je suis venu (ou venue)"
-- "je suis engagée" → type: "doubt", corrected: "je suis engagée (ou engagé)"
-- "je deviens fatigué" → type: "doubt", corrected: "je deviens fatigué (ou fatiguée)"
-- "je reste convaincu" → type: "doubt", corrected: "je reste convaincu (ou convaincue)"
+- "je suis venu" → corrected: "je suis venu", alternative: "je suis venue"
+- "je suis engagée" → corrected: "je suis engagée", alternative: "je suis engagé"
+- "je deviens fatigué" → corrected: "je deviens fatigué", alternative: "je deviens fatiguée"
+- "je reste convaincu" → corrected: "je reste convaincu", alternative: "je reste convaincue"
 
 FORMAT DE RÉPONSE :
 {
@@ -1080,12 +1080,13 @@ FORMAT DE RÉPONSE :
     {
       "index": 1,
       "original": "texte exact reçu",
-      "corrected": "texte avec suggestion genre ajoutée",
+      "corrected": "texte exact reçu (identique à original)",
       "corrections": [
         {
           "type": "doubt",
           "original": "je suis venu",
-          "corrected": "je suis venu (ou venue)",
+          "corrected": "je suis venu",
+          "alternative": "je suis venue",
           "reason": "Genre du locuteur inconnu"
         }
       ]
@@ -1095,7 +1096,9 @@ FORMAT DE RÉPONSE :
 
 IMPORTANT :
 - Type = TOUJOURS "doubt"
-- Ajouter "(ou forme_alternative)" après l'adjectif/participe
+- "corrected" = la forme présente dans le texte original (celle à valider par défaut)
+- "alternative" = l'autre forme de genre (SANS parenthèses)
+- Le champ "alternative" est OBLIGATOIRE pour les corrections de type "doubt"
 - Si aucune ambiguïté de genre trouvée, retourner {"blocks": []}`
 }
 

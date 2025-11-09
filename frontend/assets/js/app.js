@@ -324,12 +324,18 @@ async function processUploadedFile(content, filename) {
 
 /**
  * Extrait la forme alternative du genre d'une correction de type "doubt"
- * Exemple : "je reste très attachée (ou attaché)" → "je reste très attaché"
- * @param {string} corrected - Texte corrigé avec parenthèses
- * @returns {string} - Forme alternative sans parenthèses
+ * Utilise le champ "alternative" si disponible (nouveau format), sinon parse les parenthèses (ancien format)
+ * @param {Object} correction - Objet correction complet
+ * @returns {string} - Forme alternative
  */
-function extractAlternativeGender(corrected) {
-  // Pattern pour extraire "(ou XXX)" ou "(ou YYY ZZZ)"
+function extractAlternativeGender(correction) {
+  // Nouveau format : champ "alternative" fourni directement par le worker
+  if (correction.alternative) {
+    return correction.alternative
+  }
+
+  // Ancien format : extraire "(ou XXX)" des parenthèses
+  const corrected = correction.corrected
   const match = corrected.match(/\(ou\s+([^)]+)\)/)
   if (!match) {
     return corrected // Pas de forme alternative trouvée
@@ -473,14 +479,14 @@ function removeDoubtCorrectionsFromText(blocks) {
       if (doubtCorrections.length > 0) {
         // Pour chaque correction de genre, remplacer la forme avec parenthèses par l'original
         doubtCorrections.forEach(correction => {
-          // Extraire la forme alternative sans parenthèses
-          const alternativeForm = extractAlternativeGender(correction.corrected)
+          // Extraire la forme alternative
+          const alternativeForm = extractAlternativeGender(correction)
 
           // Si le texte corrigé contient la forme alternative, la remplacer par l'original
           if (block.corrected.includes(alternativeForm)) {
             block.corrected = block.corrected.replace(alternativeForm, correction.original)
           }
-          // Sinon, si le texte contient la forme avec parenthèses (cas normal)
+          // Sinon, si le texte contient la forme avec parenthèses (cas normal, ancien format)
           else if (block.corrected.includes(correction.corrected)) {
             block.corrected = block.corrected.replace(correction.corrected, correction.original)
           }
@@ -807,6 +813,11 @@ function renderBlocksTable() {
             cardEl.classList.add('validated')
           }
 
+          // Pour les corrections de doute, afficher "original → alternative" au lieu de "original → corrected"
+          const displayText = correction.type === 'doubt' && correction.alternative
+            ? correction.alternative
+            : correction.corrected
+
           cardEl.innerHTML = `
             <div class="validation-header">
               <span class="validation-type-badge badge-${correction.type}">
@@ -817,7 +828,7 @@ function renderBlocksTable() {
               <div class="validation-correction-text">
                 <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
                 →
-                <span class="corrected">${SRTParser.escapeHtml(correction.corrected)}</span>
+                <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
               </div>
               <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
             </div>
@@ -1018,8 +1029,8 @@ function toggleGender(blockIndex, corrIndex) {
     // Revenir à l'original
     AppState.genderSwitched.delete(correctionId)
 
-    // Extraire la forme alternative pour pouvoir la remplacer
-    const alternativeForm = extractAlternativeGender(correction.corrected)
+    // Extraire la forme alternative
+    const alternativeForm = extractAlternativeGender(correction)
 
     // Remplacer la forme alternative par l'original dans le texte
     if (block.corrected.includes(alternativeForm)) {
@@ -1029,8 +1040,8 @@ function toggleGender(blockIndex, corrIndex) {
     // Changer le genre : passer à la forme alternative
     AppState.genderSwitched.add(correctionId)
 
-    // Extraire la forme alternative sans parenthèses
-    const alternativeForm = extractAlternativeGender(correction.corrected)
+    // Extraire la forme alternative
+    const alternativeForm = extractAlternativeGender(correction)
 
     // Remplacer l'original par la forme alternative
     if (block.corrected.includes(correction.original)) {
@@ -1791,7 +1802,7 @@ function buildTextWithValidatedCorrections(block) {
     if (correction.type === 'doubt') {
       // Si le genre a été changé, appliquer la forme alternative
       if (AppState.genderSwitched.has(correctionId)) {
-        const alternativeForm = extractAlternativeGender(correction.corrected)
+        const alternativeForm = extractAlternativeGender(correction)
         const startPos = correction.position + offset
         const endPos = startPos + correction.original.length
 
