@@ -1083,10 +1083,18 @@ function resetToOriginalSuggestion(blockIndex, corrIndex) {
     correction.reason = correction.originalReason
   }
 
+  // Retirer de validatedCorrections pour revenir à l'état non validé
+  const correctionId = `${blockIndex}-${corrIndex}`
+  AppState.validatedCorrections.delete(correctionId)
+
   // Retirer le flag de modification manuelle
   correction.isManuallyEdited = false
 
   console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex}, correction #${corrIndex} réinitialisée à "${originalSuggestion}"`)
+
+  // Mettre à jour les stats et la jauge
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
 
   // Mettre à jour l'affichage
   renderBlocksTable()
