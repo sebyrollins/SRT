@@ -1393,9 +1393,10 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
           return true
         }).map(correction => {
           // Nettoyer les annotations dans les corrections individuelles
+          // SAUF pour Pass 4 où les parenthèses font partie de la correction (genre)
           return {
             ...correction,
-            corrected: cleanAnnotations(correction.corrected)
+            corrected: pass === 4 ? correction.corrected : cleanAnnotations(correction.corrected)
           }
         })
       }
