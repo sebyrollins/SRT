@@ -38,6 +38,11 @@ import {
   clearBlockCorrections
 } from './state/stateManager.js'
 
+// Imports des modules UI
+import { openEditModal } from './ui/modal.js'
+import { showSection as showSectionUI } from './ui/sections.js'
+import { updateProgress as updateProgressUI } from './ui/progress.js'
+
 // Éléments DOM
 const DOM = {
   uploadSection: null,
@@ -1224,88 +1229,29 @@ function editBlockText(blockIndex) {
     block.originalCorrected = block.corrected
   }
 
-  // Afficher le modal
-  const modal = document.getElementById('editModal')
-  const modalOriginal = document.getElementById('modalOriginal')
-  const modalSuggestion = document.getElementById('modalSuggestion')
-  const modalSuggestionField = document.getElementById('modalSuggestionField')
-  const modalInput = document.getElementById('modalInput')
-  const modalSaveBtn = document.getElementById('modalSaveBtn')
-  const modalCancelBtn = document.getElementById('modalCancelBtn')
-  const modalCloseBtn = document.getElementById('modalCloseBtn')
-  const modalOverlay = document.getElementById('modalOverlay')
-  const modalRestoreBtn = document.getElementById('modalRestoreBtn')
-  const modalRestoreOriginalBtn = document.getElementById('modalRestoreOriginalBtn')
-
-  // Cacher la section "Suggestion de correction" pour l'édition de bloc entier
-  if (modalSuggestionField) {
-    modalSuggestionField.style.display = 'none'
-  }
-
-  // Remplir le modal avec textContent pour préserver les apostrophes et caractères spéciaux
-  // white-space: pre-wrap dans le CSS gère les sauts de ligne
-  modalOriginal.textContent = block.original
-  modalSuggestion.textContent = block.corrected
-  modalInput.value = block.corrected
-
   // Debug : afficher les codes des caractères pour vérifier les apostrophes
   console.log('[editBlockText] Original:', block.original)
   console.log('[editBlockText] Original codes:', Array.from(block.original).map(c => `${c}=${c.charCodeAt(0)}`).join(' '))
   console.log('[editBlockText] Corrected:', block.corrected)
   console.log('[editBlockText] Corrected codes:', Array.from(block.corrected).map(c => `${c}=${c.charCodeAt(0)}`).join(' '))
 
-  modal.style.display = 'flex'
-  modalInput.focus()
-  // Pour textarea, on sélectionne tout à la fin
-  modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
+  // Déterminer la suggestion à afficher
+  const suggestionToShow = block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined
+    ? block.originalCorrected
+    : block.corrected
 
-  // Fonction pour restaurer l'original
-  const restoreOriginal = () => {
-    modalInput.value = block.original
-    modalInput.focus()
-    modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
-  }
-
-  // Fonction pour restaurer la suggestion originale de Claude
-  const restoreCorrected = () => {
-    // Utiliser originalCorrected si disponible (suggestion initiale de Claude), sinon corrected (valeur actuelle)
-    const correctedToRestore = block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined
-      ? block.originalCorrected
-      : block.corrected
-    modalInput.value = correctedToRestore
-    modalInput.focus()
-    modalInput.setSelectionRange(modalInput.value.length, modalInput.value.length)
-  }
-
-  // Fonction pour fermer le modal
-  const closeModal = () => {
-    modal.style.display = 'none'
-    // Réafficher le champ de suggestion pour les prochaines ouvertures (editCorrection)
-    if (modalSuggestionField) {
-      modalSuggestionField.style.display = 'block'
-    }
-    modalSaveBtn.onclick = null
-    modalCancelBtn.onclick = null
-    modalCloseBtn.onclick = null
-    modalOverlay.onclick = null
-    modalRestoreBtn.onclick = null
-    modalRestoreOriginalBtn.onclick = null
-    modalInput.onkeydown = null
-  }
-
-  // Fonction pour sauvegarder
-  const saveEdit = () => {
-    const newValue = convertApostrophes(modalInput.value.trim())
+  // Callback de sauvegarde
+  const handleSave = (newValue) => {
+    const processedValue = convertApostrophes(newValue)
     const oldCorrected = block.corrected
 
     // Cas 1 : Aucun changement par rapport à la suggestion de Claude actuelle
-    if (newValue === oldCorrected) {
-      closeModal()
+    if (processedValue === oldCorrected) {
       return
     }
 
     // Cas 2 : Retour au texte original → Dévalider les corrections (ne pas les supprimer)
-    if (newValue === block.original) {
+    if (processedValue === block.original) {
       // Dévalider toutes les corrections de ce bloc (mais les garder)
       if (block.corrections && block.corrections.length > 0) {
         block.corrections.forEach((_, idx) => {
@@ -1315,7 +1261,6 @@ function editBlockText(blockIndex) {
       }
 
       // Restaurer le texte corrigé original de Claude (pas l'original avec fautes)
-      // Cela remet le bloc dans l'état initial : corrections présentes mais non validées
       if (block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined) {
         block.corrected = block.originalCorrected
       }
@@ -1327,13 +1272,11 @@ function editBlockText(blockIndex) {
       // Re-render
       renderBlocksTable()
       updateMinimap()
-      closeModal()
       return
     }
 
-    // Cas 2.5 : Retour à la suggestion originale de Claude → Restaurer et valider
-    if (block.hasOwnProperty('originalCorrected') && newValue === block.originalCorrected) {
-      // C'est la suggestion originale de Claude, restaurer les corrections originales
+    // Cas 3 : Retour à la suggestion originale de Claude → Restaurer et valider
+    if (block.hasOwnProperty('originalCorrected') && processedValue === block.originalCorrected) {
       // Valider toutes les corrections et restaurer leurs propriétés originales
       if (block.corrections && block.corrections.length > 0) {
         block.corrections.forEach((correction, idx) => {
@@ -1352,7 +1295,6 @@ function editBlockText(blockIndex) {
             correction.reason = correction.originalReason
             delete correction.originalReason
           }
-          // Retirer le flag de modification manuelle
           if (correction.isManuallyEdited) {
             correction.isManuallyEdited = false
           }
@@ -1372,12 +1314,11 @@ function editBlockText(blockIndex) {
       // Re-render
       renderBlocksTable()
       updateMinimap()
-      closeModal()
       return
     }
 
-    // Cas 3 : Modification du texte (différent de l'original et de la suggestion)
-    if (newValue && newValue !== block.original && newValue !== oldCorrected) {
+    // Cas 4 : Modification du texte (différent de l'original et de la suggestion)
+    if (processedValue && processedValue !== block.original && processedValue !== oldCorrected) {
       // Supprimer toutes les anciennes corrections de ce bloc
       const oldCorrections = block.corrections ? [...block.corrections] : []
       oldCorrections.forEach((_, idx) => {
@@ -1385,17 +1326,17 @@ function editBlockText(blockIndex) {
         AppState.validatedCorrections.delete(correctionId)
       })
 
-      // Déterminer le type original (fault par défaut, ou le type de la première correction si elle existe)
+      // Déterminer le type original
       const originalType = (oldCorrections.length > 0 && oldCorrections[0].originalType)
         ? oldCorrections[0].originalType
         : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
       const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
 
-      // Remplacer par UNE SEULE correction avec le type original et flag isManuallyEdited
+      // Remplacer par UNE SEULE correction
       block.corrections = [{
         type: originalType,
         original: block.original,
-        corrected: newValue,
+        corrected: processedValue,
         reason: 'Modifié manuellement',
         position: 0,
         originalSuggestion: oldCorrected,
@@ -1404,7 +1345,7 @@ function editBlockText(blockIndex) {
         isManuallyEdited: true
       }]
 
-      block.corrected = newValue
+      block.corrected = processedValue
 
       // Valider automatiquement cette correction
       AppState.validatedCorrections.add(`${block.index}-0`)
@@ -1417,27 +1358,17 @@ function editBlockText(blockIndex) {
       renderBlocksTable()
       updateMinimap()
     }
-
-    closeModal()
   }
 
-  // Événements
-  modalSaveBtn.onclick = saveEdit
-  modalCancelBtn.onclick = closeModal
-  modalCloseBtn.onclick = closeModal
-  modalOverlay.onclick = closeModal
-  modalRestoreOriginalBtn.onclick = restoreOriginal
-  modalRestoreBtn.onclick = restoreCorrected
-
-  // Pour textarea multiligne : Ctrl+Enter pour sauvegarder, Escape pour annuler
-  modalInput.onkeydown = (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
-      saveEdit()
-    } else if (e.key === 'Escape') {
-      closeModal()
-    }
-  }
+  // Ouvrir le modal avec le système réutilisable
+  openEditModal({
+    originalText: block.original,
+    suggestedText: suggestionToShow,
+    currentValue: block.corrected,
+    showSuggestion: false, // Cacher la section suggestion pour l'édition de bloc entier
+    onSave: handleSave,
+    multiline: true // Mode textarea avec Ctrl+Enter
+  })
 }
 
 /**
@@ -1460,92 +1391,31 @@ function editCorrection(blockIndex, corrIndex) {
     correction.originalReason = correction.reason
   }
 
-  // Afficher le modal
-  const modal = document.getElementById('editModal')
-  const modalOriginal = document.getElementById('modalOriginal')
-  const modalSuggestion = document.getElementById('modalSuggestion')
-  const modalSuggestionField = document.getElementById('modalSuggestionField')
-  const modalInput = document.getElementById('modalInput')
-  const modalSaveBtn = document.getElementById('modalSaveBtn')
-  const modalCancelBtn = document.getElementById('modalCancelBtn')
-  const modalCloseBtn = document.getElementById('modalCloseBtn')
-  const modalOverlay = document.getElementById('modalOverlay')
-  const modalRestoreBtn = document.getElementById('modalRestoreBtn')
-  const modalRestoreOriginalBtn = document.getElementById('modalRestoreOriginalBtn')
-
-  // Afficher la section "Suggestion de correction" pour l'édition de correction individuelle
-  if (modalSuggestionField) {
-    modalSuggestionField.style.display = 'block'
-  }
-
-  // Remplir le modal avec textContent pour préserver les apostrophes et caractères spéciaux
-  // white-space: pre-wrap dans le CSS gère les sauts de ligne
-  modalOriginal.textContent = correction.original
-
-  // Afficher la suggestion originale de Claude (sauvegardée avant toute modification)
-  // Si originalSuggestion existe, l'utiliser, sinon utiliser corrected
+  // Déterminer la suggestion à afficher
   const suggestionToShow = correction.hasOwnProperty('originalSuggestion') && correction.originalSuggestion !== undefined
     ? correction.originalSuggestion
     : correction.corrected
-  modalSuggestion.textContent = suggestionToShow
 
-  modalInput.value = correction.corrected
-  modal.style.display = 'flex'
-  modalInput.focus()
-  modalInput.setSelectionRange(0, modalInput.value.length)
+  // Callback de sauvegarde
+  const handleSave = (newValue) => {
+    const processedValue = convertApostrophes(newValue)
 
-  // Fonction pour restaurer l'original (avec la faute)
-  const restoreOriginal = () => {
-    modalInput.value = correction.original
-    modalInput.focus()
-    modalInput.setSelectionRange(0, modalInput.value.length)
-  }
-
-  // Fonction pour restaurer la suggestion originale de Claude
-  const restoreSuggestion = () => {
-    // Utiliser originalSuggestion si disponible, sinon corrected
-    const suggestionToRestore = correction.hasOwnProperty('originalSuggestion') && correction.originalSuggestion !== undefined
-      ? correction.originalSuggestion
-      : correction.corrected
-    modalInput.value = suggestionToRestore
-    modalInput.focus()
-    modalInput.setSelectionRange(0, modalInput.value.length)
-  }
-
-  // Fonction pour fermer le modal
-  const closeModal = () => {
-    modal.style.display = 'none'
-    modalSaveBtn.onclick = null
-    modalCancelBtn.onclick = null
-    modalCloseBtn.onclick = null
-    modalOverlay.onclick = null
-    modalRestoreBtn.onclick = null
-    modalRestoreOriginalBtn.onclick = null
-    modalInput.onkeydown = null
-  }
-
-  // Fonction pour sauvegarder
-  const saveEdit = () => {
-    const newValue = convertApostrophes(modalInput.value.trim())
-
-    // Permettre d'enregistrer même si égal à l'original (pour pouvoir restaurer l'original comme modification en doute)
-    if (newValue) {
+    if (processedValue) {
       const oldCorrected = correction.corrected
 
       // Mettre à jour la correction
-      correction.corrected = newValue
+      correction.corrected = processedValue
 
       // Mettre à jour le texte du bloc
-      block.corrected = block.corrected.replace(oldCorrected, newValue)
+      block.corrected = block.corrected.replace(oldCorrected, processedValue)
 
       // Vérifier si la modification est différente de la suggestion originale
-      // Comparer aussi les codes Unicode pour détecter les différences d'apostrophes
-      const isDifferentFromSuggestion = newValue !== correction.originalSuggestion
+      const isDifferentFromSuggestion = processedValue !== correction.originalSuggestion
 
       if (isDifferentFromSuggestion) {
         // Modifié différemment → marquer comme modifié manuellement mais GARDER le type original
         console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification manuelle détectée`)
-        console.log(`  Nouveau: "${newValue}" (codes: ${Array.from(newValue).map(c => c.charCodeAt(0)).join(',')})`)
+        console.log(`  Nouveau: "${processedValue}" (codes: ${Array.from(processedValue).map(c => c.charCodeAt(0)).join(',')})`)
         console.log(`  Suggestion: "${correction.originalSuggestion}" (codes: ${Array.from(correction.originalSuggestion).map(c => c.charCodeAt(0)).join(',')})`)
 
         // Sauvegarder le type et la raison originale si pas déjà fait
@@ -1561,9 +1431,7 @@ function editCorrection(blockIndex, corrIndex) {
       } else {
         // Remis comme la suggestion → repasser au type original
         correction.type = correction.originalType || 'fault'
-        // Restaurer la raison originale
         correction.reason = correction.originalReason
-        // Retirer le flag de modification manuelle
         correction.isManuallyEdited = false
       }
 
@@ -1578,27 +1446,17 @@ function editCorrection(blockIndex, corrIndex) {
       renderBlocksTable()
       updateMinimap()
     }
-
-    closeModal()
   }
 
-  // Événements
-  modalSaveBtn.onclick = saveEdit
-  modalCancelBtn.onclick = closeModal
-  modalCloseBtn.onclick = closeModal
-  modalOverlay.onclick = closeModal
-  modalRestoreOriginalBtn.onclick = restoreOriginal
-  modalRestoreBtn.onclick = restoreSuggestion
-
-  // Enter pour sauvegarder, Escape pour annuler
-  modalInput.onkeydown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      saveEdit()
-    } else if (e.key === 'Escape') {
-      closeModal()
-    }
-  }
+  // Ouvrir le modal avec le système réutilisable
+  openEditModal({
+    originalText: correction.original,
+    suggestedText: suggestionToShow,
+    currentValue: correction.corrected,
+    showSuggestion: true, // Afficher la section suggestion pour l'édition de correction
+    onSave: handleSave,
+    multiline: false // Mode single line avec Enter
+  })
 }
 
 /**
@@ -2009,24 +1867,17 @@ function resetFileInput() {
 }
 
 /**
- * Affiche une section spécifique
+ * Affiche une section spécifique (wrapper pour le module UI)
  */
 function showSection(section) {
-  DOM.uploadSection.style.display = section === 'upload' ? 'block' : 'none'
-  DOM.loadingSection.style.display = section === 'loading' ? 'block' : 'none'
-  DOM.editorSection.style.display = section === 'editor' ? 'block' : 'none'
+  showSectionUI(section, DOM)
 }
 
 /**
- * Met à jour la barre de progression
+ * Met à jour la barre de progression (wrapper pour le module UI)
  */
 function updateProgress(percent, text) {
-  if (DOM.progressFill) {
-    DOM.progressFill.style.width = `${percent}%`
-  }
-  if (DOM.progressText) {
-    DOM.progressText.textContent = text
-  }
+  updateProgressUI(percent, text, DOM)
 }
 
 /**
