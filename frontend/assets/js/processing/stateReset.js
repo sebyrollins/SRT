@@ -139,6 +139,12 @@ export function resetApp(DOM, resetFileInput) {
     DOM.minimapBlocks.innerHTML = ''
   }
 
+  // Réactiver le sélecteur de modèle
+  const modelSelect = document.getElementById('modelSelect')
+  if (modelSelect) {
+    modelSelect.disabled = false
+  }
+
   resetFileInput()
   showSectionUI('upload', DOM)
 }

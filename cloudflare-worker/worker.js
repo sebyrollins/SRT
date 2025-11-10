@@ -666,8 +666,31 @@ async function processSRT(srtContent, modelType = 'sonnet') {
   // ═══════════════════════════════════════════════════════════════
   console.log(`[processSRT] === PASS 0: Regex preprocessing on ${blocks.length} blocks ===`)
 
+  // Compteurs pour les stats Pass 0
+  const pass0Stats = {
+    trimSpaces: 0,
+    ellipsis: 0,
+    multipleSpaces: 0,
+    spaceBeforePunctuation: 0,
+    nonBreakingSpace: 0,
+    frenchQuotes: 0,
+    spaceAfterApostrophe: 0
+  }
+
   const blocksAfterPass0 = blocks.map(block => {
     const { corrected, corrections } = preProcessWithRegex(block.text)
+
+    // Compter les types de corrections
+    corrections.forEach(corr => {
+      if (corr.reason.includes('Espaces en début/fin')) pass0Stats.trimSpaces++
+      else if (corr.reason.includes('Ellipsis')) pass0Stats.ellipsis++
+      else if (corr.reason.includes('Espaces multiples')) pass0Stats.multipleSpaces++
+      else if (corr.reason.includes('Espace avant ponctuation')) pass0Stats.spaceBeforePunctuation++
+      else if (corr.reason.includes('Espace insécable')) pass0Stats.nonBreakingSpace++
+      else if (corr.reason.includes('Guillemets')) pass0Stats.frenchQuotes++
+      else if (corr.reason.includes('Espace après apostrophe')) pass0Stats.spaceAfterApostrophe++
+    })
+
     return {
       index: block.index,
       timecode: block.timecode,
@@ -679,6 +702,7 @@ async function processSRT(srtContent, modelType = 'sonnet') {
 
   const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
   console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
+  console.log(`[processSRT] Pass 0 stats:`, pass0Stats)
 
   // ═══════════════════════════════════════════════════════════════
   // MODE CLEANING : Retourner uniquement les corrections regex
@@ -688,7 +712,8 @@ async function processSRT(srtContent, modelType = 'sonnet') {
     console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
     return {
       blocks: blocksAfterPass0,
-      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`]
+      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
+      pass0Stats: pass0Stats
     }
   }
 
@@ -920,7 +945,8 @@ async function processSRT(srtContent, modelType = 'sonnet') {
 
   return {
     blocks: finalBlocks,
-    debugLogs: debugLogs
+    debugLogs: debugLogs,
+    pass0Stats: pass0Stats
   }
 }
 

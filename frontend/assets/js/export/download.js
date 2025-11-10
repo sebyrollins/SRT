@@ -4,6 +4,33 @@
  */
 
 /**
+ * Vérifie si toutes les corrections ont été validées
+ * @param {Object} AppState - État de l'application
+ * @returns {boolean} True si toutes les corrections sont validées
+ */
+function areAllCorrectionsValidated(AppState) {
+  for (const block of AppState.blocks) {
+    if (block.corrections && block.corrections.length > 0) {
+      for (let corrIndex = 0; corrIndex < block.corrections.length; corrIndex++) {
+        const correctionId = `${block.index}-${corrIndex}`
+        if (!AppState.validatedCorrections.has(correctionId)) {
+          return false
+        }
+      }
+    }
+  }
+  return true
+}
+
+/**
+ * Affiche une alerte design pour informer l'utilisateur
+ * @param {string} message - Message à afficher
+ */
+function showAlert(message) {
+  alert(message)
+}
+
+/**
  * Extrait la forme alternative du genre d'une correction de type "doubt"
  * @param {Object} correction - Objet correction complet
  * @returns {string} - Forme alternative
@@ -109,6 +136,12 @@ function buildTextWithValidatedCorrections(block, AppState) {
  * @param {Object} SRTParser - Parser SRT
  */
 export function downloadSRT(AppState, SRTParser) {
+  // Vérifier que toutes les corrections sont validées
+  if (!areAllCorrectionsValidated(AppState)) {
+    showAlert('⚠️ Veuillez d\'abord valider toutes les corrections avant de télécharger.')
+    return
+  }
+
   // Créer une copie des blocs avec seulement les corrections validées appliquées
   const blocksWithValidatedCorrections = AppState.blocks.map(block => {
     return {
@@ -128,6 +161,12 @@ export function downloadSRT(AppState, SRTParser) {
  * @param {Object} SRTParser - Parser SRT
  */
 export function downloadTXT(AppState, SRTParser) {
+  // Vérifier que toutes les corrections sont validées
+  if (!areAllCorrectionsValidated(AppState)) {
+    showAlert('⚠️ Veuillez d\'abord valider toutes les corrections avant de télécharger.')
+    return
+  }
+
   // Créer une copie des blocs avec seulement les corrections validées appliquées
   const blocksWithValidatedCorrections = AppState.blocks.map(block => {
     return {

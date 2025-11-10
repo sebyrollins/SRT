@@ -226,7 +226,23 @@ async function sendToWorker(content, filename) {
     console.log('=== END DEBUG LOGS ===\n')
   }
 
-  return result.data
+  // Afficher les stats Pass 0 si présentes
+  if (result.pass0Stats) {
+    console.log('=== PASS 0 STATS ===')
+    console.log('Trim Spaces:', result.pass0Stats.trimSpaces)
+    console.log('Ellipsis:', result.pass0Stats.ellipsis)
+    console.log('Multiple Spaces:', result.pass0Stats.multipleSpaces)
+    console.log('Space Before Punctuation:', result.pass0Stats.spaceBeforePunctuation)
+    console.log('Non-Breaking Space:', result.pass0Stats.nonBreakingSpace)
+    console.log('French Quotes:', result.pass0Stats.frenchQuotes)
+    console.log('Space After Apostrophe:', result.pass0Stats.spaceAfterApostrophe)
+    console.log('=== END PASS 0 STATS ===\n')
+  }
+
+  return {
+    blocks: result.data,
+    pass0Stats: result.pass0Stats || null
+  }
 }
 
 /**
@@ -301,6 +317,12 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 
   setOriginalFilename(filename)
 
+  // Désactiver le sélecteur de modèle une fois le fichier envoyé
+  const modelSelect = document.getElementById('modelSelect')
+  if (modelSelect) {
+    modelSelect.disabled = true
+  }
+
   // Afficher la section de chargement
   showSectionUI('loading', DOM)
 
@@ -330,7 +352,9 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 
   try {
     // Envoyer au Worker Cloudflare
-    const correctedBlocks = await sendToWorker(content, filename)
+    const result = await sendToWorker(content, filename)
+    const correctedBlocks = result.blocks
+    const pass0Stats = result.pass0Stats
 
     // Arrêter la progression fictive
     clearInterval(progressInterval)
@@ -349,6 +373,9 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 
     // Sauvegarder les blocs
     setBlocks(correctedBlocks)
+
+    // Stocker les stats Pass 0 dans AppState pour affichage ultérieur
+    AppState.pass0Stats = pass0Stats
 
     // Valider automatiquement toutes les corrections de genre (doute)
     autoValidateDoubtCorrections(AppState)
