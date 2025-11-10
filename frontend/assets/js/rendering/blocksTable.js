@@ -213,9 +213,9 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
         // PRIORITÉ 1 : Corrections modifiées manuellement
         if (correction.isManuallyEdited) {
           const resetBtn = document.createElement('button')
-          resetBtn.className = 'btn-toggle-gender'
-          resetBtn.innerHTML = '↺ Réinitialiser'
-          resetBtn.title = 'Revenir à la suggestion de Claude'
+          resetBtn.className = 'btn-icon-only'
+          resetBtn.innerHTML = '↺'
+          resetBtn.title = 'Réinitialiser (revenir à la suggestion de Claude)'
           if (actions.resetToOriginalSuggestion) {
             resetBtn.onclick = () => actions.resetToOriginalSuggestion(block.index, corrIndex)
           }

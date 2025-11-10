@@ -142,24 +142,15 @@ export function editBlockText(blockIndex, AppState, SRTParser, updateStats, rend
         : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
       const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
 
-      // Normaliser pour comparaison
-      const normalizeForComparison = (text) => text.normalize('NFC').trim().toLowerCase()
-      const isSimilarToOriginal = normalizeForComparison(processedValue) === normalizeForComparison(block.original)
-
-      // Déterminer le type et la raison en fonction de la similarité avec l'original
-      const correctionType = isSimilarToOriginal ? 'doubt' : originalType
-      const correctionReason = isSimilarToOriginal ? 'Rejeté (texte original conservé)' : 'Modifié manuellement'
-
-      if (isSimilarToOriginal) {
-        console.log(`Bloc #${block.index}: Modification similaire à l'original → doute validé`)
-      }
+      // Toute modification différente de la suggestion de Claude → passer en doute validé
+      console.log(`Bloc #${block.index}: Modification différente de la suggestion → doute validé`)
 
       // Remplacer par UNE SEULE correction
       block.corrections = [{
-        type: correctionType,
+        type: 'doubt',
         original: block.original,
         corrected: processedValue,
-        reason: correctionReason,
+        reason: 'Modifié manuellement',
         position: 0,
         originalSuggestion: oldCorrected,
         originalType: originalType,
@@ -241,10 +232,6 @@ export function editCorrection(blockIndex, corrIndex, AppState, SRTParser, updat
       // Vérifier si la modification est différente de la suggestion originale
       const isDifferentFromSuggestion = processedValue !== correction.originalSuggestion
 
-      // Normaliser pour comparaison (ignore les différences mineures)
-      const normalizeForComparison = (text) => text.normalize('NFC').trim().toLowerCase()
-      const isSimilarToOriginal = normalizeForComparison(processedValue) === normalizeForComparison(correction.original)
-
       if (isDifferentFromSuggestion) {
         // Sauvegarder le type et la raison originale si pas déjà fait
         if (!correction.hasOwnProperty('originalType')) {
@@ -254,26 +241,14 @@ export function editCorrection(blockIndex, corrIndex, AppState, SRTParser, updat
           correction.originalReason = correction.reason
         }
 
-        // Vérifier si la modification est similaire à l'original
-        if (isSimilarToOriginal) {
-          // Modification similaire à l'original → passer en doute validé
-          console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification similaire à l'original → doute validé`)
-          console.log(`  Modifié: "${processedValue}"`)
-          console.log(`  Original: "${correction.original}"`)
+        // Toute modification différente de la suggestion de Claude → passer en doute validé
+        console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification différente de la suggestion → doute validé`)
+        console.log(`  Modifié: "${processedValue}"`)
+        console.log(`  Suggestion: "${correction.originalSuggestion}"`)
 
-          correction.type = 'doubt'
-          correction.reason = 'Rejeté (texte original conservé)'
-          correction.isManuallyEdited = true
-        } else {
-          // Modifié différemment → marquer comme modifié manuellement mais GARDER le type original
-          console.log(`Bloc #${block.index}, correction #${corrIndex}: Modification manuelle détectée`)
-          console.log(`  Nouveau: "${processedValue}" (codes: ${Array.from(processedValue).map(c => c.charCodeAt(0)).join(',')})`)
-          console.log(`  Suggestion: "${correction.originalSuggestion}" (codes: ${Array.from(correction.originalSuggestion).map(c => c.charCodeAt(0)).join(',')})`)
-
-          // Marquer comme modifié manuellement SANS changer le type
-          correction.isManuallyEdited = true
-          correction.reason = 'Modifié manuellement'
-        }
+        correction.type = 'doubt'
+        correction.reason = 'Modifié manuellement'
+        correction.isManuallyEdited = true
       } else {
         // Remis comme la suggestion → repasser au type original
         correction.type = correction.originalType || 'fault'
