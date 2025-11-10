@@ -249,6 +249,8 @@ async function sendToWorker(content, filename) {
     console.log('French Quotes:', result.pass0Stats.frenchQuotes)
     console.log('Space After Apostrophe:', result.pass0Stats.spaceAfterApostrophe)
     console.log('=== END PASS 0 STATS ===\n')
+  } else {
+    console.warn('[WARNING] No pass0Stats received from worker')
   }
 
   return {
@@ -449,10 +451,18 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
  * @param {Object} pass0Stats - Statistiques de la Pass 0
  */
 function displayPass0Stats(pass0Stats) {
+  console.log('[displayPass0Stats] Called with:', pass0Stats)
+
   const pass0StatsEl = document.getElementById('pass0Stats')
   const pass0StatsValuesEl = document.getElementById('pass0StatsValues')
 
-  if (!pass0StatsEl || !pass0StatsValuesEl) return
+  if (!pass0StatsEl || !pass0StatsValuesEl) {
+    console.error('[displayPass0Stats] Elements not found:', {
+      pass0StatsEl: !!pass0StatsEl,
+      pass0StatsValuesEl: !!pass0StatsValuesEl
+    })
+    return
+  }
 
   // Construire le texte avec les stats non nulles
   const statsTexts = []
@@ -464,9 +474,14 @@ function displayPass0Stats(pass0Stats) {
   if (pass0Stats.frenchQuotes > 0) statsTexts.push(`${pass0Stats.frenchQuotes} guillemets français`)
   if (pass0Stats.spaceAfterApostrophe > 0) statsTexts.push(`${pass0Stats.spaceAfterApostrophe} espace(s) après apostrophe`)
 
+  console.log('[displayPass0Stats] Stats texts:', statsTexts)
+
   if (statsTexts.length > 0) {
     pass0StatsValuesEl.textContent = statsTexts.join(', ')
     pass0StatsEl.style.display = 'flex'
+    console.log('[displayPass0Stats] Display set to flex')
+  } else {
+    console.log('[displayPass0Stats] No stats to display (all zeros)')
   }
 }
 
