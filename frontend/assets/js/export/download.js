@@ -23,11 +23,56 @@ function areAllCorrectionsValidated(AppState) {
 }
 
 /**
- * Affiche une alerte design pour informer l'utilisateur
+ * Affiche une alerte design centrée à l'écran
  * @param {string} message - Message à afficher
  */
 function showAlert(message) {
-  alert(message)
+  // Créer l'overlay
+  const overlay = document.createElement('div')
+  overlay.className = 'custom-alert-overlay'
+
+  // Créer la boîte d'alerte
+  const alertBox = document.createElement('div')
+  alertBox.className = 'custom-alert-box'
+
+  // Icône d'avertissement
+  const icon = document.createElement('div')
+  icon.className = 'custom-alert-icon'
+  icon.textContent = '⚠️'
+
+  // Message
+  const messageEl = document.createElement('div')
+  messageEl.className = 'custom-alert-message'
+  messageEl.textContent = message
+
+  // Bouton OK
+  const button = document.createElement('button')
+  button.className = 'custom-alert-button'
+  button.textContent = 'OK'
+  button.onclick = () => {
+    document.body.removeChild(overlay)
+  }
+
+  // Assembler
+  alertBox.appendChild(icon)
+  alertBox.appendChild(messageEl)
+  alertBox.appendChild(button)
+  overlay.appendChild(alertBox)
+
+  // Ajouter au body
+  document.body.appendChild(overlay)
+
+  // Focus sur le bouton
+  button.focus()
+
+  // Fermer avec Escape
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      document.body.removeChild(overlay)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }
+  document.addEventListener('keydown', handleEscape)
 }
 
 /**
