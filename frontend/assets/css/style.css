@@ -481,10 +481,10 @@ body {
 
 /* Pass 0 Stats (Regex corrections) - intégré dans la stats-bar */
 .stat-item.stat-pass0 {
-  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
-  color: white;
-  flex: 1.5;
-  padding: 0.5rem 0.75rem;
+  background: var(--color-bg);
+  border-left: 4px solid #3b82f6;
+  flex: 1;
+  padding: var(--spacing-sm);
 }
 
 .stat-pass0-content {
@@ -500,15 +500,15 @@ body {
 }
 
 .stat-pass0-label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  opacity: 0.9;
+  color: var(--color-text-secondary);
 }
 
 .stat-pass0-values {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 400;
-  opacity: 0.85;
+  color: var(--color-text-primary);
   text-align: center;
   line-height: 1.3;
 }
