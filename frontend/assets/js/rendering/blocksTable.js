@@ -185,9 +185,11 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
           ? correction.alternative
           : correction.corrected
 
-        const badgeText = correction.isManuallyEdited
-          ? 'MODIFIÉ'
-          : (correction.type === 'doubt' && correction.alternative ? 'DOUTE' : 'FAUTE')
+        // Déterminer le badge à afficher
+        // Si c'est un doute (rejeté ou genre), toujours afficher "DOUTE"
+        const badgeText = correction.type === 'doubt'
+          ? 'DOUTE'
+          : (correction.isManuallyEdited ? 'MODIFIÉ' : 'FAUTE')
 
         cardEl.innerHTML = `
           <div class="validation-header">
@@ -234,7 +236,7 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
           const toggleBtn = document.createElement('button')
           toggleBtn.className = isGenderSwitched ? 'btn-toggle-gender btn-gender-changed' : 'btn-toggle-gender'
-          toggleBtn.innerHTML = isGenderSwitched ? '⟲ Revenir' : '⇄ Changer le genre'
+          toggleBtn.innerHTML = isGenderSwitched ? '⟲ Revenir' : '⇄ Genre'
           toggleBtn.title = isGenderSwitched ? 'Revenir au genre d\'origine' : 'Changer le genre'
           if (actions.toggleGender) {
             toggleBtn.onclick = () => actions.toggleGender(block.index, corrIndex)
