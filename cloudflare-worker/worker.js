@@ -748,17 +748,26 @@ async function processSRT(srtContent, modelType = 'sonnet') {
     const pass1Block = pass1Map.get(pass0Block.index)
 
     if (pass1Block) {
-      // Fusionner les corrections de Pass 0 et Pass 1
+      // Ne PAS fusionner les corrections de Pass 0 car elles sont déjà appliquées au texte
+      // Le texte original est avant Pass 0, le texte corrigé est après Pass 1
+      // Les corrections Pass 0 seraient redondantes et apparaîtraient comme "déjà corrigées"
       return {
         index: pass0Block.index,
         timecode: pass0Block.timecode,
         original: pass0Block.original,  // Le vrai original (avant Pass 0)
         corrected: pass1Block.corrected,  // Texte final après Pass 1
-        corrections: [...pass0Block.corrections, ...pass1Block.corrections]  // Combiner les corrections
+        corrections: pass1Block.corrections  // Seulement les corrections de Pass 1
       }
     } else {
-      // Pas de corrections en Pass 1, garder seulement les corrections de Pass 0
-      return pass0Block
+      // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
+      // car elles sont déjà appliquées dans le champ corrected
+      return {
+        index: pass0Block.index,
+        timecode: pass0Block.timecode,
+        original: pass0Block.original,
+        corrected: pass0Block.corrected,  // Texte après Pass 0
+        corrections: []  // Pas de corrections à afficher (déjà appliquées)
+      }
     }
   })
 
