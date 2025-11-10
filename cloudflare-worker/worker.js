@@ -227,9 +227,9 @@ function preProcessWithRegex(text) {
     }
   }
 
-  // 6. ESPACES AVANT APOSTROPHES : "l' école" → "l'école"
-  if (/\b([ldnjmtsc])'\s+/gi.test(corrected)) {
-    const matches = corrected.match(/\b([ldnjmtsc])'\s+/gi)
+  // 6. ESPACES APRÈS APOSTROPHES : "l' école" → "l'école", "qu' on" → "qu'on"
+  if (/\b([ldnjmtscq]|qu)'\s+/gi.test(corrected)) {
+    const matches = corrected.match(/\b([ldnjmtscq]|qu)'\s+/gi)
     if (matches) {
       corrections.push({
         type: 'fault',
@@ -237,7 +237,7 @@ function preProcessWithRegex(text) {
         corrected: matches[0].replace(/'\s+/, "'"),
         reason: 'Espace après apostrophe'
       })
-      corrected = corrected.replace(/\b([ldnjmtsc])'\s+/gi, "$1'")
+      corrected = corrected.replace(/\b([ldnjmtscq]|qu)'\s+/gi, "$1'")
     }
   }
 
