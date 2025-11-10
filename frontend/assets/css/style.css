@@ -448,6 +448,36 @@ body {
   margin-top: var(--spacing-lg);
 }
 
+/* Pass 0 Stats (Regex corrections summary) */
+.pass0-stats {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-sm);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.pass0-stats-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.9rem;
+}
+
+.pass0-stats-icon {
+  font-size: 1.2rem;
+}
+
+.pass0-stats-label {
+  font-weight: 600;
+}
+
+.pass0-stats-values {
+  font-weight: 400;
+  opacity: 0.95;
+}
+
 .stats-bar {
   display: flex;
   gap: var(--spacing-sm);

@@ -151,6 +151,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
             <!-- Section Editor -->
             <section class="editor-section" id="editorSection" style="display: none;">
 
+                <!-- Pass 0 Stats Summary (Regex corrections) -->
+                <div class="pass0-stats" id="pass0Stats" style="display: none;">
+                    <div class="pass0-stats-content">
+                        <span class="pass0-stats-icon">📊</span>
+                        <span class="pass0-stats-label">Nettoyage automatique :</span>
+                        <span class="pass0-stats-values" id="pass0StatsValues"></span>
+                    </div>
+                </div>
+
                 <!-- Statistics Bar with integrated buttons - STICKY -->
                 <div class="stats-bar sticky-stats" id="statsBar">
                     <div class="stats-group">

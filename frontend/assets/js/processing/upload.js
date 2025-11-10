@@ -433,6 +433,32 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 }
 
 /**
+ * Affiche les statistiques de la Pass 0 (corrections regex)
+ * @param {Object} pass0Stats - Statistiques de la Pass 0
+ */
+function displayPass0Stats(pass0Stats) {
+  const pass0StatsEl = document.getElementById('pass0Stats')
+  const pass0StatsValuesEl = document.getElementById('pass0StatsValues')
+
+  if (!pass0StatsEl || !pass0StatsValuesEl) return
+
+  // Construire le texte avec les stats non nulles
+  const statsTexts = []
+  if (pass0Stats.trimSpaces > 0) statsTexts.push(`${pass0Stats.trimSpaces} espace(s) retiré(s)`)
+  if (pass0Stats.ellipsis > 0) statsTexts.push(`${pass0Stats.ellipsis} ellipsis`)
+  if (pass0Stats.multipleSpaces > 0) statsTexts.push(`${pass0Stats.multipleSpaces} espaces multiples`)
+  if (pass0Stats.spaceBeforePunctuation > 0) statsTexts.push(`${pass0Stats.spaceBeforePunctuation} espace(s) avant ponctuation`)
+  if (pass0Stats.nonBreakingSpace > 0) statsTexts.push(`${pass0Stats.nonBreakingSpace} espace(s) insécable(s)`)
+  if (pass0Stats.frenchQuotes > 0) statsTexts.push(`${pass0Stats.frenchQuotes} guillemets français`)
+  if (pass0Stats.spaceAfterApostrophe > 0) statsTexts.push(`${pass0Stats.spaceAfterApostrophe} espace(s) après apostrophe`)
+
+  if (statsTexts.length > 0) {
+    pass0StatsValuesEl.textContent = statsTexts.join(', ')
+    pass0StatsEl.style.display = 'block'
+  }
+}
+
+/**
  * Affiche l'éditeur avec les résultats
  * @param {Object} DOM - Références DOM
  * @param {Object} AppState - État de l'application
@@ -450,6 +476,11 @@ export function showEditor(DOM, AppState, SRTParser, updateStats, renderBlocksTa
   // Afficher la minimap
   if (DOM.navigationMinimap) {
     DOM.navigationMinimap.style.display = 'flex'
+  }
+
+  // Afficher les stats Pass 0 si disponibles
+  if (AppState.pass0Stats) {
+    displayPass0Stats(AppState.pass0Stats)
   }
 
   // Calculer les statistiques
