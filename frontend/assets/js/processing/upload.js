@@ -10,30 +10,51 @@ import { updateProgress as updateProgressUI } from '../ui/progress.js'
 /**
  * Convertit les apostrophes droites en apostrophes courbes dans tous les blocs
  * @param {Array} blocks - Liste des blocs
+ * @returns {number} Nombre d'apostrophes converties
  */
 function convertStraightApostrophesToCurly(blocks) {
+  let totalCount = 0
+
   // Helper pour conversion d'apostrophes (déjà défini dans editing.js mais copié ici pour indépendance)
   const convertApostrophes = (text) => {
-    if (!text) return text
+    if (!text) return { text, count: 0 }
     const placeholder = '\uFFFF'
-    return text
+
+    // Compter les apostrophes simples qui ne sont pas des doubles apostrophes
+    const apostropheCount = (text.match(/(?<!')'(?!')/g) || []).length
+
+    const converted = text
       .replace(/''/g, placeholder)
       .replace(/'/g, '\u2019')
       .replace(new RegExp(placeholder, 'g'), "''")
+
+    return { text: converted, count: apostropheCount }
   }
 
   blocks.forEach(block => {
-    block.original = convertApostrophes(block.original)
-    block.corrected = convertApostrophes(block.corrected)
+    const originalResult = convertApostrophes(block.original)
+    block.original = originalResult.text
+    totalCount += originalResult.count
+
+    const correctedResult = convertApostrophes(block.corrected)
+    block.corrected = correctedResult.text
+    totalCount += correctedResult.count
 
     if (block.corrections && block.corrections.length > 0) {
       block.corrections.forEach(correction => {
-        correction.original = convertApostrophes(correction.original)
-        correction.corrected = convertApostrophes(correction.corrected)
+        const corrOrigResult = convertApostrophes(correction.original)
+        correction.original = corrOrigResult.text
+        totalCount += corrOrigResult.count
+
+        const corrCorrectedResult = convertApostrophes(correction.corrected)
+        correction.corrected = corrCorrectedResult.text
+        totalCount += corrCorrectedResult.count
       })
     }
   })
-  console.log('[Typography] Apostrophes droites converties en apostrophes courbes')
+
+  console.log(`[Typography] ${totalCount} apostrophes droites converties en apostrophes courbes`)
+  return totalCount
 }
 
 /**
@@ -373,8 +394,8 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
     // Arrêter la progression fictive
     clearInterval(progressInterval)
 
-    // Transformer les apostrophes
-    convertStraightApostrophesToCurly(correctedBlocks)
+    // Transformer les apostrophes et compter les conversions
+    const curlyApostrophesCount = convertStraightApostrophesToCurly(correctedBlocks)
 
     // Nettoyer les corrections fantômes
     cleanPhantomCorrections(correctedBlocks)
@@ -387,6 +408,14 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 
     // Sauvegarder les blocs
     setBlocks(correctedBlocks)
+
+    // Ajouter le compte d'apostrophes courbes aux stats Pass 0
+    if (pass0Stats) {
+      pass0Stats.curlyApostrophes = curlyApostrophesCount
+    } else {
+      // Si pas de stats du worker, créer un objet avec juste les apostrophes
+      pass0Stats = { curlyApostrophes: curlyApostrophesCount }
+    }
 
     // Stocker les stats Pass 0 dans AppState pour affichage ultérieur
     AppState.pass0Stats = pass0Stats
@@ -473,6 +502,7 @@ function displayPass0Stats(pass0Stats) {
   if (pass0Stats.nonBreakingSpace > 0) statsTexts.push(`${pass0Stats.nonBreakingSpace} espace(s) insécable(s)`)
   if (pass0Stats.frenchQuotes > 0) statsTexts.push(`${pass0Stats.frenchQuotes} guillemets français`)
   if (pass0Stats.spaceAfterApostrophe > 0) statsTexts.push(`${pass0Stats.spaceAfterApostrophe} espace(s) après apostrophe`)
+  if (pass0Stats.curlyApostrophes > 0) statsTexts.push(`${pass0Stats.curlyApostrophes} apostrophe(s) courbe(s)`)
 
   console.log('[displayPass0Stats] Stats texts:', statsTexts)
 
