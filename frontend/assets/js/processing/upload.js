@@ -49,8 +49,20 @@ function cleanPhantomCorrections(blocks) {
         const normalizedOriginal = correction.original.normalize('NFC').trim()
         const normalizedCorrected = correction.corrected.normalize('NFC').trim()
 
-        // Pour les corrections de type "doubt", garder si elles ont un champ "alternative"
+        // Pour les corrections de type "doubt" avec alternative (doutes de genre)
         if (correction.type === 'doubt' && correction.alternative) {
+          const normalizedAlternative = correction.alternative.normalize('NFC').trim()
+          // Si l'alternative est identique à l'original, c'est un doute inutile
+          if (normalizedAlternative === normalizedOriginal) {
+            removed.push({
+              original: correction.original,
+              corrected: correction.corrected,
+              alternative: correction.alternative,
+              type: correction.type,
+              reason: 'Doute de genre inutile (alternative = original)'
+            })
+            return false
+          }
           return true
         }
 
