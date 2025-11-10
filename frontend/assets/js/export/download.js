@@ -116,59 +116,54 @@ function extractAlternativeGender(correction) {
  * @returns {string} Texte avec seulement les corrections validées
  */
 function buildTextWithValidatedCorrections(block, AppState) {
-  // Si pas de corrections, retourner l'original
+  // Si pas de corrections, retourner le texte corrigé (qui contient déjà Pass 0)
   if (!block.corrections || block.corrections.length === 0) {
-    return block.original
+    return block.corrected
   }
 
-  // Filtrer pour ne garder que les corrections validées
-  const validatedCorrections = block.corrections.filter((correction, corrIndex) => {
+  // IMPORTANT: Toujours utiliser block.corrected comme base car il contient Pass 0
+  // Les corrections Pass 0 sont toujours appliquées (automatiques)
+  let result = block.corrected
+
+  // Créer une liste des corrections NON validées qu'il faut défaire
+  const nonValidatedCorrections = []
+  block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${block.index}-${corrIndex}`
-    return AppState.validatedCorrections.has(correctionId)
+    if (!AppState.validatedCorrections.has(correctionId)) {
+      nonValidatedCorrections.push({ correction, corrIndex })
+    }
   })
 
-  // Si aucune correction validée, retourner l'original
-  if (validatedCorrections.length === 0) {
-    return block.original
+  // Si aucune correction à défaire, retourner le texte tel quel
+  if (nonValidatedCorrections.length === 0) {
+    return result
   }
 
-  // Trier les corrections par position
-  const sortedCorrections = [...validatedCorrections].sort((a, b) => a.position - b.position)
+  // Trier par position décroissante pour éviter les problèmes de décalage
+  nonValidatedCorrections.sort((a, b) => b.correction.position - a.correction.position)
 
-  // Appliquer les corrections au texte original
-  let result = block.original
-  let offset = 0
+  // Défaire les corrections non validées
+  nonValidatedCorrections.forEach(({ correction, corrIndex }) => {
+    const correctionId = `${block.index}-${corrIndex}`
 
-  sortedCorrections.forEach((correction) => {
-    // Trouver l'index original de cette correction dans block.corrections
-    const originalCorrIndex = block.corrections.indexOf(correction)
-    const correctionId = `${block.index}-${originalCorrIndex}`
-
-    // Pour les corrections "doubt" de GENRE (avec alternative, pas modifiées manuellement)
+    // Pour les corrections "doubt" de GENRE
     if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
-      // Si le genre a été changé, appliquer la forme alternative
+      // Le texte dans block.corrected contient déjà l'original
+      // Si genre switché, on applique l'alternative
       if (AppState.genderSwitched.has(correctionId)) {
         const alternativeForm = extractAlternativeGender(correction)
-        const startPos = correction.position + offset
-        const endPos = startPos + correction.original.length
-
-        if (result.substring(startPos, endPos) === correction.original) {
-          result = result.substring(0, startPos) + alternativeForm + result.substring(endPos)
-          offset += alternativeForm.length - correction.original.length
+        const pos = result.indexOf(correction.original)
+        if (pos !== -1) {
+          result = result.substring(0, pos) + alternativeForm + result.substring(pos + correction.original.length)
         }
       }
-      // Sinon, garder l'original (ne rien faire)
       return
     }
 
-    // Pour les autres types de corrections (fault, et corrections modifiées manuellement)
-    const startPos = correction.position + offset
-    const endPos = startPos + correction.original.length
-
-    // Vérifier que la correction est bien à la bonne position
-    if (result.substring(startPos, endPos) === correction.original) {
-      result = result.substring(0, startPos) + correction.corrected + result.substring(endPos)
-      offset += correction.corrected.length - correction.original.length
+    // Pour les autres corrections non validées, revenir à l'original
+    const pos = result.indexOf(correction.corrected)
+    if (pos !== -1) {
+      result = result.substring(0, pos) + correction.original + result.substring(pos + correction.corrected.length)
     }
   })
 
