@@ -466,7 +466,7 @@ function displayPass0Stats(pass0Stats) {
 
   if (statsTexts.length > 0) {
     pass0StatsValuesEl.textContent = statsTexts.join(', ')
-    pass0StatsEl.style.display = 'block'
+    pass0StatsEl.style.display = 'flex'
   }
 }
 
