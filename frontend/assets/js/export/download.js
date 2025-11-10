@@ -146,8 +146,8 @@ function buildTextWithValidatedCorrections(block, AppState) {
   nonValidatedCorrections.forEach(({ correction, corrIndex }) => {
     const correctionId = `${block.index}-${corrIndex}`
 
-    // Pour les corrections "doubt" de GENRE
-    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
+    // Pour les corrections "doubt" de GENRE (vrais doutes, pas rejetées)
+    if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited && !correction.hasOwnProperty('originalType')) {
       // Le texte dans block.corrected contient déjà l'original
       // Si genre switché, on applique l'alternative
       if (AppState.genderSwitched.has(correctionId)) {
@@ -156,6 +156,15 @@ function buildTextWithValidatedCorrections(block, AppState) {
         if (pos !== -1) {
           result = result.substring(0, pos) + alternativeForm + result.substring(pos + correction.original.length)
         }
+      }
+      return
+    }
+
+    // Pour les corrections rejetées/modifiées non validées, appliquer la suggestion originale de Claude
+    if (correction.hasOwnProperty('originalSuggestion')) {
+      const pos = result.indexOf(correction.corrected)
+      if (pos !== -1) {
+        result = result.substring(0, pos) + correction.originalSuggestion + result.substring(pos + correction.corrected.length)
       }
       return
     }
