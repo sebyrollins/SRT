@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:03,000
+  Bonjour à tous
+
+2
+00:00:03,500 --> 00:00:06,000
+J'ai dit... "Attendez !"
+
+3
+00:00:06,500 --> 00:00:09,000
+C'est  vraiment  étrange , n'est-ce  pas ?
+
+4
+00:00:09,500 --> 00:00:12,000
+Voici : un exemple ; avec de la ponctuation ! Et une question ?
+
+5
+00:00:12,500 --> 00:00:15,000
+L' apostrophe et l' espace
+
+6
+00:00:15,500 --> 00:00:18,000
+Il a dit "C'est parfait" aujourd'hui .
+
+7
+00:00:18,500 --> 00:00:21,000
+Phrase normale sans erreur
+
+8
+00:00:21,500 --> 00:00:24,000
+Multiple    espaces    et "guillemets" partout...
