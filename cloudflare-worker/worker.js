@@ -54,6 +54,7 @@ async function handleRequest(request) {
       success: true,
       data: result.blocks,
       debugLogs: result.debugLogs,
+      pass0Stats: result.pass0Stats,
       fileName: fileName
     }), {
       status: 200,
