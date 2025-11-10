@@ -507,7 +507,7 @@ function displayPass0Stats(pass0Stats) {
   console.log('[displayPass0Stats] Stats texts:', statsTexts)
 
   if (statsTexts.length > 0) {
-    pass0StatsValuesEl.textContent = statsTexts.join(', ')
+    pass0StatsValuesEl.innerHTML = statsTexts.join('<br>')
     pass0StatsEl.style.display = 'flex'
     console.log('[displayPass0Stats] Display set to flex')
   } else {

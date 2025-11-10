@@ -356,10 +356,90 @@ function downloadTXT() {
 }
 
 /**
+ * Affiche une boîte de confirmation
+ * @param {string} message - Message à afficher
+ * @returns {Promise<boolean>} - true si l'utilisateur a cliqué sur "Oui"
+ */
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    // Créer l'overlay
+    const overlay = document.createElement('div')
+    overlay.className = 'custom-alert-overlay'
+
+    // Créer la boîte de confirmation
+    const confirmBox = document.createElement('div')
+    confirmBox.className = 'custom-alert-box'
+
+    // Icône de question
+    const icon = document.createElement('div')
+    icon.className = 'custom-alert-icon'
+    icon.textContent = '❓'
+
+    // Message
+    const messageEl = document.createElement('div')
+    messageEl.className = 'custom-alert-message'
+    messageEl.textContent = message
+
+    // Container pour les boutons
+    const buttonsContainer = document.createElement('div')
+    buttonsContainer.style.display = 'flex'
+    buttonsContainer.style.gap = '10px'
+    buttonsContainer.style.justifyContent = 'center'
+    buttonsContainer.style.marginTop = '10px'
+
+    // Bouton NON
+    const noButton = document.createElement('button')
+    noButton.className = 'custom-alert-button'
+    noButton.textContent = 'Non'
+    noButton.style.backgroundColor = '#6b7280'
+    noButton.onclick = () => {
+      document.body.removeChild(overlay)
+      resolve(false)
+    }
+
+    // Bouton OUI
+    const yesButton = document.createElement('button')
+    yesButton.className = 'custom-alert-button'
+    yesButton.textContent = 'Oui'
+    yesButton.onclick = () => {
+      document.body.removeChild(overlay)
+      resolve(true)
+    }
+
+    // Assembler
+    buttonsContainer.appendChild(noButton)
+    buttonsContainer.appendChild(yesButton)
+    confirmBox.appendChild(icon)
+    confirmBox.appendChild(messageEl)
+    confirmBox.appendChild(buttonsContainer)
+    overlay.appendChild(confirmBox)
+
+    // Ajouter au body
+    document.body.appendChild(overlay)
+
+    // Focus sur le bouton Non
+    noButton.focus()
+
+    // Fermer avec Escape (considéré comme "Non")
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(overlay)
+        document.removeEventListener('keydown', handleEscape)
+        resolve(false)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+  })
+}
+
+/**
  * Réinitialise l'application (wrapper pour le module processing)
  */
-function resetApp() {
-  resetAppModule(DOM, resetFileInput)
+async function resetApp() {
+  const confirmed = await showConfirm('Êtes-vous sûr de vouloir ouvrir un nouveau document ?')
+  if (confirmed) {
+    resetAppModule(DOM, resetFileInput)
+  }
 }
 
 /**

@@ -301,7 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
     <!-- Footer -->
     <footer class="app-footer">
         <div class="container">
-            <p>&copy; <?php echo date('Y'); ?> SRT Corrector Pro - Powered by Claude AI</p>
+            <p>&copy; <?php echo date('Y'); ?> SRT Corrector Pro - Powered by SebyRollins</p>
         </div>
     </footer>
 
