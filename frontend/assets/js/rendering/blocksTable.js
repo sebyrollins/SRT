@@ -217,21 +217,36 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
           ? 'DOUTE'
           : (correction.isManuallyEdited ? 'MODIFIÉ' : 'FAUTE')
 
-        cardEl.innerHTML = `
-          <div class="validation-header">
-            <span class="validation-type-badge badge-${correction.type}">
-              ${badgeText}
-            </span>
-          </div>
-          <div class="validation-correction">
-            <div class="validation-correction-text">
-              <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
-              →
-              <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
+        // Cas spécial : bloc sans correction initiale modifié
+        if (correction.wasNoCorrection) {
+          cardEl.innerHTML = `
+            <div class="validation-header">
+              <span class="validation-type-badge badge-${correction.type}">
+                ${badgeText}
+              </span>
             </div>
-            <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
-          </div>
-        `
+            <div class="validation-correction">
+              <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
+            </div>
+          `
+        } else {
+          // Affichage normal avec texte original → corrigé
+          cardEl.innerHTML = `
+            <div class="validation-header">
+              <span class="validation-type-badge badge-${correction.type}">
+                ${badgeText}
+              </span>
+            </div>
+            <div class="validation-correction">
+              <div class="validation-correction-text">
+                <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
+                →
+                <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
+              </div>
+              <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
+            </div>
+          `
+        }
 
         const actionsEl = document.createElement('div')
         actionsEl.className = 'validation-actions'

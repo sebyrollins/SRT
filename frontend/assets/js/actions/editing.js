@@ -130,20 +130,32 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
       return
     }
 
-    // Cas 2 : Retour au texte original → Dévalider les corrections (ne pas les supprimer)
+    // Cas 2 : Retour au texte original → Passer en doute validé (refus des corrections)
     if (processedValue === block.original) {
-      // Dévalider toutes les corrections de ce bloc (mais les garder)
       if (block.corrections && block.corrections.length > 0) {
-        block.corrections.forEach((_, idx) => {
+        block.corrections.forEach((correction, idx) => {
           const correctionId = `${block.index}-${idx}`
-          AppState.validatedCorrections.delete(correctionId)
+
+          // Sauvegarder le type original si pas déjà fait
+          if (!correction.hasOwnProperty('originalType')) {
+            correction.originalType = correction.type
+          }
+          if (!correction.hasOwnProperty('originalSuggestion')) {
+            correction.originalSuggestion = correction.corrected
+          }
+
+          // Passer en doute (refus de la correction)
+          correction.type = 'doubt'
+          correction.reason = 'Correction refusée par l\'utilisateur'
+          correction.isManuallyEdited = true
+
+          // VALIDER cette correction en tant que doute
+          AppState.validatedCorrections.add(correctionId)
         })
       }
 
-      // Restaurer le texte corrigé original de Claude (pas l'original avec fautes)
-      if (block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined) {
-        block.corrected = block.originalCorrected
-      }
+      // Mettre le texte corrigé = texte original (refus des corrections)
+      block.corrected = block.original
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
@@ -205,13 +217,19 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
         // Pas de corrections → créer une correction de type doute validée
         console.log(`Bloc #${block.index}: Pas de corrections, création d'une correction doute`)
 
+        // Sauvegarder l'état original si pas déjà fait
+        if (!block.hasOwnProperty('originalCorrected')) {
+          block.originalCorrected = block.corrected
+        }
+
         block.corrections = [{
           type: 'doubt',
           original: block.original,
           corrected: processedValue,
           reason: 'Modifié manuellement',
           position: 0,
-          isManuallyEdited: true
+          isManuallyEdited: true,
+          wasNoCorrection: true  // Flag pour identifier ce cas spécial
         }]
 
         block.corrected = processedValue
@@ -301,6 +319,11 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
       } else {
         // Aucune combinaison ne correspond → créer une nouvelle correction manuelle
         console.log(`Bloc #${block.index}: Modification manuelle, aucune combinaison ne correspond`)
+
+        // Sauvegarder les corrections originales pour pouvoir les restaurer
+        if (!block.hasOwnProperty('originalCorrections')) {
+          block.originalCorrections = oldCorrections.map(c => ({...c}))
+        }
 
         block.corrections = [{
           type: 'doubt',

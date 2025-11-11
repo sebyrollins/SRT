@@ -55,7 +55,68 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
 
   const correction = block.corrections[corrIndex]
 
-  // Récupérer la suggestion originale de Claude
+  // CAS SPÉCIAL : Bloc sans correction initiale (wasNoCorrection)
+  // Revenir au statut "aucune correction"
+  if (correction.wasNoCorrection) {
+    console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex} était sans correction, restauration`)
+
+    // Restaurer le texte original corrigé (avant modification)
+    if (block.hasOwnProperty('originalCorrected')) {
+      block.corrected = block.originalCorrected
+      delete block.originalCorrected
+    } else {
+      block.corrected = block.original
+    }
+
+    // Supprimer toutes les corrections
+    block.corrections.forEach((_, idx) => {
+      const corrId = `${blockIndex}-${idx}`
+      AppState.validatedCorrections.delete(corrId)
+    })
+    block.corrections = []
+
+    // Mettre à jour les stats
+    const stats = SRTParser.calculateStats(AppState.blocks)
+    updateStats(stats)
+
+    // Mettre à jour l'affichage
+    renderBlocksTable()
+    updateMinimap()
+    return
+  }
+
+  // CAS SPÉCIAL : Bloc avec plusieurs fautes qui a été remplacé par une correction globale
+  // Restaurer les fautes originales
+  if (block.hasOwnProperty('originalCorrections') && block.corrections.length === 1 && block.corrections[0].isManuallyEdited) {
+    console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex} restauration des corrections originales`)
+
+    // Restaurer les corrections originales
+    block.corrections = block.originalCorrections.map(c => ({...c}))
+    delete block.originalCorrections
+
+    // Restaurer le texte corrigé original
+    if (block.hasOwnProperty('originalCorrected')) {
+      block.corrected = block.originalCorrected
+      delete block.originalCorrected
+    }
+
+    // Dévalider toutes les corrections restaurées
+    block.corrections.forEach((_, idx) => {
+      const corrId = `${blockIndex}-${idx}`
+      AppState.validatedCorrections.delete(corrId)
+    })
+
+    // Mettre à jour les stats
+    const stats = SRTParser.calculateStats(AppState.blocks)
+    updateStats(stats)
+
+    // Mettre à jour l'affichage
+    renderBlocksTable()
+    updateMinimap()
+    return
+  }
+
+  // CAS NORMAL : Restaurer la suggestion originale d'une correction
   const originalSuggestion = correction.originalSuggestion
   if (!originalSuggestion) {
     console.log(`[resetToOriginalSuggestion] Pas de suggestion originale pour bloc #${blockIndex}, correction #${corrIndex}`)
