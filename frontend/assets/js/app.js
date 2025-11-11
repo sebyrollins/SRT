@@ -42,6 +42,7 @@ import {
 import { openEditModal } from './ui/modal.js'
 import { showSection as showSectionUI } from './ui/sections.js'
 import { updateProgress as updateProgressUI } from './ui/progress.js'
+import { initTextSizeControl } from './ui/textSize.js'
 
 // Imports des modules de rendu
 import { updateStats as updateStatsModule } from './rendering/stats.js'
@@ -220,6 +221,9 @@ function initEventListeners() {
   document.querySelectorAll('.stat-filter').forEach(filterBtn => {
     filterBtn.addEventListener('click', handleFilterClick)
   })
+
+  // Contrôle de la taille du texte
+  initTextSizeControl(DOM)
 }
 
 /**
