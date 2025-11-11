@@ -136,11 +136,30 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
       <div class="block-content" data-editable="true">${SRTParser.escapeHtml(finalCorrectedText)}</div>
     `
 
-    // Ajouter l'édition inline au double-clic sur le texte corrigé
+    // Ajouter l'édition inline au clic sur le texte corrigé
     setTimeout(() => {
       const contentEl = correctedEl.querySelector('.block-content')
       if (contentEl) {
         contentEl.addEventListener('click', () => {
+          // Vérifier si toutes les corrections sont validées avant d'autoriser l'édition
+          if (block.corrections && block.corrections.length > 0) {
+            const allValidated = block.corrections.every((_, idx) => {
+              const correctionId = `${block.index}-${idx}`
+              return AppState.validatedCorrections.has(correctionId)
+            })
+
+            if (!allValidated) {
+              // Afficher une alerte si des corrections ne sont pas validées
+              if (window.customAlert) {
+                window.customAlert('Validez d\'abord toutes les corrections de ce bloc avant de l\'éditer.')
+              } else {
+                alert('Validez d\'abord toutes les corrections de ce bloc avant de l\'éditer.')
+              }
+              return
+            }
+          }
+
+          // Autoriser l'édition si toutes les corrections sont validées (ou aucune correction)
           enableInlineEdit(contentEl, block.index, (blockIndex, newText) => {
             // Callback de sauvegarde - utiliser l'action editBlockText
             if (actions.editBlockText) {

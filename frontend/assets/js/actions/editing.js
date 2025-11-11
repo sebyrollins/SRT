@@ -22,6 +22,29 @@ function convertApostrophes(text) {
 }
 
 /**
+ * Applique un ensemble de corrections à un texte original
+ * @param {string} originalText - Texte original
+ * @param {Array} corrections - Liste de toutes les corrections
+ * @param {Array} indexesToApply - Indices des corrections à appliquer
+ * @returns {string} - Texte avec les corrections appliquées
+ */
+function applyCorrections(originalText, corrections, indexesToApply) {
+  // Trier les corrections par position (de la fin vers le début pour éviter les décalages de position)
+  const sortedCorrections = corrections
+    .map((corr, idx) => ({ corr, idx }))
+    .filter(item => indexesToApply.includes(item.idx))
+    .sort((a, b) => b.corr.position - a.corr.position)
+
+  let result = originalText
+  for (const { corr } of sortedCorrections) {
+    const before = result.substring(0, corr.position)
+    const after = result.substring(corr.position + corr.original.length)
+    result = before + corr.corrected + after
+  }
+  return result
+}
+
+/**
  * Édite le texte complet d'un bloc
  * @param {number} blockIndex - Index du bloc
  * @param {Object|string} AppStateOrNewText - État de l'application OU nouveau texte (pour édition inline)
@@ -174,38 +197,99 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
 
     // Cas 4 : Modification du texte (différent de l'original et de la suggestion)
     if (processedValue && processedValue !== block.original && processedValue !== oldCorrected) {
-      // Supprimer toutes les anciennes corrections de ce bloc
       const oldCorrections = block.corrections ? [...block.corrections] : []
+
+      if (oldCorrections.length === 0) {
+        // Pas de corrections, ne rien faire
+        return
+      }
+
+      // Analyser chaque correction pour voir si elle a été acceptée ou rejetée
+      // Tester toutes les combinaisons possibles (2^n)
+      let foundMatch = false
+      let acceptedCorrections = []
+
+      const numCorrections = oldCorrections.length
+      const maxCombinations = 1 << numCorrections // 2^n
+
+      for (let mask = 0; mask < maxCombinations; mask++) {
+        const correctionIndexesToApply = []
+        for (let i = 0; i < numCorrections; i++) {
+          if (mask & (1 << i)) {
+            correctionIndexesToApply.push(i)
+          }
+        }
+
+        // Reconstruire le texte avec cette combinaison de corrections
+        const reconstructed = applyCorrections(block.original, oldCorrections, correctionIndexesToApply)
+
+        if (reconstructed === processedValue) {
+          // On a trouvé la combinaison correspondante !
+          acceptedCorrections = correctionIndexesToApply
+          foundMatch = true
+          console.log(`Bloc #${block.index}: Corrections acceptées: ${acceptedCorrections.join(', ')}`)
+          break
+        }
+      }
+
+      // Dévalider toutes les corrections d'abord
       oldCorrections.forEach((_, idx) => {
         const correctionId = `${block.index}-${idx}`
         AppState.validatedCorrections.delete(correctionId)
       })
 
-      // Déterminer le type original
-      const originalType = (oldCorrections.length > 0 && oldCorrections[0].originalType)
-        ? oldCorrections[0].originalType
-        : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
-      const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
+      if (foundMatch) {
+        // Marquer chaque correction individuellement
+        oldCorrections.forEach((correction, idx) => {
+          const correctionId = `${block.index}-${idx}`
 
-      // Toute modification différente de la suggestion de Claude → passer en doute validé
-      console.log(`Bloc #${block.index}: Modification différente de la suggestion → doute validé`)
+          if (acceptedCorrections.includes(idx)) {
+            // Correction acceptée → garder le type original et valider
+            // Sauvegarder le type original si pas déjà fait
+            if (!correction.hasOwnProperty('originalType')) {
+              correction.originalType = correction.type
+            }
+            // Garder le type original (fault ou doubt)
+            correction.isManuallyEdited = false
+            // Valider cette correction
+            AppState.validatedCorrections.add(correctionId)
+          } else {
+            // Correction rejetée → passer en doute validé
+            // Sauvegarder le type original si pas déjà fait
+            if (!correction.hasOwnProperty('originalType')) {
+              correction.originalType = correction.type
+            }
+            correction.type = 'doubt'
+            correction.reason = 'Correction rejetée par l\'utilisateur'
+            correction.isManuallyEdited = true
+            // Valider cette correction en tant que doute
+            AppState.validatedCorrections.add(correctionId)
+          }
+        })
 
-      // Remplacer par UNE SEULE correction
-      block.corrections = [{
-        type: 'doubt',
-        original: block.original,
-        corrected: processedValue,
-        reason: 'Modifié manuellement',
-        position: 0,
-        originalSuggestion: oldCorrected,
-        originalType: originalType,
-        originalReason: originalReason,
-        isManuallyEdited: true
-      }]
+        // Mettre à jour le texte corrigé
+        block.corrected = processedValue
 
-      block.corrected = processedValue
+        // Déterminer le type global du bloc (le plus restrictif)
+        const hasDoubt = oldCorrections.some(c => c.type === 'doubt')
+        console.log(`Bloc #${block.index}: Type global = ${hasDoubt ? 'doubt' : 'fault'}`)
+      } else {
+        // Aucune combinaison ne correspond → créer une nouvelle correction manuelle
+        console.log(`Bloc #${block.index}: Modification manuelle, aucune combinaison ne correspond`)
 
-      // Ne pas valider automatiquement - laisser l'utilisateur décider
+        block.corrections = [{
+          type: 'doubt',
+          original: block.original,
+          corrected: processedValue,
+          reason: 'Modifié manuellement',
+          position: 0,
+          originalSuggestion: oldCorrected,
+          isManuallyEdited: true
+        }]
+
+        block.corrected = processedValue
+        // Ne pas valider automatiquement
+      }
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
