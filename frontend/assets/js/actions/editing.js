@@ -124,6 +124,8 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
     const oldCorrected = block.corrected
 
     // Cas 1 : Aucun changement par rapport à la suggestion de Claude actuelle
+    // L'utilisateur a cliqué et sorti sans modifier → ne rien faire
+    // (toutes les corrections sont déjà validées puisqu'on vérifie avant d'autoriser l'édition)
     if (processedValue === oldCorrected) {
       return
     }
