@@ -202,7 +202,30 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
       const oldCorrections = block.corrections ? [...block.corrections] : []
 
       if (oldCorrections.length === 0) {
-        // Pas de corrections, ne rien faire
+        // Pas de corrections → créer une correction de type doute validée
+        console.log(`Bloc #${block.index}: Pas de corrections, création d'une correction doute`)
+
+        block.corrections = [{
+          type: 'doubt',
+          original: block.original,
+          corrected: processedValue,
+          reason: 'Modifié manuellement',
+          position: 0,
+          isManuallyEdited: true
+        }]
+
+        block.corrected = processedValue
+
+        // Valider automatiquement cette correction en doute
+        AppState.validatedCorrections.add(`${block.index}-0`)
+
+        // Mettre à jour les stats
+        const stats = SRTParser.calculateStats(AppState.blocks)
+        updateStats(stats)
+
+        // Re-render
+        renderBlocksTable()
+        updateMinimap()
         return
       }
 
@@ -290,7 +313,9 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
         }]
 
         block.corrected = processedValue
-        // Ne pas valider automatiquement
+
+        // Valider automatiquement cette correction en doute
+        AppState.validatedCorrections.add(`${block.index}-0`)
       }
 
       // Mettre à jour les stats

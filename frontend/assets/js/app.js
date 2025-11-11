@@ -445,6 +445,69 @@ function showConfirm(message) {
 }
 
 /**
+ * Affiche une alerte centrée
+ * @param {string} message - Message à afficher
+ * @returns {Promise<void>}
+ */
+function customAlert(message) {
+  return new Promise((resolve) => {
+    // Créer l'overlay
+    const overlay = document.createElement('div')
+    overlay.className = 'custom-alert-overlay'
+
+    // Créer la boîte d'alerte
+    const alertBox = document.createElement('div')
+    alertBox.className = 'custom-alert-box'
+
+    // Icône d'avertissement
+    const icon = document.createElement('div')
+    icon.className = 'custom-alert-icon'
+    icon.textContent = '⚠️'
+
+    // Message
+    const messageEl = document.createElement('div')
+    messageEl.className = 'custom-alert-message'
+    messageEl.textContent = message
+
+    // Bouton OK
+    const okButton = document.createElement('button')
+    okButton.className = 'custom-alert-button'
+    okButton.textContent = 'OK'
+    okButton.style.marginTop = '10px'
+    okButton.onclick = () => {
+      document.body.removeChild(overlay)
+      document.removeEventListener('keydown', handleEscape)
+      resolve()
+    }
+
+    // Assembler
+    alertBox.appendChild(icon)
+    alertBox.appendChild(messageEl)
+    alertBox.appendChild(okButton)
+    overlay.appendChild(alertBox)
+
+    // Ajouter au body
+    document.body.appendChild(overlay)
+
+    // Focus sur le bouton OK
+    okButton.focus()
+
+    // Fermer avec Escape ou Enter
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        document.body.removeChild(overlay)
+        document.removeEventListener('keydown', handleEscape)
+        resolve()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+  })
+}
+
+// Exposer customAlert globalement
+window.customAlert = customAlert
+
+/**
  * Réinitialise l'application (wrapper pour le module processing)
  */
 async function resetApp() {

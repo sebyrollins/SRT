@@ -150,11 +150,7 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
             if (!allValidated) {
               // Afficher une alerte si des corrections ne sont pas validées
-              if (window.customAlert) {
-                window.customAlert('Validez d\'abord toutes les corrections de ce bloc avant de l\'éditer.')
-              } else {
-                alert('Validez d\'abord toutes les corrections de ce bloc avant de l\'éditer.')
-              }
+              window.customAlert('Validez d\'abord toutes les corrections de ce bloc avant de l\'éditer.')
               return
             }
           }
