@@ -42,7 +42,6 @@ export function enableInlineEdit(contentElement, blockIndex, onSave) {
     // Si le texte a changé, sauvegarder
     if (newText !== originalText && newText.length > 0) {
       onSave(blockIndex, newText)
-      showToast('✓ Texte modifié', 'success')
     }
 
     // Retirer les listeners
@@ -57,8 +56,6 @@ export function enableInlineEdit(contentElement, blockIndex, onSave) {
     // Désactiver l'édition
     contentElement.contentEditable = 'false'
     contentElement.classList.remove('editing-inline')
-
-    showToast('✕ Modification annulée', 'info')
 
     // Retirer les listeners
     cleanup()
