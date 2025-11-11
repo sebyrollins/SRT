@@ -1914,12 +1914,12 @@ body {
   display: flex;
   flex-direction: column;
 
-  /* Valeurs par défaut (desktop) */
+  /* Valeurs par défaut (desktop) - positionné sous la barre de stats */
   right: 20px;
-  top: 220px;
+  top: calc(var(--stats-height) + 20px); /* Sous la barre de stats + marge */
   bottom: 20px;
   width: 50px;
-  height: calc(100vh - 240px);
+  height: calc(100vh - var(--stats-height) - 40px); /* Hauteur = viewport - stats - marges */
   padding: 8px;
 }
 
@@ -2036,25 +2036,25 @@ body {
 
 /* ===== Minimap Responsive Design ===== */
 
-/* Desktop (défaut) : minimap normale */
+/* Desktop (défaut) : minimap normale sous la barre de stats */
 @media (min-width: 1025px) {
   .navigation-minimap {
     right: 20px;
-    top: 220px;
+    top: calc(var(--stats-height) + 20px);
     bottom: 20px;
     width: 50px;
-    height: calc(100vh - 240px);
+    height: calc(100vh - var(--stats-height) - 40px);
   }
 }
 
-/* Tablette (768px - 1024px) : minimap plus petite, repositionnée */
+/* Tablette (768px - 1024px) : minimap plus petite, sous la barre de stats */
 @media (max-width: 1024px) and (min-width: 768px) {
   .navigation-minimap {
     right: 12px;
-    top: 180px;
+    top: calc(var(--stats-height) + 12px);
     bottom: 12px;
     width: 40px;
-    height: calc(100vh - 200px);
+    height: calc(100vh - var(--stats-height) - 24px);
   }
 
   .minimap-title {
@@ -2064,6 +2064,7 @@ body {
 
   .minimap-block {
     min-height: 2px;
+    border-radius: 1.5px;
   }
 
   /* Tooltip plus petit sur tablette */
@@ -2073,14 +2074,14 @@ body {
   }
 }
 
-/* Mobile paysage (481px - 767px) : minimap très compacte */
+/* Mobile paysage (481px - 767px) : minimap très compacte sous la barre de stats */
 @media (max-width: 767px) and (min-width: 481px) {
   .navigation-minimap {
     right: 8px;
-    top: 140px;
+    top: calc(var(--stats-height) + 8px);
     bottom: 8px;
     width: 32px;
-    height: calc(100vh - 160px);
+    height: calc(100vh - var(--stats-height) - 16px);
     padding: 6px;
   }
 
@@ -2105,16 +2106,16 @@ body {
   }
 }
 
-/* Mobile portrait (< 480px) : minimap cachée par défaut, affichée via toggle */
+/* Mobile portrait (< 480px) : minimap semi-transparente sous la barre de stats */
 @media (max-width: 480px) {
   .navigation-minimap {
     right: 8px;
-    top: 100px;
+    top: calc(var(--stats-height) + 8px);
     bottom: 8px;
     width: 28px;
-    height: calc(100vh - 120px);
+    height: calc(100vh - var(--stats-height) - 16px);
     padding: 4px;
-    opacity: 0.6;
+    opacity: 0.7;
     transition: opacity 0.3s ease;
   }
 
@@ -2129,7 +2130,7 @@ body {
 
   .minimap-block {
     min-height: 1px;
-    border-radius: 1px;
+    border-radius: 0.5px;
   }
 
   .minimap-block:hover {
@@ -2149,14 +2150,20 @@ body {
   }
 }
 
-/* Très petit écran (< 360px) : minimap encore plus compacte */
+/* Très petit écran (< 360px) : minimap ultra-compacte */
 @media (max-width: 359px) {
   .navigation-minimap {
     width: 24px;
     right: 4px;
-    top: 80px;
+    top: calc(var(--stats-height) + 4px);
     bottom: 4px;
+    height: calc(100vh - var(--stats-height) - 8px);
     padding: 3px;
+  }
+
+  .minimap-block {
+    min-height: 0.5px;
+    border-radius: 0.5px;
   }
 
   .minimap-block.minimap-current {
