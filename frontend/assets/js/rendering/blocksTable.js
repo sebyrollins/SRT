@@ -140,7 +140,7 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
     setTimeout(() => {
       const contentEl = correctedEl.querySelector('.block-content')
       if (contentEl) {
-        contentEl.addEventListener('dblclick', () => {
+        contentEl.addEventListener('click', () => {
           enableInlineEdit(contentEl, block.index, (blockIndex, newText) => {
             // Callback de sauvegarde - utiliser l'action editBlockText
             if (actions.editBlockText) {
@@ -151,7 +151,7 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
         // Ajouter une indication visuelle au survol
         contentEl.style.cursor = 'text'
-        contentEl.title = 'Double-cliquer pour éditer'
+        contentEl.title = 'Cliquer pour éditer'
       }
     }, 0)
 
