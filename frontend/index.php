@@ -154,6 +154,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                 <!-- Statistics Bar with integrated buttons - STICKY -->
                 <div class="stats-bar sticky-stats" id="statsBar">
                     <div class="stats-group">
+                        <!-- Pass 0 Stats (Regex corrections) -->
+                        <div class="stat-item stat-pass0" id="pass0Stats" style="display: none;">
+                            <div class="stat-pass0-content">
+                                <span class="stat-pass0-icon">📊</span>
+                                <span class="stat-pass0-label">Nettoyage :</span>
+                                <span class="stat-pass0-values" id="pass0StatsValues"></span>
+                            </div>
+                        </div>
+
                         <div class="stat-item">
                             <div class="stat-filter-zone stat-filter" data-filter="all">
                                 <div class="stat-line">
@@ -292,7 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
     <!-- Footer -->
     <footer class="app-footer">
         <div class="container">
-            <p>&copy; <?php echo date('Y'); ?> SRT Corrector Pro - Powered by Claude AI</p>
+            <p>&copy; <?php echo date('Y'); ?> SRT Corrector Pro - Powered by SebyRollins</p>
         </div>
     </footer>
 
@@ -313,6 +322,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
         <?php endif; ?>
     </script>
     <script src="assets/js/srt-parser.js"></script>
-    <script src="assets/js/app.js"></script>
+    <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>

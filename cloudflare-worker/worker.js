@@ -54,6 +54,7 @@ async function handleRequest(request) {
       success: true,
       data: result.blocks,
       debugLogs: result.debugLogs,
+      pass0Stats: result.pass0Stats,
       fileName: fileName
     }), {
       status: 200,
@@ -226,9 +227,9 @@ function preProcessWithRegex(text) {
     }
   }
 
-  // 6. ESPACES AVANT APOSTROPHES : "l' école" → "l'école"
-  if (/\b([ldnjmtsc])'\s+/gi.test(corrected)) {
-    const matches = corrected.match(/\b([ldnjmtsc])'\s+/gi)
+  // 6. ESPACES APRÈS APOSTROPHES : "l' école" → "l'école", "qu' on" → "qu'on"
+  if (/\b([ldnjmtscq]|qu)'\s+/gi.test(corrected)) {
+    const matches = corrected.match(/\b([ldnjmtscq]|qu)'\s+/gi)
     if (matches) {
       corrections.push({
         type: 'fault',
@@ -236,7 +237,7 @@ function preProcessWithRegex(text) {
         corrected: matches[0].replace(/'\s+/, "'"),
         reason: 'Espace après apostrophe'
       })
-      corrected = corrected.replace(/\b([ldnjmtsc])'\s+/gi, "$1'")
+      corrected = corrected.replace(/\b([ldnjmtscq]|qu)'\s+/gi, "$1'")
     }
   }
 
@@ -458,8 +459,23 @@ function deduplicateCorrections(corrections, blockIndex) {
     // Vérifier si cette correction est contenue dans une autre correction doubt plus longue
     const isContainedInLonger = doubtCorrections.some(other => {
       if (other === correction) return false
-      // Si l'autre correction contient celle-ci (texte plus long), alors celle-ci est un doublon
-      return other.original.includes(correction.original) && other.original.length > correction.original.length
+
+      // Construire les textes possibles pour chaque doute (original et alternative)
+      const otherTexts = [other.original]
+      if (other.alternative) otherTexts.push(other.alternative)
+
+      const correctionTexts = [correction.original]
+      if (correction.alternative) correctionTexts.push(correction.alternative)
+
+      // Vérifier si n'importe quel texte de 'other' contient n'importe quel texte de 'correction'
+      // ET que 'other' est plus long (plus de contexte)
+      const hasOverlap = otherTexts.some(otherText =>
+        correctionTexts.some(corrText =>
+          otherText.includes(corrText) && otherText.length > corrText.length
+        )
+      )
+
+      return hasOverlap
     })
 
     if (isContainedInLonger) {
@@ -480,10 +496,20 @@ function deduplicateCorrections(corrections, blockIndex) {
   otherCorrections.forEach(correction => {
     // Vérifier si cette correction fault est englobée par un doute de genre
     const isEnglobed = filteredDoubtCorrections.some(doubt => {
-      // Si le doute contient l'original de la fault, c'est un chevauchement
-      // Exemple: doubt "Je semble perdu" englobe fault "perdue"
-      return doubt.original.includes(correction.original) ||
-             (doubt.alternative && doubt.alternative.includes(correction.original))
+      // Si le doute contient l'original OU le corrected de la fault, c'est un chevauchement
+      // Exemple: doubt "Je semble perdu" englobe fault "perdue" → "perdu"
+      // Vérifie les deux sens possibles pour être robuste
+      const doubtTexts = [doubt.original]
+      if (doubt.alternative) {
+        doubtTexts.push(doubt.alternative)
+      }
+
+      const correctionTexts = [correction.original, correction.corrected]
+
+      // Vérifier si n'importe quel texte du doute contient n'importe quel texte de la correction
+      return doubtTexts.some(doubtText =>
+        correctionTexts.some(corrText => doubtText.includes(corrText))
+      )
     })
 
     if (isEnglobed) {
@@ -641,8 +667,31 @@ async function processSRT(srtContent, modelType = 'sonnet') {
   // ═══════════════════════════════════════════════════════════════
   console.log(`[processSRT] === PASS 0: Regex preprocessing on ${blocks.length} blocks ===`)
 
+  // Compteurs pour les stats Pass 0
+  const pass0Stats = {
+    trimSpaces: 0,
+    ellipsis: 0,
+    multipleSpaces: 0,
+    spaceBeforePunctuation: 0,
+    nonBreakingSpace: 0,
+    frenchQuotes: 0,
+    spaceAfterApostrophe: 0
+  }
+
   const blocksAfterPass0 = blocks.map(block => {
     const { corrected, corrections } = preProcessWithRegex(block.text)
+
+    // Compter les types de corrections
+    corrections.forEach(corr => {
+      if (corr.reason.includes('Espaces en début/fin')) pass0Stats.trimSpaces++
+      else if (corr.reason.includes('Ellipsis')) pass0Stats.ellipsis++
+      else if (corr.reason.includes('Espaces multiples')) pass0Stats.multipleSpaces++
+      else if (corr.reason.includes('Espace avant ponctuation')) pass0Stats.spaceBeforePunctuation++
+      else if (corr.reason.includes('Espace insécable')) pass0Stats.nonBreakingSpace++
+      else if (corr.reason.includes('Guillemets')) pass0Stats.frenchQuotes++
+      else if (corr.reason.includes('Espace après apostrophe')) pass0Stats.spaceAfterApostrophe++
+    })
+
     return {
       index: block.index,
       timecode: block.timecode,
@@ -654,6 +703,7 @@ async function processSRT(srtContent, modelType = 'sonnet') {
 
   const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
   console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
+  console.log(`[processSRT] Pass 0 stats:`, pass0Stats)
 
   // ═══════════════════════════════════════════════════════════════
   // MODE CLEANING : Retourner uniquement les corrections regex
@@ -663,7 +713,8 @@ async function processSRT(srtContent, modelType = 'sonnet') {
     console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
     return {
       blocks: blocksAfterPass0,
-      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`]
+      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
+      pass0Stats: pass0Stats
     }
   }
 
@@ -697,17 +748,26 @@ async function processSRT(srtContent, modelType = 'sonnet') {
     const pass1Block = pass1Map.get(pass0Block.index)
 
     if (pass1Block) {
-      // Fusionner les corrections de Pass 0 et Pass 1
+      // Ne PAS fusionner les corrections de Pass 0 car elles sont déjà appliquées au texte
+      // Le texte original est avant Pass 0, le texte corrigé est après Pass 1
+      // Les corrections Pass 0 seraient redondantes et apparaîtraient comme "déjà corrigées"
       return {
         index: pass0Block.index,
         timecode: pass0Block.timecode,
         original: pass0Block.original,  // Le vrai original (avant Pass 0)
         corrected: pass1Block.corrected,  // Texte final après Pass 1
-        corrections: [...pass0Block.corrections, ...pass1Block.corrections]  // Combiner les corrections
+        corrections: pass1Block.corrections  // Seulement les corrections de Pass 1
       }
     } else {
-      // Pas de corrections en Pass 1, garder seulement les corrections de Pass 0
-      return pass0Block
+      // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
+      // car elles sont déjà appliquées dans le champ corrected
+      return {
+        index: pass0Block.index,
+        timecode: pass0Block.timecode,
+        original: pass0Block.original,
+        corrected: pass0Block.corrected,  // Texte après Pass 0
+        corrections: []  // Pas de corrections à afficher (déjà appliquées)
+      }
     }
   })
 
@@ -895,7 +955,8 @@ async function processSRT(srtContent, modelType = 'sonnet') {
 
   return {
     blocks: finalBlocks,
-    debugLogs: debugLogs
+    debugLogs: debugLogs,
+    pass0Stats: pass0Stats
   }
 }
 
@@ -1022,7 +1083,7 @@ function applyCorrections(originalText, corrections) {
  * Laisse Claude détecter les fautes évidentes sans surcharge
  */
 function buildSystemPromptPass1() {
-  return `Corrige toutes les fautes de français dans ce fichier SRT.
+  return `Corrige les sous-titres comme un professionnel de l'orthographe, conjugaison, grammaire et typographie, tout en respectant le parlé de la personne dans ce fichier SRT.
 
 Format de réponse JSON :
 {

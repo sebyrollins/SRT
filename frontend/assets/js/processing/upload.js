@@ -1,0 +1,576 @@
+/**
+ * Module de traitement des fichiers uploadés
+ * Gère l'upload, le traitement et le nettoyage des corrections
+ */
+
+import { setOriginalFilename, setBlocks } from '../state/stateManager.js'
+import { showSection as showSectionUI } from '../ui/sections.js'
+import { updateProgress as updateProgressUI } from '../ui/progress.js'
+
+/**
+ * Convertit les apostrophes droites en apostrophes courbes dans tous les blocs
+ * @param {Array} blocks - Liste des blocs
+ * @returns {number} Nombre d'apostrophes converties
+ */
+function convertStraightApostrophesToCurly(blocks) {
+  let totalCount = 0
+
+  // Helper pour conversion d'apostrophes (déjà défini dans editing.js mais copié ici pour indépendance)
+  const convertApostrophes = (text) => {
+    if (!text) return { text, count: 0 }
+    const placeholder = '\uFFFF'
+
+    // Compter les apostrophes simples qui ne sont pas des doubles apostrophes
+    const apostropheCount = (text.match(/(?<!')'(?!')/g) || []).length
+
+    const converted = text
+      .replace(/''/g, placeholder)
+      .replace(/'/g, '\u2019')
+      .replace(new RegExp(placeholder, 'g'), "''")
+
+    return { text: converted, count: apostropheCount }
+  }
+
+  blocks.forEach(block => {
+    const originalResult = convertApostrophes(block.original)
+    block.original = originalResult.text
+    totalCount += originalResult.count
+
+    const correctedResult = convertApostrophes(block.corrected)
+    block.corrected = correctedResult.text
+    totalCount += correctedResult.count
+
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach(correction => {
+        const corrOrigResult = convertApostrophes(correction.original)
+        correction.original = corrOrigResult.text
+        totalCount += corrOrigResult.count
+
+        const corrCorrectedResult = convertApostrophes(correction.corrected)
+        correction.corrected = corrCorrectedResult.text
+        totalCount += corrCorrectedResult.count
+      })
+    }
+  })
+
+  console.log(`[Typography] ${totalCount} apostrophes droites converties en apostrophes courbes`)
+  return totalCount
+}
+
+/**
+ * Nettoie les corrections "fantômes" où original === corrected
+ * @param {Array} blocks - Liste des blocs
+ */
+function cleanPhantomCorrections(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      const removed = []
+
+      block.corrections = block.corrections.filter(correction => {
+        const normalizedOriginal = correction.original.normalize('NFC').trim()
+        const normalizedCorrected = correction.corrected.normalize('NFC').trim()
+
+        // Pour les corrections de type "doubt" avec alternative (doutes de genre)
+        if (correction.type === 'doubt' && correction.alternative) {
+          const normalizedAlternative = correction.alternative.normalize('NFC').trim()
+          // Si l'alternative est identique à l'original, c'est un doute inutile
+          if (normalizedAlternative === normalizedOriginal) {
+            removed.push({
+              original: correction.original,
+              corrected: correction.corrected,
+              alternative: correction.alternative,
+              type: correction.type,
+              reason: 'Doute de genre inutile (alternative = original)'
+            })
+            return false
+          }
+          return true
+        }
+
+        const isPhantom = normalizedOriginal === normalizedCorrected
+
+        if (isPhantom) {
+          removed.push({
+            original: correction.original,
+            corrected: correction.corrected,
+            type: correction.type,
+            reason: correction.reason
+          })
+        }
+        return !isPhantom
+      })
+
+      if (removed.length > 0) {
+        console.log(`Bloc #${block.index}: ${removed.length} correction(s) fantôme(s) supprimée(s):`, removed)
+      }
+    }
+  })
+}
+
+/**
+ * Retire les corrections de genre (doubt) du texte corrigé
+ * @param {Array} blocks - Liste des blocs
+ */
+function removeDoubtCorrectionsFromText(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      const doubtCorrections = block.corrections.filter(c => c.type === 'doubt')
+
+      if (doubtCorrections.length > 0) {
+        doubtCorrections.forEach(correction => {
+          if (block.corrected.includes(correction.original)) {
+            return
+          }
+
+          // Nouveau format : utiliser le champ alternative si disponible
+          if (correction.alternative) {
+            if (block.corrected.includes(correction.alternative)) {
+              block.corrected = block.corrected.replace(correction.alternative, correction.original)
+              return
+            }
+          }
+
+          // Ancien format : chercher et remplacer les formes avec parenthèses
+          const originalWords = correction.original.split(/\s+/)
+          const lastWord = originalWords[originalWords.length - 1]
+
+          const escapedPrefix = originalWords.slice(0, -1).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+          const escapedLastWord = lastWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+          const pattern = new RegExp(
+            `${escapedPrefix}${escapedPrefix ? '\\s+' : ''}${escapedLastWord}e*\\s*\\(ou\\s+[^)]+\\)`,
+            'g'
+          )
+
+          const newText = block.corrected.replace(pattern, correction.original)
+          if (newText !== block.corrected) {
+            block.corrected = newText
+            console.log(`[removeDoubtCorrections] Nettoyé ancien format dans bloc #${block.index}`)
+          }
+        })
+      }
+    }
+  })
+}
+
+/**
+ * Nettoie les objets correction.corrected pour les corrections de doute
+ * @param {Array} blocks - Liste des blocs
+ */
+function cleanDoubtCorrectionsObjects(blocks) {
+  blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach(correction => {
+        if (correction.type === 'doubt') {
+          // Si nouveau format avec alternative, s'assurer que corrected = original
+          if (correction.alternative) {
+            correction.corrected = correction.original
+          }
+          // Si ancien format avec parenthèses, enlever les parenthèses
+          else if (correction.corrected.includes('(ou ')) {
+            correction.corrected = correction.original
+            console.log(`[cleanDoubtObjects] Nettoyé correction de doute dans bloc #${block.index}`)
+          }
+        }
+      })
+    }
+  })
+}
+
+/**
+ * Valide automatiquement toutes les corrections de doute (genre)
+ * @param {Object} AppState - État de l'application
+ */
+function autoValidateDoubtCorrections(AppState) {
+  AppState.blocks.forEach(block => {
+    if (block.corrections && block.corrections.length > 0) {
+      block.corrections.forEach((correction, corrIndex) => {
+        // Ne valider que les VRAIS doutes de genre (avec alternative), pas les corrections rejetées
+        if (correction.type === 'doubt' && correction.alternative) {
+          const correctionId = `${block.index}-${corrIndex}`
+          AppState.validatedCorrections.add(correctionId)
+        }
+      })
+    }
+  })
+  console.log('[Doubt] Corrections de genre auto-validées:', AppState.validatedCorrections.size)
+}
+
+/**
+ * Envoie le contenu au Cloudflare Worker
+ * @param {string} content - Contenu du fichier SRT
+ * @param {string} filename - Nom du fichier
+ * @returns {Promise} - Promise résolvant avec les blocs corrigés
+ */
+async function sendToWorker(content, filename) {
+  // Vérifier que le Worker est configuré
+  if (window.APP_CONFIG.workerUrl.includes('YOUR-SUBDOMAIN')) {
+    throw new Error(`⚠️ Le Worker Cloudflare n'est pas encore configuré.\n\nÉtapes :\n1. Déployez le Worker sur Cloudflare\n2. Modifiez l'URL dans frontend/lib/config.php\n\nConsultez le README.md pour les instructions.`)
+  }
+
+  // Récupérer le modèle sélectionné
+  const modelSelect = document.getElementById('modelSelect')
+  const selectedModel = modelSelect ? modelSelect.value : 'haiku'
+
+  const response = await fetch(window.APP_CONFIG.workerUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      srtContent: content,
+      fileName: filename,
+      model: selectedModel
+    })
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Erreur serveur: ${response.status}\n\nDétails: ${errorText}\n\nVérifiez que :\n1. Le Worker Cloudflare est déployé\n2. La clé ANTHROPIC_API_KEY est configurée\n3. L'URL du Worker est correcte dans config.php`)
+  }
+
+  const result = await response.json()
+
+  if (!result.success) {
+    throw new Error(result.error || 'Erreur inconnue')
+  }
+
+  // Afficher les logs de debug si présents
+  if (result.debugLogs && result.debugLogs.length > 0) {
+    console.log('=== DEBUG LOGS FROM WORKER ===')
+    result.debugLogs.forEach((log, index) => {
+      console.log(`\n[${index + 1}] ${log.type} (${log.timestamp}):`)
+      if (log.type === 'pass4_user_prompt') {
+        console.log('User Prompt:', log.content)
+      } else if (log.type === 'pass4_claude_response') {
+        console.log('Claude Response:', log.content)
+        console.log('Blocks Count:', log.blocksCount)
+      } else if (log.type === 'pass4_validation') {
+        console.log(`Block #${log.blockIndex}:`)
+        console.log(`  Correction: "${log.correctionOriginal}"`)
+        console.log(`  Block text: "${log.blockText}"`)
+        console.log(`  Contains: ${log.contains}`)
+      } else if (log.type === 'pass4_rejection') {
+        console.log(`❌ REJECTED - Block #${log.blockIndex}:`)
+        console.log(`  Correction: "${log.correctionOriginal}" → "${log.correctionCorrected}"`)
+        console.log(`  Block text: "${log.blockText}"`)
+      }
+    })
+    console.log('=== END DEBUG LOGS ===\n')
+  }
+
+  // Afficher les stats Pass 0 si présentes
+  if (result.pass0Stats) {
+    console.log('=== PASS 0 STATS ===')
+    console.log('Trim Spaces:', result.pass0Stats.trimSpaces)
+    console.log('Ellipsis:', result.pass0Stats.ellipsis)
+    console.log('Multiple Spaces:', result.pass0Stats.multipleSpaces)
+    console.log('Space Before Punctuation:', result.pass0Stats.spaceBeforePunctuation)
+    console.log('Non-Breaking Space:', result.pass0Stats.nonBreakingSpace)
+    console.log('French Quotes:', result.pass0Stats.frenchQuotes)
+    console.log('Space After Apostrophe:', result.pass0Stats.spaceAfterApostrophe)
+    console.log('=== END PASS 0 STATS ===\n')
+  } else {
+    console.warn('[WARNING] No pass0Stats received from worker')
+  }
+
+  return {
+    blocks: result.data,
+    pass0Stats: result.pass0Stats || null
+  }
+}
+
+/**
+ * Gère la sélection de fichier
+ * @param {Event} event - Événement de sélection de fichier
+ * @param {Object} DOM - Références DOM
+ * @param {Object} SRTParser - Parser SRT
+ */
+export function handleFileSelection(event, DOM, SRTParser, resetFileInput) {
+  const file = event.target.files[0]
+
+  if (file) {
+    DOM.fileName.textContent = file.name
+    DOM.fileSize.textContent = SRTParser.formatFileSize(file.size)
+    DOM.fileInfo.style.display = 'flex'
+
+    // Valider la taille
+    if (file.size > window.APP_CONFIG.maxFileSize) {
+      alert(`Le fichier est trop volumineux (max ${SRTParser.formatFileSize(window.APP_CONFIG.maxFileSize)})`)
+      resetFileInput()
+    }
+  }
+}
+
+/**
+ * Gestion de la soumission du formulaire
+ * @param {Event} event - Événement de soumission
+ * @param {Object} DOM - Références DOM
+ * @param {Function} processUploadedFile - Fonction de traitement
+ */
+export function handleFormSubmit(event, DOM, processUploadedFile) {
+  event.preventDefault()
+
+  const file = DOM.fileInput.files[0]
+  if (!file) {
+    alert('Veuillez sélectionner un fichier')
+    return
+  }
+
+  // Lire le fichier
+  const reader = new FileReader()
+
+  reader.onload = (e) => {
+    const content = e.target.result
+    processUploadedFile(content, file.name)
+  }
+
+  reader.onerror = () => {
+    alert('Erreur lors de la lecture du fichier')
+  }
+
+  reader.readAsText(file)
+}
+
+/**
+ * Traite un fichier uploadé
+ * @param {string} content - Contenu du fichier
+ * @param {string} filename - Nom du fichier
+ * @param {Object} DOM - Références DOM
+ * @param {Object} AppState - État de l'application
+ * @param {Object} SRTParser - Parser SRT
+ * @param {Function} showEditor - Fonction d'affichage de l'éditeur
+ */
+export async function processUploadedFile(content, filename, DOM, AppState, SRTParser, showEditor) {
+  // Valider le contenu
+  const validation = SRTParser.validate(content)
+
+  if (!validation.valid) {
+    alert(`Fichier invalide : ${validation.error}`)
+    return
+  }
+
+  setOriginalFilename(filename)
+
+  // Désactiver le sélecteur de modèle une fois le fichier envoyé
+  const modelSelect = document.getElementById('modelSelect')
+  if (modelSelect) {
+    modelSelect.disabled = true
+  }
+
+  // Afficher la section de chargement
+  showSectionUI('loading', DOM)
+
+  // Estimer le temps de traitement
+  const fileSizeKB = new Blob([content]).size / 1024
+  const baseTimeMs = 30000
+  const msPerKB = 280
+  const maxTimeMs = 100000
+  const estimatedTimeMs = Math.min(maxTimeMs, baseTimeMs + (fileSizeKB * msPerKB))
+
+  // Progression fictive fluide jusqu'à 80%
+  let currentProgress = 0
+  const targetProgress = 80
+  const updateInterval = 100
+  const progressIncrement = (targetProgress / estimatedTimeMs) * updateInterval
+
+  updateProgressUI(0, 'Veuillez patienter pendant l\'analyse...', DOM)
+
+  const progressInterval = setInterval(() => {
+    currentProgress += progressIncrement
+    if (currentProgress >= targetProgress) {
+      currentProgress = targetProgress
+      clearInterval(progressInterval)
+    }
+    updateProgressUI(Math.round(currentProgress), 'Veuillez patienter pendant l\'analyse...', DOM)
+  }, updateInterval)
+
+  try {
+    // Envoyer au Worker Cloudflare
+    const result = await sendToWorker(content, filename)
+    const correctedBlocks = result.blocks
+    const pass0Stats = result.pass0Stats
+
+    // Arrêter la progression fictive
+    clearInterval(progressInterval)
+
+    // Transformer les apostrophes et compter les conversions
+    const curlyApostrophesCount = convertStraightApostrophesToCurly(correctedBlocks)
+
+    // Nettoyer les corrections fantômes
+    cleanPhantomCorrections(correctedBlocks)
+
+    // Retirer les corrections de genre du texte
+    removeDoubtCorrectionsFromText(correctedBlocks)
+
+    // Nettoyer les objets correction.corrected pour les corrections de doute
+    cleanDoubtCorrectionsObjects(correctedBlocks)
+
+    // Sauvegarder les blocs
+    setBlocks(correctedBlocks)
+
+    // Ajouter le compte d'apostrophes courbes aux stats Pass 0
+    if (pass0Stats) {
+      pass0Stats.curlyApostrophes = curlyApostrophesCount
+    } else {
+      // Si pas de stats du worker, créer un objet avec juste les apostrophes
+      pass0Stats = { curlyApostrophes: curlyApostrophesCount }
+    }
+
+    // Stocker les stats Pass 0 dans AppState pour affichage ultérieur
+    AppState.pass0Stats = pass0Stats
+
+    // Valider automatiquement toutes les corrections de genre (doute)
+    autoValidateDoubtCorrections(AppState)
+
+    // Sauvegarder la suggestion originale de Claude pour chaque bloc
+    AppState.blocks.forEach(block => {
+      if (!block.hasOwnProperty('originalCorrected')) {
+        block.originalCorrected = block.corrected
+      }
+      if (!block.hasOwnProperty('hadOriginalCorrections')) {
+        block.hadOriginalCorrections = block.corrections && block.corrections.length > 0
+      }
+    })
+
+    // Progression finale de 80% à 100%
+    const finalProgressDuration = 4000
+    const finalProgressSteps = 20
+    const finalProgressIncrement = 20 / finalProgressSteps
+    const finalProgressInterval = finalProgressDuration / finalProgressSteps
+
+    let finalProgress = 80
+    const messages = [
+      { threshold: 80, text: 'Traitement des résultats...' },
+      { threshold: 90, text: 'Finalisation...' },
+      { threshold: 98, text: 'Terminé !' }
+    ]
+
+    for (let i = 0; i < finalProgressSteps; i++) {
+      finalProgress += finalProgressIncrement
+      const roundedProgress = Math.min(Math.round(finalProgress), 100)
+
+      let message = messages[0].text
+      for (const msg of messages) {
+        if (roundedProgress >= msg.threshold) {
+          message = msg.text
+        }
+      }
+
+      updateProgressUI(roundedProgress, message, DOM)
+      await new Promise(resolve => setTimeout(resolve, finalProgressInterval))
+    }
+
+    updateProgressUI(100, 'Terminé !', DOM)
+
+    setTimeout(() => {
+      showEditor()
+    }, 300)
+
+  } catch (error) {
+    console.error('Erreur lors du traitement:', error)
+    clearInterval(progressInterval)
+    alert(`Erreur : ${error.message}`)
+    showSectionUI('upload', DOM)
+  }
+}
+
+/**
+ * Affiche les statistiques de la Pass 0 (corrections regex)
+ * @param {Object} pass0Stats - Statistiques de la Pass 0
+ */
+function displayPass0Stats(pass0Stats) {
+  console.log('[displayPass0Stats] Called with:', pass0Stats)
+
+  const pass0StatsEl = document.getElementById('pass0Stats')
+  const pass0StatsValuesEl = document.getElementById('pass0StatsValues')
+
+  if (!pass0StatsEl || !pass0StatsValuesEl) {
+    console.error('[displayPass0Stats] Elements not found:', {
+      pass0StatsEl: !!pass0StatsEl,
+      pass0StatsValuesEl: !!pass0StatsValuesEl
+    })
+    return
+  }
+
+  // Construire le texte avec les stats non nulles
+  const statsTexts = []
+  if (pass0Stats.trimSpaces > 0) statsTexts.push(`${pass0Stats.trimSpaces} espace(s) retiré(s)`)
+  if (pass0Stats.ellipsis > 0) statsTexts.push(`${pass0Stats.ellipsis} ellipsis`)
+  if (pass0Stats.multipleSpaces > 0) statsTexts.push(`${pass0Stats.multipleSpaces} espaces multiples`)
+  if (pass0Stats.spaceBeforePunctuation > 0) statsTexts.push(`${pass0Stats.spaceBeforePunctuation} espace(s) avant ponctuation`)
+  if (pass0Stats.nonBreakingSpace > 0) statsTexts.push(`${pass0Stats.nonBreakingSpace} espace(s) insécable(s)`)
+  if (pass0Stats.frenchQuotes > 0) statsTexts.push(`${pass0Stats.frenchQuotes} guillemets français`)
+  if (pass0Stats.spaceAfterApostrophe > 0) statsTexts.push(`${pass0Stats.spaceAfterApostrophe} espace(s) après apostrophe`)
+  if (pass0Stats.curlyApostrophes > 0) statsTexts.push(`${pass0Stats.curlyApostrophes} apostrophe(s) courbe(s)`)
+
+  console.log('[displayPass0Stats] Stats texts:', statsTexts)
+
+  if (statsTexts.length > 0) {
+    pass0StatsValuesEl.innerHTML = statsTexts.join('<br>')
+    pass0StatsEl.style.display = 'flex'
+    console.log('[displayPass0Stats] Display set to flex')
+  } else {
+    console.log('[displayPass0Stats] No stats to display (all zeros)')
+  }
+}
+
+/**
+ * Affiche l'éditeur avec les résultats
+ * @param {Object} DOM - Références DOM
+ * @param {Object} AppState - État de l'application
+ * @param {Object} SRTParser - Parser SRT
+ * @param {Function} updateStats - Fonction de mise à jour des stats
+ * @param {Function} renderBlocksTable - Fonction de rendu du tableau
+ * @param {Function} renderMinimap - Fonction de rendu de la minimap
+ * @param {Function} updateMinimapCurrentPosition - Fonction de mise à jour de la position minimap
+ * @param {Function} onScrollThrottled - Handler de scroll throttled
+ * @param {Function} onResizeThrottled - Handler de resize throttled
+ */
+export function showEditor(DOM, AppState, SRTParser, updateStats, renderBlocksTable, renderMinimap, updateMinimapCurrentPosition, onScrollThrottled, onResizeThrottled) {
+  showSectionUI('editor', DOM)
+
+  // Afficher la minimap
+  if (DOM.navigationMinimap) {
+    DOM.navigationMinimap.style.display = 'flex'
+  }
+
+  // Afficher les stats Pass 0 si disponibles
+  if (AppState.pass0Stats) {
+    displayPass0Stats(AppState.pass0Stats)
+  }
+
+  // Calculer les statistiques
+  const stats = SRTParser.calculateStats(AppState.blocks)
+  updateStats(stats)
+
+  // Afficher le tableau des blocs
+  renderBlocksTable()
+
+  // Générer la minimap
+  renderMinimap()
+
+  // Mettre à jour la position actuelle dans la minimap
+  updateMinimapCurrentPosition()
+
+  // Écouter le scroll pour mettre à jour la position actuelle
+  window.removeEventListener('scroll', onScrollThrottled)
+  window.addEventListener('scroll', onScrollThrottled)
+
+  // Écouter le resize pour recalculer la minimap
+  window.removeEventListener('resize', onResizeThrottled)
+  window.addEventListener('resize', onResizeThrottled)
+}
+
+/**
+ * Réinitialise l'input de fichier
+ * @param {Object} DOM - Références DOM
+ */
+export function resetFileInput(DOM) {
+  if (DOM.fileInput) {
+    DOM.fileInput.value = ''
+  }
+  if (DOM.fileInfo) {
+    DOM.fileInfo.style.display = 'none'
+  }
+}
