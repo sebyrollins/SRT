@@ -304,9 +304,17 @@ function toggleGender(blockIndex, corrIndex) {
 
 /**
  * Édite le texte complet d'un bloc (wrapper pour le module actions)
+ * @param {number} blockIndex - Index du bloc
+ * @param {string} [newText] - Nouveau texte (optionnel, pour édition inline)
  */
-function editBlockText(blockIndex) {
-  editBlockTextModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+function editBlockText(blockIndex, newText) {
+  if (newText !== undefined) {
+    // Mode édition inline : passer le nouveau texte directement
+    editBlockTextModule(blockIndex, newText, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+  } else {
+    // Mode édition modale : passer AppState
+    editBlockTextModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+  }
 }
 
 /**
