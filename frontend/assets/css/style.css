@@ -1219,6 +1219,13 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+/* Exception : boutons dans la barre de stats restent fixes (non affectés par le slider) */
+.stats-bar .btn-icon-only {
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+}
+
 .btn-icon-validate {
   background: var(--color-success);
   color: white;
@@ -1764,6 +1771,13 @@ body {
 .btn-icon-only:hover {
   transform: scale(1.1);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Exception : boutons dans la barre de stats restent fixes (non affectés par le slider) */
+.stats-bar .btn-icon-only {
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
 }
 
 .btn-icon-validate {
