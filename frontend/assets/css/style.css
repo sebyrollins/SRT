@@ -2354,3 +2354,64 @@ body {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
+
+/* ===== Édition inline du texte corrigé ===== */
+.block-content[data-editable="true"] {
+  transition: all 0.2s ease;
+}
+
+.block-content[data-editable="true"]:hover:not(.editing-inline) {
+  background: rgba(79, 70, 229, 0.05);
+  border-radius: var(--radius-sm);
+}
+
+.block-content.editing-inline {
+  background: #ffffff;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  min-height: 60px;
+}
+
+.block-content.editing-inline:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+}
+
+/* ===== Toast notifications pour édition inline ===== */
+.inline-edit-toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-text-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 10000;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  pointer-events: none;
+}
+
+.inline-edit-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.inline-edit-toast-success {
+  background: var(--color-success);
+}
+
+.inline-edit-toast-error {
+  background: var(--color-danger);
+}
+
+.inline-edit-toast-info {
+  background: var(--color-secondary);
+}

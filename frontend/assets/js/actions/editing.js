@@ -24,13 +24,33 @@ function convertApostrophes(text) {
 /**
  * Édite le texte complet d'un bloc
  * @param {number} blockIndex - Index du bloc
- * @param {Object} AppState - État de l'application
+ * @param {Object|string} AppStateOrNewText - État de l'application OU nouveau texte (pour édition inline)
  * @param {Object} SRTParser - Parser SRT
  * @param {Function} updateStats - Fonction de mise à jour des stats
  * @param {Function} renderBlocksTable - Fonction de rendu du tableau
  * @param {Function} updateMinimap - Fonction de mise à jour de la minimap
  */
-export function editBlockText(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap) {
+export function editBlockText(blockIndex, AppStateOrNewText, SRTParser, updateStats, renderBlocksTable, updateMinimap) {
+  // Si le deuxième argument est une string, c'est l'édition inline directe
+  if (typeof AppStateOrNewText === 'string') {
+    const newText = AppStateOrNewText
+    // Récupérer les dépendances depuis window pour l'édition inline
+    const AppState = window.AppState
+    const block = AppState.blocks.find(b => b.index === blockIndex)
+    if (!block) return
+
+    // Sauvegarder la suggestion originale de Claude si pas déjà fait
+    if (!block.hasOwnProperty('originalCorrected')) {
+      block.originalCorrected = block.corrected
+    }
+
+    // Utiliser SRTParser depuis les paramètres de fonction (défini dans la signature)
+    processBlockEdit(newText, block, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+    return
+  }
+
+  // Sinon, c'est l'ancien système avec modal
+  const AppState = AppStateOrNewText
   const block = AppState.blocks.find(b => b.index === blockIndex)
   if (!block) return
 
@@ -52,6 +72,31 @@ export function editBlockText(blockIndex, AppState, SRTParser, updateStats, rend
 
   // Callback de sauvegarde
   const handleSave = (newValue) => {
+    processBlockEdit(newValue, block, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+  }
+
+  // Ouvrir le modal avec le système réutilisable
+  openEditModal({
+    originalText: block.original,
+    suggestedText: suggestionToShow,
+    currentValue: block.corrected,
+    showSuggestion: false, // Cacher la section suggestion pour l'édition de bloc entier
+    onSave: handleSave,
+    multiline: true // Mode textarea avec Ctrl+Enter
+  })
+}
+
+/**
+ * Traite l'édition d'un bloc (factorisation de la logique commune)
+ * @param {string} newValue - Nouvelle valeur
+ * @param {Object} block - Bloc à éditer
+ * @param {Object} AppState - État de l'application
+ * @param {Object} SRTParser - Parser SRT
+ * @param {Function} updateStats - Fonction de mise à jour des stats
+ * @param {Function} renderBlocksTable - Fonction de rendu du tableau
+ * @param {Function} updateMinimap - Fonction de mise à jour de la minimap
+ */
+function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap) {
     const processedValue = convertApostrophes(newValue)
     const oldCorrected = block.corrected
 
@@ -171,17 +216,6 @@ export function editBlockText(blockIndex, AppState, SRTParser, updateStats, rend
       renderBlocksTable()
       updateMinimap()
     }
-  }
-
-  // Ouvrir le modal avec le système réutilisable
-  openEditModal({
-    originalText: block.original,
-    suggestedText: suggestionToShow,
-    currentValue: block.corrected,
-    showSuggestion: false, // Cacher la section suggestion pour l'édition de bloc entier
-    onSave: handleSave,
-    multiline: true // Mode textarea avec Ctrl+Enter
-  })
 }
 
 /**
