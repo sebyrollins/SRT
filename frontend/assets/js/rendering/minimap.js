@@ -357,5 +357,5 @@ export function onResizeThrottled(DOM) {
     // Reconstruire complètement la minimap avec les nouvelles dimensions
     rebuildMinimap(domRef)
     resizeTimeout = null
-  }, 300) // Augmenté à 300ms pour laisser le temps au CSS de s'appliquer
+  }, 100) // 100ms pour resize rapide et réactif
 }

@@ -1914,13 +1914,23 @@ body {
   display: flex;
   flex-direction: column;
 
+  /* Transparence pour ne pas gêner la lecture du contenu */
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+
   /* Valeurs par défaut (desktop) - positionné sous la barre de stats */
   right: 20px;
   top: calc(var(--stats-height) + 20px); /* Sous la barre de stats + marge */
   bottom: 20px;
-  width: 50px;
+  width: 25px; /* Réduit de moitié : 50px → 25px */
   height: calc(100vh - var(--stats-height) - 40px); /* Hauteur = viewport - stats - marges */
-  padding: 8px;
+  padding: 4px; /* Réduit proportionnellement : 8px → 4px */
+}
+
+/* Opacité complète au survol pour meilleure visibilité */
+.navigation-minimap:hover,
+.navigation-minimap:focus-within {
+  opacity: 1;
 }
 
 .minimap-title {
@@ -2042,7 +2052,7 @@ body {
     right: 20px;
     top: calc(var(--stats-height) + 20px);
     bottom: 20px;
-    width: 50px;
+    width: 25px; /* Réduit de moitié : 50px → 25px */
     height: calc(100vh - var(--stats-height) - 40px);
   }
 }
@@ -2053,7 +2063,7 @@ body {
     right: 12px;
     top: calc(var(--stats-height) + 12px);
     bottom: 12px;
-    width: 40px;
+    width: 20px; /* Réduit de moitié : 40px → 20px */
     height: calc(100vh - var(--stats-height) - 24px);
   }
 
@@ -2080,9 +2090,9 @@ body {
     right: 8px;
     top: calc(var(--stats-height) + 8px);
     bottom: 8px;
-    width: 32px;
+    width: 16px; /* Réduit de moitié : 32px → 16px */
     height: calc(100vh - var(--stats-height) - 16px);
-    padding: 6px;
+    padding: 3px; /* Réduit proportionnellement : 6px → 3px */
   }
 
   .minimap-title {
@@ -2112,10 +2122,10 @@ body {
     right: 8px;
     top: calc(var(--stats-height) + 8px);
     bottom: 8px;
-    width: 28px;
+    width: 14px; /* Réduit de moitié : 28px → 14px */
     height: calc(100vh - var(--stats-height) - 16px);
-    padding: 4px;
-    opacity: 0.7;
+    padding: 2px; /* Réduit proportionnellement : 4px → 2px */
+    opacity: 0.3; /* Encore plus transparent sur mobile */
     transition: opacity 0.3s ease;
   }
 
@@ -2153,12 +2163,12 @@ body {
 /* Très petit écran (< 360px) : minimap ultra-compacte */
 @media (max-width: 359px) {
   .navigation-minimap {
-    width: 24px;
+    width: 12px; /* Réduit de moitié : 24px → 12px */
     right: 4px;
     top: calc(var(--stats-height) + 4px);
     bottom: 4px;
     height: calc(100vh - var(--stats-height) - 8px);
-    padding: 3px;
+    padding: 2px; /* Réduit proportionnellement : 3px → 2px */
   }
 
   .minimap-block {
