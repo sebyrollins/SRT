@@ -291,6 +291,54 @@ async function sendToWorkerSinglePass(content, filename, pass, inputBlocks = nul
 }
 
 /**
+ * Simule une progression fluide entre deux valeurs pendant l'exécution d'une promesse
+ * @param {Promise} promise - Promesse à exécuter
+ * @param {number} startProgress - Progression de départ (%)
+ * @param {number} endProgress - Progression cible (%)
+ * @param {string} message - Message à afficher
+ * @param {Object} DOM - Références DOM
+ * @param {Function} updateProgress - Fonction de mise à jour
+ * @returns {Promise} - Résultat de la promesse
+ */
+async function executeWithProgressAnimation(promise, startProgress, endProgress, message, DOM, updateProgress) {
+  let currentProgress = startProgress
+  const targetProgress = endProgress - 2 // S'arrêter à 2% avant la fin pour attendre le résultat
+  const updateInterval = 100 // Mise à jour toutes les 100ms
+
+  // Estimer la durée (30s de base + adaptable)
+  const estimatedTimeMs = 30000
+  const progressIncrement = ((targetProgress - startProgress) / estimatedTimeMs) * updateInterval
+
+  // Démarrer la progression simulée
+  updateProgress(currentProgress, message, DOM)
+
+  const progressInterval = setInterval(() => {
+    currentProgress += progressIncrement
+    if (currentProgress >= targetProgress) {
+      currentProgress = targetProgress
+      clearInterval(progressInterval)
+    }
+    updateProgress(Math.round(currentProgress), message, DOM)
+  }, updateInterval)
+
+  try {
+    // Attendre que la promesse se termine
+    const result = await promise
+
+    // Arrêter la progression simulée
+    clearInterval(progressInterval)
+
+    // Sauter à la fin de cette étape
+    updateProgress(endProgress, message, DOM)
+
+    return result
+  } catch (error) {
+    clearInterval(progressInterval)
+    throw error
+  }
+}
+
+/**
  * Envoie le contenu au Cloudflare Worker en 4 passes séquentielles
  * @param {string} content - Contenu du fichier SRT
  * @param {string} filename - Nom du fichier
@@ -304,39 +352,63 @@ async function sendToWorkerMultiPass(content, filename, DOM, updateProgress) {
 
   // PASS 1 : Pass 0 (regex) + Pass 1 (corrections générales)
   console.log('[Multi-Pass] Starting Pass 1 (regex + general corrections)...')
-  updateProgress(0, 'Pass 1/4 : Corrections générales...', DOM)
 
-  const pass1Result = await sendToWorkerSinglePass(content, filename, 1, null)
+  const pass1Result = await executeWithProgressAnimation(
+    sendToWorkerSinglePass(content, filename, 1, null),
+    0,
+    25,
+    'Pass 1/4 : Corrections générales...',
+    DOM,
+    updateProgress
+  )
+
   currentBlocks = pass1Result.blocks
   pass0Stats = pass1Result.pass0Stats
-
   console.log(`[Multi-Pass] Pass 1 completed: ${currentBlocks.length} blocks`)
-  updateProgress(25, 'Pass 2/4 : Institutions et formatage...', DOM)
 
   // PASS 2 : Institutions + formatage
   console.log('[Multi-Pass] Starting Pass 2 (institutions + formatting)...')
 
-  const pass2Result = await sendToWorkerSinglePass(null, filename, 2, currentBlocks)
-  currentBlocks = pass2Result.blocks
+  const pass2Result = await executeWithProgressAnimation(
+    sendToWorkerSinglePass(null, filename, 2, currentBlocks),
+    25,
+    50,
+    'Pass 2/4 : Institutions et formatage...',
+    DOM,
+    updateProgress
+  )
 
+  currentBlocks = pass2Result.blocks
   console.log(`[Multi-Pass] Pass 2 completed: ${currentBlocks.length} blocks`)
-  updateProgress(50, 'Pass 3/4 : Ministères et politesse...', DOM)
 
   // PASS 3 : Ministères + formules de politesse
   console.log('[Multi-Pass] Starting Pass 3 (ministries + politeness)...')
 
-  const pass3Result = await sendToWorkerSinglePass(null, filename, 3, currentBlocks)
-  currentBlocks = pass3Result.blocks
+  const pass3Result = await executeWithProgressAnimation(
+    sendToWorkerSinglePass(null, filename, 3, currentBlocks),
+    50,
+    75,
+    'Pass 3/4 : Ministères et politesse...',
+    DOM,
+    updateProgress
+  )
 
+  currentBlocks = pass3Result.blocks
   console.log(`[Multi-Pass] Pass 3 completed: ${currentBlocks.length} blocks`)
-  updateProgress(75, 'Pass 4/4 : Ambiguïtés de genre...', DOM)
 
   // PASS 4 : Ambiguïtés de genre
   console.log('[Multi-Pass] Starting Pass 4 (gender ambiguity)...')
 
-  const pass4Result = await sendToWorkerSinglePass(null, filename, 4, currentBlocks)
-  currentBlocks = pass4Result.blocks
+  const pass4Result = await executeWithProgressAnimation(
+    sendToWorkerSinglePass(null, filename, 4, currentBlocks),
+    75,
+    100,
+    'Pass 4/4 : Ambiguïtés de genre...',
+    DOM,
+    updateProgress
+  )
 
+  currentBlocks = pass4Result.blocks
   console.log(`[Multi-Pass] Pass 4 completed: ${currentBlocks.length} blocks`)
   console.log('[Multi-Pass] All passes completed successfully!')
 
@@ -475,16 +547,9 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
       }
     })
 
-    // Progression finale de 75% à 100%
-    updateProgressUI(75, 'Traitement des résultats...', DOM)
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    updateProgressUI(85, 'Finalisation...', DOM)
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    updateProgressUI(95, 'Presque terminé...', DOM)
-    await new Promise(resolve => setTimeout(resolve, 500))
-
+    // La progression est déjà à 100% après Pass 4
+    // Juste une petite pause pour le traitement final
+    await new Promise(resolve => setTimeout(resolve, 300))
     updateProgressUI(100, 'Terminé !', DOM)
 
     setTimeout(() => {
