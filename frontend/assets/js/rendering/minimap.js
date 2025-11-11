@@ -25,28 +25,54 @@ export function renderMinimap(DOM) {
  * @param {Object} AppState - État de l'application (global)
  */
 export function rebuildMinimap(DOM, AppState) {
-  if (!DOM.minimapBlocks) return
+  if (!DOM || !DOM.minimapBlocks) {
+    console.warn('[Minimap] DOM or minimapBlocks not available')
+    return
+  }
 
   // Utiliser AppState global si non fourni
   const state = AppState || window.AppState
 
-  // Vider la minimap
-  DOM.minimapBlocks.innerHTML = ''
-
-  // Forcer un reflow pour obtenir la hauteur correcte après les media queries
-  DOM.minimapBlocks.offsetHeight
-
-  // Récupérer les dimensions (la hauteur peut changer avec le responsive)
-  const minimapHeight = DOM.minimapBlocks.offsetHeight
-  const windowWidth = window.innerWidth
-
-  if (minimapHeight === 0) {
-    console.warn('[Minimap] Container height is 0, skipping rebuild')
+  if (!state || !state.blocks || state.blocks.length === 0) {
+    console.warn('[Minimap] No blocks to display')
     return
   }
 
-  console.log(`[Minimap] Container height: ${minimapHeight}px (window width: ${windowWidth}px)`)
-  console.log(`[Minimap] Total blocks: ${state.blocks.length}`)
+  // Vider la minimap
+  DOM.minimapBlocks.innerHTML = ''
+
+  // Utiliser requestAnimationFrame pour s'assurer que le DOM est à jour
+  // après le resize et que les media queries CSS sont appliquées
+  requestAnimationFrame(() => {
+    // Double requestAnimationFrame pour garantir que le reflow est complet
+    requestAnimationFrame(() => {
+      // Récupérer les dimensions (la hauteur peut changer avec le responsive)
+      const minimapHeight = DOM.minimapBlocks.offsetHeight
+      const windowWidth = window.innerWidth
+      const windowHeight = window.innerHeight
+
+      if (minimapHeight === 0) {
+        console.warn('[Minimap] Container height is 0, skipping rebuild')
+        return
+      }
+
+      console.log(`[Minimap] Rebuild - Container: ${minimapHeight}px, Window: ${windowWidth}x${windowHeight}px`)
+      console.log(`[Minimap] Total blocks: ${state.blocks.length}`)
+
+      // Appeler la fonction interne qui fait le vrai travail
+      buildMinimapBlocks(DOM, state, minimapHeight, windowWidth)
+    })
+  })
+}
+
+/**
+ * Construit les blocs de la minimap (fonction interne)
+ * @param {Object} DOM - Références DOM
+ * @param {Object} state - État de l'application
+ * @param {number} minimapHeight - Hauteur du conteneur
+ * @param {number} windowWidth - Largeur de la fenêtre
+ */
+function buildMinimapBlocks(DOM, state, minimapHeight, windowWidth) {
 
   // Première passe : collecter les données des blocs
   const blocksData = []
@@ -312,12 +338,24 @@ export function onScrollThrottled() {
  * @param {Object} DOM - Références DOM (optionnel)
  */
 export function onResizeThrottled(DOM) {
-  if (resizeTimeout) return
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout)
+  }
 
   resizeTimeout = setTimeout(() => {
-    console.log('[Minimap] Window resized, rebuilding minimap')
+    console.log('[Minimap] Window resized, rebuilding minimap...')
+
+    // Utiliser window.DOM si DOM n'est pas fourni
+    const domRef = DOM || window.DOM
+
+    if (!domRef || !domRef.minimapBlocks) {
+      console.warn('[Minimap] Cannot rebuild - DOM not available')
+      resizeTimeout = null
+      return
+    }
+
     // Reconstruire complètement la minimap avec les nouvelles dimensions
-    rebuildMinimap(DOM || window.DOM)
+    rebuildMinimap(domRef)
     resizeTimeout = null
-  }, 200)
+  }, 300) // Augmenté à 300ms pour laisser le temps au CSS de s'appliquer
 }

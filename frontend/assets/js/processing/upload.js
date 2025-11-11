@@ -646,8 +646,18 @@ export function showEditor(DOM, AppState, SRTParser, updateStats, renderBlocksTa
   window.addEventListener('scroll', onScrollThrottled)
 
   // Écouter le resize pour recalculer la minimap
-  window.removeEventListener('resize', onResizeThrottled)
-  window.addEventListener('resize', onResizeThrottled)
+  // Créer un wrapper pour passer le DOM correctement
+  const resizeHandler = () => onResizeThrottled(DOM)
+
+  // Stocker le handler pour pouvoir le retirer plus tard
+  if (!window._minimapResizeHandler) {
+    window._minimapResizeHandler = resizeHandler
+  } else {
+    window.removeEventListener('resize', window._minimapResizeHandler)
+    window._minimapResizeHandler = resizeHandler
+  }
+
+  window.addEventListener('resize', window._minimapResizeHandler)
 }
 
 /**
