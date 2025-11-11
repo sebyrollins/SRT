@@ -1906,18 +1906,21 @@ body {
 /* ===== Navigation Minimap ===== */
 .navigation-minimap {
   position: fixed;
+  /* Position et dimensions définies via media queries pour responsive design */
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+
+  /* Valeurs par défaut (desktop) */
   right: 20px;
   top: 220px;
   bottom: 20px;
   width: 50px;
   height: calc(100vh - 240px);
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
   padding: 8px;
-  z-index: 150;
-  display: flex;
-  flex-direction: column;
 }
 
 .minimap-title {
@@ -2031,7 +2034,136 @@ body {
   opacity: 1;
 }
 
-/* Minimap toujours visible, même sur petits écrans */
+/* ===== Minimap Responsive Design ===== */
+
+/* Desktop (défaut) : minimap normale */
+@media (min-width: 1025px) {
+  .navigation-minimap {
+    right: 20px;
+    top: 220px;
+    bottom: 20px;
+    width: 50px;
+    height: calc(100vh - 240px);
+  }
+}
+
+/* Tablette (768px - 1024px) : minimap plus petite, repositionnée */
+@media (max-width: 1024px) and (min-width: 768px) {
+  .navigation-minimap {
+    right: 12px;
+    top: 180px;
+    bottom: 12px;
+    width: 40px;
+    height: calc(100vh - 200px);
+  }
+
+  .minimap-title {
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+  }
+
+  .minimap-block {
+    min-height: 2px;
+  }
+
+  /* Tooltip plus petit sur tablette */
+  .minimap-block::after {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+}
+
+/* Mobile paysage (481px - 767px) : minimap très compacte */
+@media (max-width: 767px) and (min-width: 481px) {
+  .navigation-minimap {
+    right: 8px;
+    top: 140px;
+    bottom: 8px;
+    width: 32px;
+    height: calc(100vh - 160px);
+    padding: 6px;
+  }
+
+  .minimap-title {
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+  }
+
+  .minimap-block {
+    min-height: 2px;
+    border-radius: 1px;
+  }
+
+  .minimap-block:hover {
+    transform: scaleY(1.2);
+  }
+
+  /* Masquer le tooltip sur mobile */
+  .minimap-block::after {
+    display: none;
+  }
+}
+
+/* Mobile portrait (< 480px) : minimap cachée par défaut, affichée via toggle */
+@media (max-width: 480px) {
+  .navigation-minimap {
+    right: 8px;
+    top: 100px;
+    bottom: 8px;
+    width: 28px;
+    height: calc(100vh - 120px);
+    padding: 4px;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+  }
+
+  .navigation-minimap:hover,
+  .navigation-minimap:active {
+    opacity: 1;
+  }
+
+  .minimap-title {
+    display: none;
+  }
+
+  .minimap-block {
+    min-height: 1px;
+    border-radius: 1px;
+  }
+
+  .minimap-block:hover {
+    transform: scaleY(1.15);
+  }
+
+  /* Masquer le tooltip sur mobile */
+  .minimap-block::after {
+    display: none;
+  }
+
+  /* Réduire l'outline sur mobile */
+  .minimap-block.minimap-current {
+    transform: scaleX(1.4);
+    outline: 2px solid #4a4a4a;
+    outline-offset: 0px;
+  }
+}
+
+/* Très petit écran (< 360px) : minimap encore plus compacte */
+@media (max-width: 359px) {
+  .navigation-minimap {
+    width: 24px;
+    right: 4px;
+    top: 80px;
+    bottom: 4px;
+    padding: 3px;
+  }
+
+  .minimap-block.minimap-current {
+    transform: scaleX(1.3);
+    outline: 1px solid #4a4a4a;
+  }
+}
 
 /* ===== Custom Alert (Alerte design centrée) ===== */
 .custom-alert-overlay {

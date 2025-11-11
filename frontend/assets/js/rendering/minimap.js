@@ -33,12 +33,19 @@ export function rebuildMinimap(DOM, AppState) {
   // Vider la minimap
   DOM.minimapBlocks.innerHTML = ''
 
-  // Récupérer les dimensions
+  // Forcer un reflow pour obtenir la hauteur correcte après les media queries
+  DOM.minimapBlocks.offsetHeight
+
+  // Récupérer les dimensions (la hauteur peut changer avec le responsive)
   const minimapHeight = DOM.minimapBlocks.offsetHeight
+  const windowWidth = window.innerWidth
 
-  if (minimapHeight === 0) return
+  if (minimapHeight === 0) {
+    console.warn('[Minimap] Container height is 0, skipping rebuild')
+    return
+  }
 
-  console.log(`[Minimap] Container height: ${minimapHeight}px`)
+  console.log(`[Minimap] Container height: ${minimapHeight}px (window width: ${windowWidth}px)`)
   console.log(`[Minimap] Total blocks: ${state.blocks.length}`)
 
   // Première passe : collecter les données des blocs
@@ -66,12 +73,37 @@ export function rebuildMinimap(DOM, AppState) {
 
   if (visibleBlocksCount === 0) return
 
-  // Déterminer le gap entre les blocs
+  // Déterminer le gap entre les blocs (responsive selon la largeur de fenêtre)
   let gap = 3
-  if (visibleBlocksCount > 100) {
+  let minBlockHeight = 3
+
+  // Ajuster selon la taille d'écran pour le responsive
+  if (windowWidth <= 359) {
+    // Très petit écran
+    gap = 0.5
+    minBlockHeight = 1
+  } else if (windowWidth <= 480) {
+    // Mobile portrait
     gap = 1
-  } else if (visibleBlocksCount > 50) {
+    minBlockHeight = 1
+  } else if (windowWidth <= 767) {
+    // Mobile paysage
+    gap = 1
+    minBlockHeight = 2
+  } else if (windowWidth <= 1024) {
+    // Tablette
     gap = 2
+    minBlockHeight = 2
+  } else {
+    // Desktop
+    if (visibleBlocksCount > 100) {
+      gap = 1
+    } else if (visibleBlocksCount > 50) {
+      gap = 2
+    } else {
+      gap = 3
+    }
+    minBlockHeight = 3
   }
 
   // Calculer l'espace total pour les gaps
@@ -80,10 +112,10 @@ export function rebuildMinimap(DOM, AppState) {
   // Calculer la hauteur disponible pour les blocs
   const availableHeightForBlocks = minimapHeight - totalGapsHeight
 
-  // Hauteur uniforme pour chaque bloc (minimum 3px)
-  const uniformBlockHeight = Math.max(3, availableHeightForBlocks / visibleBlocksCount)
+  // Hauteur uniforme pour chaque bloc (avec minimum responsive)
+  const uniformBlockHeight = Math.max(minBlockHeight, availableHeightForBlocks / visibleBlocksCount)
 
-  console.log(`[Minimap] ${visibleBlocksCount} visible blocks, gap: ${gap}px, uniform height: ${uniformBlockHeight.toFixed(1)}px`)
+  console.log(`[Minimap] ${visibleBlocksCount} visible blocks, gap: ${gap}px, uniform height: ${uniformBlockHeight.toFixed(1)}px (min: ${minBlockHeight}px)`)
 
   // Deuxième passe : créer les blocs avec taille uniforme
   blocksData.forEach(({ block, blockClass, isHidden }) => {
