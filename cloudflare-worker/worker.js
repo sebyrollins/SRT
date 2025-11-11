@@ -34,10 +34,11 @@ async function handleRequest(request) {
 
   try {
     const data = await request.json()
-    const { srtContent, fileName, model } = data
+    const { srtContent, fileName, model, pass, inputBlocks } = data
 
-    if (!srtContent) {
-      return new Response(JSON.stringify({ error: 'Contenu SRT manquant' }), {
+    // Validation : soit srtContent soit inputBlocks doit être fourni
+    if (!srtContent && !inputBlocks) {
+      return new Response(JSON.stringify({ error: 'Contenu SRT ou blocs manquants' }), {
         status: 400,
         headers: corsHeaders
       })
@@ -46,9 +47,10 @@ async function handleRequest(request) {
     // Déterminer le modèle à utiliser (sonnet par défaut)
     const modelType = model === 'cleaning' ? 'cleaning' : (model === 'sonnet' ? 'sonnet' : 'sonnet')
     console.log(`[handleRequest] Using model: ${modelType}`)
+    console.log(`[handleRequest] Pass requested: ${pass || 'all'}`)
 
     // Traitement du contenu SRT
-    const result = await processSRT(srtContent, modelType)
+    const result = await processSRT(srtContent, modelType, pass, inputBlocks)
 
     return new Response(JSON.stringify({
       success: true,
@@ -640,15 +642,17 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
 /**
  * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
- * @param {string} srtContent - Contenu du fichier SRT
+ * @param {string} srtContent - Contenu du fichier SRT (optionnel si inputBlocks fourni)
  * @param {string} modelType - Type de modèle à utiliser : 'cleaning' (regex uniquement), 'sonnet' (qualité)
+ * @param {number} pass - Numéro de passe à exécuter (1, 2, 3, 4) ou null pour toutes
+ * @param {Array} inputBlocks - Blocs déjà traités (pour passes 2, 3, 4)
  */
-async function processSRT(srtContent, modelType = 'sonnet') {
+async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBlocks = null) {
   // Tableau de logs pour debugging (sera renvoyé au frontend)
   const debugLogs = []
 
-  // Parse les blocs SRT
-  const blocks = parseSRTBlocks(srtContent)
+  // Parse les blocs SRT (ou utilise inputBlocks si fourni)
+  const blocks = inputBlocks || parseSRTBlocks(srtContent)
 
   // CHUNK SIZE : Large pour maximum de contexte
   // L'ajout d'exemples explicites compense les chunks larges
@@ -660,303 +664,359 @@ async function processSRT(srtContent, modelType = 'sonnet') {
   }
 
   console.log(`[processSRT] Processing ${blocks.length} blocks in ${chunks.length} chunks with MULTI-PASS system...`)
+  console.log(`[processSRT] Requested pass: ${pass === null ? 'ALL' : pass}`)
   const startTime = Date.now()
 
+  // Variables pour stocker les résultats de chaque passe
+  let pass0Stats = null
+  let blocksAfterPass1 = blocks
+  let blocksAfterPass2 = blocks
+  let blocksAfterPass3 = blocks
+
   // ═══════════════════════════════════════════════════════════════
-  // PASSE 0 : Prétraitement avec regex (corrections déterministes)
+  // PASSE 1 : Pass 0 (regex) + Pass 1 (général)
   // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 0: Regex preprocessing on ${blocks.length} blocks ===`)
+  if (pass === 1 || pass === null) {
+    console.log(`[processSRT] === PASS 0: Regex preprocessing on ${blocks.length} blocks ===`)
 
-  // Compteurs pour les stats Pass 0
-  const pass0Stats = {
-    trimSpaces: 0,
-    ellipsis: 0,
-    multipleSpaces: 0,
-    spaceBeforePunctuation: 0,
-    nonBreakingSpace: 0,
-    frenchQuotes: 0,
-    spaceAfterApostrophe: 0
-  }
+    // Compteurs pour les stats Pass 0
+    pass0Stats = {
+      trimSpaces: 0,
+      ellipsis: 0,
+      multipleSpaces: 0,
+      spaceBeforePunctuation: 0,
+      nonBreakingSpace: 0,
+      frenchQuotes: 0,
+      spaceAfterApostrophe: 0
+    }
 
-  const blocksAfterPass0 = blocks.map(block => {
-    const { corrected, corrections } = preProcessWithRegex(block.text)
+    const blocksAfterPass0 = blocks.map(block => {
+      const { corrected, corrections } = preProcessWithRegex(block.text)
 
-    // Compter les types de corrections
-    corrections.forEach(corr => {
-      if (corr.reason.includes('Espaces en début/fin')) pass0Stats.trimSpaces++
-      else if (corr.reason.includes('Ellipsis')) pass0Stats.ellipsis++
-      else if (corr.reason.includes('Espaces multiples')) pass0Stats.multipleSpaces++
-      else if (corr.reason.includes('Espace avant ponctuation')) pass0Stats.spaceBeforePunctuation++
-      else if (corr.reason.includes('Espace insécable')) pass0Stats.nonBreakingSpace++
-      else if (corr.reason.includes('Guillemets')) pass0Stats.frenchQuotes++
-      else if (corr.reason.includes('Espace après apostrophe')) pass0Stats.spaceAfterApostrophe++
+      // Compter les types de corrections
+      corrections.forEach(corr => {
+        if (corr.reason.includes('Espaces en début/fin')) pass0Stats.trimSpaces++
+        else if (corr.reason.includes('Ellipsis')) pass0Stats.ellipsis++
+        else if (corr.reason.includes('Espaces multiples')) pass0Stats.multipleSpaces++
+        else if (corr.reason.includes('Espace avant ponctuation')) pass0Stats.spaceBeforePunctuation++
+        else if (corr.reason.includes('Espace insécable')) pass0Stats.nonBreakingSpace++
+        else if (corr.reason.includes('Guillemets')) pass0Stats.frenchQuotes++
+        else if (corr.reason.includes('Espace après apostrophe')) pass0Stats.spaceAfterApostrophe++
+      })
+
+      return {
+        index: block.index,
+        timecode: block.timecode,
+        original: block.text,  // Le vrai texte original (avant regex)
+        corrected: corrected,  // Texte après regex
+        corrections: corrections  // Corrections faites par regex
+      }
     })
 
-    return {
-      index: block.index,
-      timecode: block.timecode,
-      original: block.text,  // Le vrai texte original (avant regex)
-      corrected: corrected,  // Texte après regex
-      corrections: corrections  // Corrections faites par regex
-    }
-  })
+    const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
+    console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
+    console.log(`[processSRT] Pass 0 stats:`, pass0Stats)
 
-  const pass0CorrectionsCount = blocksAfterPass0.filter(b => b.corrections.length > 0).length
-  console.log(`[processSRT] Pass 0 completed: ${pass0CorrectionsCount}/${blocks.length} blocks with regex corrections`)
-  console.log(`[processSRT] Pass 0 stats:`, pass0Stats)
-
-  // ═══════════════════════════════════════════════════════════════
-  // MODE CLEANING : Retourner uniquement les corrections regex
-  // ═══════════════════════════════════════════════════════════════
-  if (modelType === 'cleaning') {
-    const totalTime = Date.now() - startTime
-    console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
-    return {
-      blocks: blocksAfterPass0,
-      debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
-      pass0Stats: pass0Stats
-    }
-  }
-
-  // Recréer les chunks avec les blocs prétraités
-  const preprocessedChunks = []
-  for (let i = 0; i < blocksAfterPass0.length; i += maxBlocksPerChunk) {
-    const chunkBlocks = blocksAfterPass0.slice(i, i + maxBlocksPerChunk)
-    // Convertir au format attendu par correctWithClaude
-    preprocessedChunks.push(chunkBlocks.map(b => ({
-      index: b.index,
-      timecode: b.timecode,
-      text: b.corrected  // Utiliser le texte prétraité
-    })))
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // PASSE 1 : Correction générale (orthographe, grammaire, tirets)
-  // ═══════════════════════════════════════════════════════════════
-  console.log(`[processSRT] === PASS 1: General corrections on ${preprocessedChunks.length} chunks in parallel ===`)
-
-  const pass1Chunks = await Promise.all(
-    preprocessedChunks.map(chunk => correctWithClaude(chunk, modelType, 1))
-  )
-  const pass1Blocks = pass1Chunks.flat()
-
-  // Fusionner les blocs corrigés de la passe 1 avec la passe 0
-  const pass1Map = new Map()
-  pass1Blocks.forEach(block => pass1Map.set(block.index, block))
-
-  const blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
-    const pass1Block = pass1Map.get(pass0Block.index)
-
-    if (pass1Block) {
-      // Ne PAS fusionner les corrections de Pass 0 car elles sont déjà appliquées au texte
-      // Le texte original est avant Pass 0, le texte corrigé est après Pass 1
-      // Les corrections Pass 0 seraient redondantes et apparaîtraient comme "déjà corrigées"
+    // ═══════════════════════════════════════════════════════════════
+    // MODE CLEANING : Retourner uniquement les corrections regex
+    // ═══════════════════════════════════════════════════════════════
+    if (modelType === 'cleaning') {
+      const totalTime = Date.now() - startTime
+      console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
       return {
-        index: pass0Block.index,
-        timecode: pass0Block.timecode,
-        original: pass0Block.original,  // Le vrai original (avant Pass 0)
-        corrected: pass1Block.corrected,  // Texte final après Pass 1
-        corrections: pass1Block.corrections  // Seulement les corrections de Pass 1
-      }
-    } else {
-      // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
-      // car elles sont déjà appliquées dans le champ corrected
-      return {
-        index: pass0Block.index,
-        timecode: pass0Block.timecode,
-        original: pass0Block.original,
-        corrected: pass0Block.corrected,  // Texte après Pass 0
-        corrections: []  // Pas de corrections à afficher (déjà appliquées)
+        blocks: blocksAfterPass0,
+        debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
+        pass0Stats: pass0Stats
       }
     }
-  })
 
-  console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected by Claude`)
+    // Recréer les chunks avec les blocs prétraités
+    const preprocessedChunks = []
+    for (let i = 0; i < blocksAfterPass0.length; i += maxBlocksPerChunk) {
+      const chunkBlocks = blocksAfterPass0.slice(i, i + maxBlocksPerChunk)
+      // Convertir au format attendu par correctWithClaude
+      preprocessedChunks.push(chunkBlocks.map(b => ({
+        index: b.index,
+        timecode: b.timecode,
+        text: b.corrected  // Utiliser le texte prétraité
+      })))
+    }
 
-  // ═══════════════════════════════════════════════════════════════
-  // DÉTECTION : Quels chunks nécessitent la passe 2 ?
-  // ═══════════════════════════════════════════════════════════════
-  const chunksNeedingPass2 = []
+    // ═══════════════════════════════════════════════════════════════
+    // PASSE 1 : Correction générale (orthographe, grammaire, tirets)
+    // ═══════════════════════════════════════════════════════════════
+    console.log(`[processSRT] === PASS 1: General corrections on ${preprocessedChunks.length} chunks in parallel ===`)
 
-  chunks.forEach((originalChunk, chunkIndex) => {
-    if (needsSecondPass(originalChunk)) {
-      // Récupérer les blocs DÉJÀ CORRIGÉS de la passe 1 pour ce chunk
-      const correctedChunk = originalChunk.map(originalBlock => {
-        const blockAfterPass1 = blocksAfterPass1.find(b => b.index === originalBlock.index)
-        if (!blockAfterPass1) {
-          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 1!`)
-          return originalBlock
-        }
-        // Créer un bloc avec le texte corrigé de la passe 1 comme "texte d'entrée"
+    const pass1Chunks = await Promise.all(
+      preprocessedChunks.map(chunk => correctWithClaude(chunk, modelType, 1))
+    )
+    const pass1Blocks = pass1Chunks.flat()
+
+    // Fusionner les blocs corrigés de la passe 1 avec la passe 0
+    const pass1Map = new Map()
+    pass1Blocks.forEach(block => pass1Map.set(block.index, block))
+
+    const blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
+      const pass1Block = pass1Map.get(pass0Block.index)
+
+      if (pass1Block) {
+        // Ne PAS fusionner les corrections de Pass 0 car elles sont déjà appliquées au texte
+        // Le texte original est avant Pass 0, le texte corrigé est après Pass 1
+        // Les corrections Pass 0 seraient redondantes et apparaîtraient comme "déjà corrigées"
         return {
-          index: blockAfterPass1.index,
-          timecode: blockAfterPass1.timecode,
-          text: blockAfterPass1.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+          index: pass0Block.index,
+          timecode: pass0Block.timecode,
+          original: pass0Block.original,  // Le vrai original (avant Pass 0)
+          corrected: pass1Block.corrected,  // Texte final après Pass 1
+          corrections: pass1Block.corrections  // Seulement les corrections de Pass 1
         }
-      })
-      chunksNeedingPass2.push({ chunkIndex, chunk: correctedChunk })
-    }
-  })
+      } else {
+        // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
+        // car elles sont déjà appliquées dans le champ corrected
+        return {
+          index: pass0Block.index,
+          timecode: pass0Block.timecode,
+          original: pass0Block.original,
+          corrected: pass0Block.corrected,  // Texte après Pass 0
+          corrections: []  // Pas de corrections à afficher (déjà appliquées)
+        }
+      }
+    })
 
-  console.log(`[processSRT] ${chunksNeedingPass2.length}/${chunks.length} chunks need pass 2`)
+    console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected by Claude`)
+
+    // Si on n'exécute que Pass 1, retourner maintenant
+    if (pass === 1) {
+      const totalTime = Date.now() - startTime
+      console.log(`[processSRT] === PASS 1 ONLY: Completed in ${totalTime}ms ===`)
+      return {
+        blocks: blocksAfterPass1,
+        debugLogs: debugLogs,
+        pass0Stats: pass0Stats
+      }
+    }
+  }
+
+  // Pour les passes 2, 3, 4 : utiliser les blocs d'entrée
+  blocksAfterPass2 = blocksAfterPass1
 
   // ═══════════════════════════════════════════════════════════════
   // PASSE 2 : Institutions + formatage
   // ═══════════════════════════════════════════════════════════════
-  let blocksAfterPass2 = [...blocksAfterPass1]
+  if (pass === 2 || pass === null) {
+    console.log(`[processSRT] === PASS 2: Institutions + formatting ===`)
 
-  if (chunksNeedingPass2.length > 0) {
-    console.log(`[processSRT] === PASS 2: Institutions + formatting on ${chunksNeedingPass2.length} chunks in parallel ===`)
-
-    const pass2Results = await Promise.all(
-      chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, modelType, 2))
-    )
-    const pass2Blocks = pass2Results.flat()
-
-    console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with institutions + formatting corrections`)
-
-    // ═══════════════════════════════════════════════════════════════
-    // FUSION : Combiner les corrections de la passe 1 et de la passe 2
-    // ═══════════════════════════════════════════════════════════════
-    blocksAfterPass2 = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, blocks)
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // DÉTECTION : Quels chunks nécessitent la passe 3 ?
-  // ═══════════════════════════════════════════════════════════════
-  const chunksNeedingPass3 = []
-
-  chunks.forEach((originalChunk, chunkIndex) => {
-    if (needsPass3(originalChunk)) {
-      // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 2 pour ce chunk
-      const correctedChunk = originalChunk.map(originalBlock => {
-        const blockAfterPass2 = blocksAfterPass2.find(b => b.index === originalBlock.index)
-        if (!blockAfterPass2) {
-          console.error(`[processSRT] Block ${originalBlock.index} not found after pass 2!`)
-          return originalBlock
-        }
-        // Créer un bloc avec le texte corrigé de la passe 2 comme "texte d'entrée"
-        return {
-          index: blockAfterPass2.index,
-          timecode: blockAfterPass2.timecode,
-          text: blockAfterPass2.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
-        }
-      })
-      chunksNeedingPass3.push({ chunkIndex, chunk: correctedChunk })
-    }
-  })
-
-  console.log(`[processSRT] ${chunksNeedingPass3.length}/${chunks.length} chunks need pass 3`)
-
-  // ═══════════════════════════════════════════════════════════════
-  // PASSE 3 : Ministères + formules de politesse (après institutions)
-  // ═══════════════════════════════════════════════════════════════
-  let blocksAfterPass3 = [...blocksAfterPass2]
-
-  if (chunksNeedingPass3.length > 0) {
-    console.log(`[processSRT] === PASS 3: Ministries + politeness formulas on ${chunksNeedingPass3.length} chunks in parallel ===`)
-
-    const pass3Results = await Promise.all(
-      chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, modelType, 3))
-    )
-    const pass3Blocks = pass3Results.flat()
-
-    console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with ministries + politeness corrections`)
-
-    // ═══════════════════════════════════════════════════════════════
-    // FUSION : Combiner les corrections (passe 1 + 2 + 3)
-    // ═══════════════════════════════════════════════════════════════
-    blocksAfterPass3 = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, blocks)
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // DÉTECTION : Quels chunks nécessitent la passe 4 ?
-  // ═══════════════════════════════════════════════════════════════
-  const chunksNeedingPass4 = []
-
-  // Filtrer pour n'envoyer que les chunks contenant "je/Je/J'/j'"
-  // Économise les appels API en excluant les chunks sans "je"
-  chunks.forEach((originalChunk, chunkIndex) => {
-    // Vérifier si le chunk contient "je" (toute casse : je/Je/JE) ou "j'" (apostrophe droite/courbe)
-    const chunkText = originalChunk.map(b => b.text).join(' ')
-    const containsJe = /\bje\b|\bj['\u2019]/i.test(chunkText)
-
-    if (!containsJe) {
-      return // Skip ce chunk, pas de "je"
+    // Recréer les chunks avec les blocs actuels
+    const currentChunks = []
+    for (let i = 0; i < blocksAfterPass1.length; i += maxBlocksPerChunk) {
+      currentChunks.push(blocksAfterPass1.slice(i, i + maxBlocksPerChunk))
     }
 
-    // Récupérer les blocs DÉJÀ CORRIGÉS après la passe 3 pour ce chunk
-    const correctedChunk = originalChunk.map(originalBlock => {
-      const blockAfterPass3 = blocksAfterPass3.find(b => b.index === originalBlock.index)
-      if (!blockAfterPass3) {
-        console.error(`[processSRT] Block ${originalBlock.index} not found after pass 3!`)
-        return originalBlock
-      }
-      // Créer un bloc avec le texte corrigé de la passe 3 comme "texte d'entrée"
-      return {
-        index: blockAfterPass3.index,
-        timecode: blockAfterPass3.timecode,
-        text: blockAfterPass3.corrected  // CRITIQUE : le texte corrigé devient le nouveau "text"
+    // Détection : Quels chunks nécessitent la passe 2 ?
+    const chunksNeedingPass2 = []
+
+    currentChunks.forEach((chunk, chunkIndex) => {
+      // Convertir les blocs au format SRT simple pour la détection
+      const srtChunk = chunk.map(b => ({
+        index: b.index,
+        timecode: b.timecode,
+        text: b.corrected || b.text
+      }))
+
+      if (needsSecondPass(srtChunk)) {
+        // Utiliser le texte corrigé comme entrée pour Pass 2
+        const inputChunk = chunk.map(b => ({
+          index: b.index,
+          timecode: b.timecode,
+          text: b.corrected || b.text
+        }))
+        chunksNeedingPass2.push({ chunkIndex, chunk: inputChunk })
       }
     })
-    chunksNeedingPass4.push({ chunkIndex, chunk: correctedChunk })
-  })
 
-  console.log(`[processSRT] ${chunksNeedingPass4.length}/${chunks.length} chunks sent to pass 4 (filtered by "je")`)
+    console.log(`[processSRT] ${chunksNeedingPass2.length}/${currentChunks.length} chunks need pass 2`)
+
+    if (chunksNeedingPass2.length > 0) {
+      const pass2Results = await Promise.all(
+        chunksNeedingPass2.map(({ chunk }) => correctWithClaude(chunk, modelType, 2))
+      )
+      const pass2Blocks = pass2Results.flat()
+
+      console.log(`[processSRT] Pass 2 completed: ${pass2Blocks.length} blocks with institutions + formatting corrections`)
+
+      // Fusion : Combiner les corrections de la passe 1 et de la passe 2
+      const originalBlocks = pass === null ? blocks : blocksAfterPass1
+      blocksAfterPass2 = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks)
+    }
+
+    // Si on n'exécute que Pass 2, retourner maintenant
+    if (pass === 2) {
+      const totalTime = Date.now() - startTime
+      console.log(`[processSRT] === PASS 2 ONLY: Completed in ${totalTime}ms ===`)
+      return {
+        blocks: blocksAfterPass2,
+        debugLogs: debugLogs,
+        pass0Stats: null
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASSE 3 : Ministères + formules de politesse
+  // ═══════════════════════════════════════════════════════════════
+  blocksAfterPass3 = blocksAfterPass2
+
+  if (pass === 3 || pass === null) {
+    console.log(`[processSRT] === PASS 3: Ministries + politeness formulas ===`)
+
+    // Recréer les chunks avec les blocs actuels
+    const currentChunks = []
+    for (let i = 0; i < blocksAfterPass2.length; i += maxBlocksPerChunk) {
+      currentChunks.push(blocksAfterPass2.slice(i, i + maxBlocksPerChunk))
+    }
+
+    // Détection : Quels chunks nécessitent la passe 3 ?
+    const chunksNeedingPass3 = []
+
+    currentChunks.forEach((chunk, chunkIndex) => {
+      // Convertir les blocs au format SRT simple pour la détection
+      const srtChunk = chunk.map(b => ({
+        index: b.index,
+        timecode: b.timecode,
+        text: b.corrected || b.text
+      }))
+
+      if (needsPass3(srtChunk)) {
+        // Utiliser le texte corrigé comme entrée pour Pass 3
+        const inputChunk = chunk.map(b => ({
+          index: b.index,
+          timecode: b.timecode,
+          text: b.corrected || b.text
+        }))
+        chunksNeedingPass3.push({ chunkIndex, chunk: inputChunk })
+      }
+    })
+
+    console.log(`[processSRT] ${chunksNeedingPass3.length}/${currentChunks.length} chunks need pass 3`)
+
+    if (chunksNeedingPass3.length > 0) {
+      const pass3Results = await Promise.all(
+        chunksNeedingPass3.map(({ chunk }) => correctWithClaude(chunk, modelType, 3))
+      )
+      const pass3Blocks = pass3Results.flat()
+
+      console.log(`[processSRT] Pass 3 completed: ${pass3Blocks.length} blocks with ministries + politeness corrections`)
+
+      // Fusion : Combiner les corrections (passe 1 + 2 + 3)
+      const originalBlocks = pass === null ? blocks : blocksAfterPass2
+      blocksAfterPass3 = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, originalBlocks)
+    }
+
+    // Si on n'exécute que Pass 3, retourner maintenant
+    if (pass === 3) {
+      const totalTime = Date.now() - startTime
+      console.log(`[processSRT] === PASS 3 ONLY: Completed in ${totalTime}ms ===`)
+      return {
+        blocks: blocksAfterPass3,
+        debugLogs: debugLogs,
+        pass0Stats: null
+      }
+    }
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // PASSE 4 : UNIQUEMENT ambiguïté de genre (règle isolée)
   // ═══════════════════════════════════════════════════════════════
-  let finalBlocks = [...blocksAfterPass3]
+  let finalBlocks = blocksAfterPass3
 
-  if (chunksNeedingPass4.length > 0) {
-    console.log(`[processSRT] === PASS 4: Gender ambiguity ONLY on ${chunksNeedingPass4.length} chunks in parallel ===`)
+  if (pass === 4 || pass === null) {
+    console.log(`[processSRT] === PASS 4: Gender ambiguity ONLY ===`)
 
-    // DEBUG: Afficher le contenu des chunks envoyés à Pass 4
-    console.log(`[DEBUG Pass 4] First chunk content:`, chunksNeedingPass4[0]?.chunk.slice(0, 3).map(b => b.text))
-
-    const pass4Results = await Promise.all(
-      chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4, debugLogs))
-    )
-    const pass4Blocks = pass4Results.flat()
-
-    console.log(`[processSRT] Pass 4 completed: ${pass4Blocks.length} blocks with gender ambiguity suggestions`)
-
-    // DEBUG: Afficher les corrections détectées par Pass 4
-    const blocksWithCorrections = pass4Blocks.filter(b => b.corrections && b.corrections.length > 0)
-    console.log(`[DEBUG Pass 4] Blocks with corrections: ${blocksWithCorrections.length}/${pass4Blocks.length}`)
-    if (blocksWithCorrections.length > 0) {
-      console.log(`[DEBUG Pass 4] First correction example:`, JSON.stringify(blocksWithCorrections[0], null, 2))
-    } else {
-      console.log(`[DEBUG Pass 4] No corrections found - checking first 3 blocks:`)
-      pass4Blocks.slice(0, 3).forEach(b => {
-        console.log(`  Block #${b.index}: "${b.original}" -> corrections: ${b.corrections?.length || 0}`)
-      })
+    // Recréer les chunks avec les blocs actuels
+    const currentChunks = []
+    for (let i = 0; i < blocksAfterPass3.length; i += maxBlocksPerChunk) {
+      currentChunks.push(blocksAfterPass3.slice(i, i + maxBlocksPerChunk))
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // FUSION : Combiner toutes les corrections (passe 1 + 2 + 3 + 4)
-    // ═══════════════════════════════════════════════════════════════
-    // IMPORTANT : Pass 4 travaille sur le texte APRÈS Pass 3, donc on valide contre blocksAfterPass3, pas blocks original
-    finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, blocksAfterPass3)
+    // Détection : Quels chunks nécessitent la passe 4 ?
+    // Filtrer pour n'envoyer que les chunks contenant "je/Je/J'/j'"
+    const chunksNeedingPass4 = []
+
+    currentChunks.forEach((chunk, chunkIndex) => {
+      // Vérifier si le chunk contient "je" (toute casse : je/Je/JE) ou "j'" (apostrophe droite/courbe)
+      const chunkText = chunk.map(b => b.corrected || b.text).join(' ')
+      const containsJe = /\bje\b|\bj['\u2019]/i.test(chunkText)
+
+      if (!containsJe) {
+        return // Skip ce chunk, pas de "je"
+      }
+
+      // Utiliser le texte corrigé comme entrée pour Pass 4
+      const inputChunk = chunk.map(b => ({
+        index: b.index,
+        timecode: b.timecode,
+        text: b.corrected || b.text
+      }))
+      chunksNeedingPass4.push({ chunkIndex, chunk: inputChunk })
+    })
+
+    console.log(`[processSRT] ${chunksNeedingPass4.length}/${currentChunks.length} chunks sent to pass 4 (filtered by "je")`)
+
+    if (chunksNeedingPass4.length > 0) {
+      // DEBUG: Afficher le contenu des chunks envoyés à Pass 4
+      console.log(`[DEBUG Pass 4] First chunk content:`, chunksNeedingPass4[0]?.chunk.slice(0, 3).map(b => b.text))
+
+      const pass4Results = await Promise.all(
+        chunksNeedingPass4.map(({ chunk }) => correctWithClaude(chunk, modelType, 4, debugLogs))
+      )
+      const pass4Blocks = pass4Results.flat()
+
+      console.log(`[processSRT] Pass 4 completed: ${pass4Blocks.length} blocks with gender ambiguity suggestions`)
+
+      // DEBUG: Afficher les corrections détectées par Pass 4
+      const blocksWithCorrections = pass4Blocks.filter(b => b.corrections && b.corrections.length > 0)
+      console.log(`[DEBUG Pass 4] Blocks with corrections: ${blocksWithCorrections.length}/${pass4Blocks.length}`)
+      if (blocksWithCorrections.length > 0) {
+        console.log(`[DEBUG Pass 4] First correction example:`, JSON.stringify(blocksWithCorrections[0], null, 2))
+      } else {
+        console.log(`[DEBUG Pass 4] No corrections found - checking first 3 blocks:`)
+        pass4Blocks.slice(0, 3).forEach(b => {
+          console.log(`  Block #${b.index}: "${b.original}" -> corrections: ${b.corrections?.length || 0}`)
+        })
+      }
+
+      // Fusion : Combiner toutes les corrections (passe 1 + 2 + 3 + 4)
+      // IMPORTANT : Pass 4 travaille sur le texte APRÈS Pass 3
+      const originalBlocks = pass === null ? blocksAfterPass3 : blocksAfterPass3
+      finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, originalBlocks)
+    }
+
+    // Si on n'exécute que Pass 4, retourner maintenant
+    if (pass === 4) {
+      const totalTime = Date.now() - startTime
+      console.log(`[processSRT] === PASS 4 ONLY: Completed in ${totalTime}ms ===`)
+      return {
+        blocks: finalBlocks,
+        debugLogs: debugLogs,
+        pass0Stats: null
+      }
+    }
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // RÉSUMÉ FINAL (mode toutes les passes)
+  // ═══════════════════════════════════════════════════════════════
   const endTime = Date.now()
   console.log(`[processSRT] ========================================`)
-  console.log(`[processSRT] SUMMARY:`)
+  console.log(`[processSRT] SUMMARY: All passes completed`)
   console.log(`[processSRT]   Total blocks: ${blocks.length}`)
-  console.log(`[processSRT]   Pass 0 (regex): ${pass0CorrectionsCount} blocks`)
-  console.log(`[processSRT]   Pass 1 (general): ${pass1Blocks.length} blocks`)
-  console.log(`[processSRT]   Pass 2 (institutions + formatting): ${chunksNeedingPass2.length} chunks`)
-  console.log(`[processSRT]   Pass 3 (ministries + politeness): ${chunksNeedingPass3.length} chunks`)
-  console.log(`[processSRT]   Pass 4 (gender ambiguity ONLY): ${chunksNeedingPass4.length} chunks`)
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
   return {
     blocks: finalBlocks,
     debugLogs: debugLogs,
-    pass0Stats: pass0Stats
+    pass0Stats: pass === null && typeof pass0Stats !== 'undefined' ? pass0Stats : null
   }
 }
 

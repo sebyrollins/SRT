@@ -197,12 +197,14 @@ function autoValidateDoubtCorrections(AppState) {
 }
 
 /**
- * Envoie le contenu au Cloudflare Worker
- * @param {string} content - Contenu du fichier SRT
+ * Envoie le contenu au Cloudflare Worker pour une passe spécifique
+ * @param {string} content - Contenu du fichier SRT (pour pass 1 uniquement)
  * @param {string} filename - Nom du fichier
+ * @param {number} pass - Numéro de passe (1, 2, 3, 4)
+ * @param {Array} inputBlocks - Blocs déjà traités (pour passes 2, 3, 4)
  * @returns {Promise} - Promise résolvant avec les blocs corrigés
  */
-async function sendToWorker(content, filename) {
+async function sendToWorkerSinglePass(content, filename, pass, inputBlocks = null) {
   // Vérifier que le Worker est configuré
   if (window.APP_CONFIG.workerUrl.includes('YOUR-SUBDOMAIN')) {
     throw new Error(`⚠️ Le Worker Cloudflare n'est pas encore configuré.\n\nÉtapes :\n1. Déployez le Worker sur Cloudflare\n2. Modifiez l'URL dans frontend/lib/config.php\n\nConsultez le README.md pour les instructions.`)
@@ -212,16 +214,26 @@ async function sendToWorker(content, filename) {
   const modelSelect = document.getElementById('modelSelect')
   const selectedModel = modelSelect ? modelSelect.value : 'haiku'
 
+  const requestBody = {
+    fileName: filename,
+    model: selectedModel,
+    pass: pass
+  }
+
+  // Pour Pass 1 : envoyer le contenu SRT brut
+  if (pass === 1) {
+    requestBody.srtContent = content
+  } else {
+    // Pour Pass 2, 3, 4 : envoyer les blocs déjà traités
+    requestBody.inputBlocks = inputBlocks
+  }
+
   const response = await fetch(window.APP_CONFIG.workerUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      srtContent: content,
-      fileName: filename,
-      model: selectedModel
-    })
+    body: JSON.stringify(requestBody)
   })
 
   if (!response.ok) {
@@ -237,7 +249,7 @@ async function sendToWorker(content, filename) {
 
   // Afficher les logs de debug si présents
   if (result.debugLogs && result.debugLogs.length > 0) {
-    console.log('=== DEBUG LOGS FROM WORKER ===')
+    console.log(`=== DEBUG LOGS FROM WORKER (Pass ${pass}) ===`)
     result.debugLogs.forEach((log, index) => {
       console.log(`\n[${index + 1}] ${log.type} (${log.timestamp}):`)
       if (log.type === 'pass4_user_prompt') {
@@ -259,8 +271,8 @@ async function sendToWorker(content, filename) {
     console.log('=== END DEBUG LOGS ===\n')
   }
 
-  // Afficher les stats Pass 0 si présentes
-  if (result.pass0Stats) {
+  // Afficher les stats Pass 0 si présentes (seulement pour Pass 1)
+  if (pass === 1 && result.pass0Stats) {
     console.log('=== PASS 0 STATS ===')
     console.log('Trim Spaces:', result.pass0Stats.trimSpaces)
     console.log('Ellipsis:', result.pass0Stats.ellipsis)
@@ -270,13 +282,67 @@ async function sendToWorker(content, filename) {
     console.log('French Quotes:', result.pass0Stats.frenchQuotes)
     console.log('Space After Apostrophe:', result.pass0Stats.spaceAfterApostrophe)
     console.log('=== END PASS 0 STATS ===\n')
-  } else {
-    console.warn('[WARNING] No pass0Stats received from worker')
   }
 
   return {
     blocks: result.data,
     pass0Stats: result.pass0Stats || null
+  }
+}
+
+/**
+ * Envoie le contenu au Cloudflare Worker en 4 passes séquentielles
+ * @param {string} content - Contenu du fichier SRT
+ * @param {string} filename - Nom du fichier
+ * @param {Object} DOM - Références DOM pour la barre de progression
+ * @param {Function} updateProgress - Fonction de mise à jour de la progression
+ * @returns {Promise} - Promise résolvant avec les blocs corrigés finaux
+ */
+async function sendToWorkerMultiPass(content, filename, DOM, updateProgress) {
+  let currentBlocks = null
+  let pass0Stats = null
+
+  // PASS 1 : Pass 0 (regex) + Pass 1 (corrections générales)
+  console.log('[Multi-Pass] Starting Pass 1 (regex + general corrections)...')
+  updateProgress(0, 'Pass 1/4 : Corrections générales...', DOM)
+
+  const pass1Result = await sendToWorkerSinglePass(content, filename, 1, null)
+  currentBlocks = pass1Result.blocks
+  pass0Stats = pass1Result.pass0Stats
+
+  console.log(`[Multi-Pass] Pass 1 completed: ${currentBlocks.length} blocks`)
+  updateProgress(25, 'Pass 2/4 : Institutions et formatage...', DOM)
+
+  // PASS 2 : Institutions + formatage
+  console.log('[Multi-Pass] Starting Pass 2 (institutions + formatting)...')
+
+  const pass2Result = await sendToWorkerSinglePass(null, filename, 2, currentBlocks)
+  currentBlocks = pass2Result.blocks
+
+  console.log(`[Multi-Pass] Pass 2 completed: ${currentBlocks.length} blocks`)
+  updateProgress(50, 'Pass 3/4 : Ministères et politesse...', DOM)
+
+  // PASS 3 : Ministères + formules de politesse
+  console.log('[Multi-Pass] Starting Pass 3 (ministries + politeness)...')
+
+  const pass3Result = await sendToWorkerSinglePass(null, filename, 3, currentBlocks)
+  currentBlocks = pass3Result.blocks
+
+  console.log(`[Multi-Pass] Pass 3 completed: ${currentBlocks.length} blocks`)
+  updateProgress(75, 'Pass 4/4 : Ambiguïtés de genre...', DOM)
+
+  // PASS 4 : Ambiguïtés de genre
+  console.log('[Multi-Pass] Starting Pass 4 (gender ambiguity)...')
+
+  const pass4Result = await sendToWorkerSinglePass(null, filename, 4, currentBlocks)
+  currentBlocks = pass4Result.blocks
+
+  console.log(`[Multi-Pass] Pass 4 completed: ${currentBlocks.length} blocks`)
+  console.log('[Multi-Pass] All passes completed successfully!')
+
+  return {
+    blocks: currentBlocks,
+    pass0Stats: pass0Stats
   }
 }
 
@@ -361,38 +427,14 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
   // Afficher la section de chargement
   showSectionUI('loading', DOM)
 
-  // Estimer le temps de traitement
-  const fileSizeKB = new Blob([content]).size / 1024
-  const baseTimeMs = 30000
-  const msPerKB = 280
-  const maxTimeMs = 100000
-  const estimatedTimeMs = Math.min(maxTimeMs, baseTimeMs + (fileSizeKB * msPerKB))
-
-  // Progression fictive fluide jusqu'à 80%
-  let currentProgress = 0
-  const targetProgress = 80
-  const updateInterval = 100
-  const progressIncrement = (targetProgress / estimatedTimeMs) * updateInterval
-
-  updateProgressUI(0, 'Veuillez patienter pendant l\'analyse...', DOM)
-
-  const progressInterval = setInterval(() => {
-    currentProgress += progressIncrement
-    if (currentProgress >= targetProgress) {
-      currentProgress = targetProgress
-      clearInterval(progressInterval)
-    }
-    updateProgressUI(Math.round(currentProgress), 'Veuillez patienter pendant l\'analyse...', DOM)
-  }, updateInterval)
+  // Démarrer avec 0% de progression
+  updateProgressUI(0, 'Initialisation...', DOM)
 
   try {
-    // Envoyer au Worker Cloudflare
-    const result = await sendToWorker(content, filename)
+    // Envoyer au Worker Cloudflare en 4 passes séquentielles
+    const result = await sendToWorkerMultiPass(content, filename, DOM, updateProgressUI)
     const correctedBlocks = result.blocks
     const pass0Stats = result.pass0Stats
-
-    // Arrêter la progression fictive
-    clearInterval(progressInterval)
 
     // Transformer les apostrophes et compter les conversions
     const curlyApostrophesCount = convertStraightApostrophesToCurly(correctedBlocks)
@@ -433,33 +475,15 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
       }
     })
 
-    // Progression finale de 80% à 100%
-    const finalProgressDuration = 4000
-    const finalProgressSteps = 20
-    const finalProgressIncrement = 20 / finalProgressSteps
-    const finalProgressInterval = finalProgressDuration / finalProgressSteps
+    // Progression finale de 75% à 100%
+    updateProgressUI(75, 'Traitement des résultats...', DOM)
+    await new Promise(resolve => setTimeout(resolve, 500))
 
-    let finalProgress = 80
-    const messages = [
-      { threshold: 80, text: 'Traitement des résultats...' },
-      { threshold: 90, text: 'Finalisation...' },
-      { threshold: 98, text: 'Terminé !' }
-    ]
+    updateProgressUI(85, 'Finalisation...', DOM)
+    await new Promise(resolve => setTimeout(resolve, 500))
 
-    for (let i = 0; i < finalProgressSteps; i++) {
-      finalProgress += finalProgressIncrement
-      const roundedProgress = Math.min(Math.round(finalProgress), 100)
-
-      let message = messages[0].text
-      for (const msg of messages) {
-        if (roundedProgress >= msg.threshold) {
-          message = msg.text
-        }
-      }
-
-      updateProgressUI(roundedProgress, message, DOM)
-      await new Promise(resolve => setTimeout(resolve, finalProgressInterval))
-    }
+    updateProgressUI(95, 'Presque terminé...', DOM)
+    await new Promise(resolve => setTimeout(resolve, 500))
 
     updateProgressUI(100, 'Terminé !', DOM)
 
@@ -469,7 +493,6 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 
   } catch (error) {
     console.error('Erreur lors du traitement:', error)
-    clearInterval(progressInterval)
     alert(`Erreur : ${error.message}`)
     showSectionUI('upload', DOM)
   }
