@@ -205,8 +205,7 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
 
       block.corrected = processedValue
 
-      // Valider automatiquement cette correction
-      AppState.validatedCorrections.add(`${block.index}-0`)
+      // Ne pas valider automatiquement - laisser l'utilisateur décider
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
