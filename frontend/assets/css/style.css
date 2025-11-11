@@ -1212,6 +1212,10 @@ body {
 
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
+  :root {
+    --stats-height: 240px; /* Hauteur augmentée pour stats-bar en mode colonne */
+  }
+
   .editor-grid {
     grid-template-columns: 1fr;
   }
@@ -1234,6 +1238,10 @@ body {
 }
 
 @media (max-width: 640px) {
+  :root {
+    --stats-height: 380px; /* Hauteur encore plus augmentée pour stats-group en mode colonne complète */
+  }
+
   .app-title {
     font-size: 1.75rem;
   }
@@ -1922,9 +1930,9 @@ body {
   right: 20px;
   top: calc(var(--stats-height) + 20px); /* Sous la barre de stats + marge */
   bottom: 20px;
-  width: 25px; /* Réduit de moitié : 50px → 25px */
+  width: 50px;
   height: calc(100vh - var(--stats-height) - 40px); /* Hauteur = viewport - stats - marges */
-  padding: 4px; /* Réduit proportionnellement : 8px → 4px */
+  padding: 8px;
 }
 
 /* Opacité complète au survol pour meilleure visibilité */
@@ -2052,7 +2060,7 @@ body {
     right: 20px;
     top: calc(var(--stats-height) + 20px);
     bottom: 20px;
-    width: 25px; /* Réduit de moitié : 50px → 25px */
+    width: 50px;
     height: calc(100vh - var(--stats-height) - 40px);
   }
 }
@@ -2063,7 +2071,7 @@ body {
     right: 12px;
     top: calc(var(--stats-height) + 12px);
     bottom: 12px;
-    width: 20px; /* Réduit de moitié : 40px → 20px */
+    width: 40px;
     height: calc(100vh - var(--stats-height) - 24px);
   }
 
@@ -2090,9 +2098,9 @@ body {
     right: 8px;
     top: calc(var(--stats-height) + 8px);
     bottom: 8px;
-    width: 16px; /* Réduit de moitié : 32px → 16px */
+    width: 32px;
     height: calc(100vh - var(--stats-height) - 16px);
-    padding: 3px; /* Réduit proportionnellement : 6px → 3px */
+    padding: 6px;
   }
 
   .minimap-title {
@@ -2122,9 +2130,9 @@ body {
     right: 8px;
     top: calc(var(--stats-height) + 8px);
     bottom: 8px;
-    width: 14px; /* Réduit de moitié : 28px → 14px */
+    width: 28px;
     height: calc(100vh - var(--stats-height) - 16px);
-    padding: 2px; /* Réduit proportionnellement : 4px → 2px */
+    padding: 4px;
     opacity: 0.3; /* Encore plus transparent sur mobile */
     transition: opacity 0.3s ease;
   }
@@ -2163,12 +2171,12 @@ body {
 /* Très petit écran (< 360px) : minimap ultra-compacte */
 @media (max-width: 359px) {
   .navigation-minimap {
-    width: 12px; /* Réduit de moitié : 24px → 12px */
+    width: 24px;
     right: 4px;
     top: calc(var(--stats-height) + 4px);
     bottom: 4px;
     height: calc(100vh - var(--stats-height) - 8px);
-    padding: 2px; /* Réduit proportionnellement : 3px → 2px */
+    padding: 3px;
   }
 
   .minimap-block {

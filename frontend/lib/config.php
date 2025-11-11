@@ -10,7 +10,7 @@ declare(strict_types=1);
 define('WORKER_URL', 'https://srt-corrector-worker.sraynal.workers.dev/');
 
 // Limites de fichiers
-define('MAX_FILE_SIZE', 50 * 1024); // 50 Ko en bytes
+define('MAX_FILE_SIZE', 20 * 1024); // 20 Ko en bytes
 define('ALLOWED_EXTENSIONS', ['srt']);
 
 // Dossier temporaire pour les uploads
