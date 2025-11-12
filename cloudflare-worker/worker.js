@@ -1214,6 +1214,70 @@ function normalizeFuzzy(text, options = {}) {
 }
 
 /**
+ * Construit un pattern regex pour la recherche souple
+ * Permet d'ignorer les "s" sur CHAQUE mot de l'expression
+ */
+function buildFuzzyPattern(search, options = {}) {
+  // Séparer en mots
+  const words = search.trim().split(/\s+/)
+  const patterns = []
+
+  words.forEach(word => {
+    // Échapper les caractères spéciaux regex
+    let pattern = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+    // Si ignorePlural, rendre le "s" final optionnel pour chaque mot
+    if (options.ignorePlural) {
+      // Ajouter s? à la fin (s optionnel)
+      pattern += 's?'
+    }
+
+    // Si ignoreAccents, construire une version avec variantes d'accents
+    if (options.ignoreAccents) {
+      const accentMap = {
+        'e': '[eéèêë]',
+        'E': '[EÉÈÊË]',
+        'a': '[aàâä]',
+        'A': '[AÀÂÄ]',
+        'i': '[iîï]',
+        'I': '[IÎÏ]',
+        'o': '[oôö]',
+        'O': '[OÔÖ]',
+        'u': '[uùûü]',
+        'U': '[UÙÛÜ]',
+        'c': '[cç]',
+        'C': '[CÇ]'
+      }
+
+      for (const [base, classPattern] of Object.entries(accentMap)) {
+        // Remplacer le caractère de base par sa classe
+        const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        pattern = pattern.replace(new RegExp(escapedBase, 'g'), classPattern)
+      }
+    }
+
+    // Si ignoreHyphens, permettre tiret ou espace ou rien entre les caractères
+    if (options.ignoreHyphens) {
+      pattern = pattern.replace(/\\-/g, '[-\\s]?').replace(/\\ /g, '[-\\s]?')
+    }
+
+    patterns.push(`\\b${pattern}\\b`)
+  })
+
+  // Joindre les mots avec des espaces/tirets selon les options
+  const separator = options.ignoreHyphens ? '[-\\s]+' : '\\s+'
+  const fullPattern = patterns.join(separator)
+
+  // Construire les flags
+  let flags = 'g'
+  if (options.ignoreCase) {
+    flags += 'i'
+  }
+
+  return new RegExp(fullPattern, flags)
+}
+
+/**
  * Applique une règle de vocabulaire à un texte
  */
 function applyVocabularyRule(text, rule) {
@@ -1256,11 +1320,9 @@ function applyVocabularyRule(text, rule) {
         const search = rule.search || ''
 
         if (search) {
-          // Pour la recherche souple, on utilise une regex insensible à la casse
-          let flags = 'g'
-          if (options.ignoreCase) flags += 'i'
-
-          const pattern = new RegExp(`\\b${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, flags)
+          // Construire un pattern regex intelligent basé sur les options
+          // Cela permet d'ignorer les "s" sur CHAQUE mot de l'expression
+          const pattern = buildFuzzyPattern(search, options)
           const matches = corrected.match(pattern)
 
           if (matches && matches.length > 0) {

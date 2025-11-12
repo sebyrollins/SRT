@@ -164,6 +164,72 @@ function remove_accents($str) {
 }
 
 /**
+ * Construit un pattern regex pour la recherche souple
+ * @param string $search Texte de recherche
+ * @param array $options Options de recherche
+ * @return string Pattern regex
+ */
+function buildFuzzyPattern($search, $options = []) {
+    // Séparer en mots
+    $words = preg_split('/\s+/', trim($search));
+    $patterns = [];
+
+    foreach ($words as $word) {
+        $pattern = preg_quote($word, '/');
+
+        // Si ignorePlural, rendre le "s" final optionnel pour chaque mot
+        if (isset($options['ignorePlural']) && $options['ignorePlural']) {
+            // Si le mot ne se termine pas déjà par "s?"
+            if (!preg_match('/s\?$/', $pattern)) {
+                // Ajouter s? à la fin (s optionnel)
+                $pattern .= 's?';
+            }
+        }
+
+        // Si ignoreAccents, construire une version avec variantes d'accents
+        if (isset($options['ignoreAccents']) && $options['ignoreAccents']) {
+            // Remplacer les caractères accentués par des classes de caractères
+            $accentMap = [
+                'e' => '[eéèêë]',
+                'a' => '[aàâä]',
+                'i' => '[iîï]',
+                'o' => '[oôö]',
+                'u' => '[uùûü]',
+                'c' => '[cç]',
+            ];
+
+            foreach ($accentMap as $base => $class) {
+                $pattern = preg_replace('/' . preg_quote($base, '/') . '/i', $class, $pattern);
+            }
+        }
+
+        // Si ignoreHyphens, permettre tiret ou espace ou rien
+        if (isset($options['ignoreHyphens']) && $options['ignoreHyphens']) {
+            $pattern = str_replace(['\-', '\\\ '], '[-\s]?', $pattern);
+        }
+
+        $patterns[] = '\b' . $pattern . '\b';
+    }
+
+    // Joindre les mots avec des espaces/tirets optionnels selon les options
+    if (isset($options['ignoreHyphens']) && $options['ignoreHyphens']) {
+        $separator = '[-\s]+';
+    } else {
+        $separator = '\s+';
+    }
+
+    $fullPattern = implode($separator, $patterns);
+
+    // Ajouter les flags
+    $flags = 'u'; // UTF-8
+    if (isset($options['ignoreCase']) && $options['ignoreCase']) {
+        $flags .= 'i';
+    }
+
+    return '/' . $fullPattern . '/' . $flags;
+}
+
+/**
  * Applique une règle de vocabulaire à un texte
  * @param string $text Texte à corriger
  * @param array $rule Règle à appliquer
@@ -226,36 +292,28 @@ function applyVocabularyRule($text, $rule) {
             $search = $rule['search'] ?? '';
 
             if (!empty($search)) {
-                $textNormalized = normalizeFuzzy($corrected, $options);
-                $searchNormalized = normalizeFuzzy($search, $options);
+                // Construire un pattern regex intelligent basé sur les options
+                // Cela permet d'ignorer les "s" sur CHAQUE mot de l'expression
+                $pattern = buildFuzzyPattern($search, $options);
 
-                if (strpos($textNormalized, $searchNormalized) !== false) {
-                    // Pour la recherche souple, on utilise une regex insensible à la casse
-                    $pattern = '/\b' . preg_quote($search, '/') . '\b/ui';
+                $count = preg_match_all($pattern, $corrected, $matchesArray);
 
-                    if ($options['ignoreCase'] ?? false) {
-                        $pattern = '/\b' . preg_quote($search, '/') . '\b/ui';
-                    }
+                if ($count > 0) {
+                    $matches[] = [
+                        'type' => 'souple',
+                        'matched' => true,
+                        'count' => $count
+                    ];
 
-                    $count = preg_match_all($pattern, $corrected, $matchesArray);
+                    $corrected = preg_replace($pattern, $rule['replace'], $corrected);
 
-                    if ($count > 0) {
-                        $matches[] = [
-                            'type' => 'souple',
-                            'matched' => true,
-                            'count' => $count
-                        ];
-
-                        $corrected = preg_replace($pattern, $rule['replace'], $corrected);
-
-                        $corrections[] = [
-                            'type' => 'souple',
-                            'original' => $search,
-                            'corrected' => $rule['replace'],
-                            'reason' => $rule['reason'] ?? 'Règle de vocabulaire',
-                            'count' => $count
-                        ];
-                    }
+                    $corrections[] = [
+                        'type' => 'souple',
+                        'original' => $search,
+                        'corrected' => $rule['replace'],
+                        'reason' => $rule['reason'] ?? 'Règle de vocabulaire',
+                        'count' => $count
+                    ];
                 }
             }
             break;
