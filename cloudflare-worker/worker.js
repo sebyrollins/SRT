@@ -1010,8 +1010,10 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
   // ═══════════════════════════════════════════════════════════════
   // PASS 5 : VOCABULAIRE (SANS API CLAUDE - GRATUIT)
+  // Cette passe s'exécute TOUJOURS (sauf si Pass 0 uniquement)
+  // car elle ne coûte rien et est très rapide
   // ═══════════════════════════════════════════════════════════════
-  if (pass === null || pass === 5) {
+  if (pass !== 0) {
     console.log('[processSRT] ========================================')
     console.log('[processSRT] Starting Pass 5: Vocabulary corrections (no API cost)')
     console.log('[processSRT] ========================================')
