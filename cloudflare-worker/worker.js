@@ -1004,6 +1004,52 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // PASS 5 : VOCABULAIRE (SANS API CLAUDE - GRATUIT)
+  // ═══════════════════════════════════════════════════════════════
+  if (pass === null || pass === 5) {
+    console.log('[processSRT] ========================================')
+    console.log('[processSRT] Starting Pass 5: Vocabulary corrections (no API cost)')
+    console.log('[processSRT] ========================================')
+
+    const pass5StartTime = Date.now()
+
+    // Appliquer les règles de vocabulaire à tous les blocs finaux
+    const blocksWithVocabulary = finalBlocks.map(block => applyVocabularyRules(block))
+
+    // Compter les blocs modifiés
+    const modifiedBlocks = blocksWithVocabulary.filter(b => b.correctedByPass5)
+    const totalCorrections = blocksWithVocabulary.reduce((sum, b) =>
+      sum + (b.corrections?.length || 0), 0
+    )
+
+    console.log(`[processSRT] Pass 5 completed:`)
+    console.log(`[processSRT]   - ${modifiedBlocks.length}/${blocksWithVocabulary.length} blocks modified`)
+    console.log(`[processSRT]   - ${totalCorrections} vocabulary corrections applied`)
+    console.log(`[processSRT]   - Duration: ${Date.now() - pass5StartTime}ms`)
+    console.log(`[processSRT]   - Cost: $0.00 (no API call)`)
+
+    // Mettre à jour finalBlocks avec les corrections de vocabulaire
+    finalBlocks = blocksWithVocabulary
+
+    // Si on n'exécute que Pass 5, retourner maintenant
+    if (pass === 5) {
+      const totalTime = Date.now() - startTime
+      console.log(`[processSRT] === PASS 5 ONLY: Completed in ${totalTime}ms ===`)
+      return {
+        blocks: finalBlocks,
+        debugLogs: debugLogs,
+        pass0Stats: null,
+        pass5Stats: {
+          modifiedBlocks: modifiedBlocks.length,
+          totalBlocks: blocksWithVocabulary.length,
+          totalCorrections: totalCorrections,
+          rulesApplied: VOCABULARY_RULES.rules.filter(r => r.enabled).length
+        }
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // RÉSUMÉ FINAL (mode toutes les passes)
   // ═══════════════════════════════════════════════════════════════
   const endTime = Date.now()
@@ -1091,6 +1137,195 @@ function cleanAnnotations(text) {
   // Supprimer les annotations entre parenthèses à la fin du texte
   // Pattern: texte suivi optionnellement d'un espace puis (annotation)
   return text.replace(/\s*\([^)]*\)\s*$/g, '').trim()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PASS 5 : VOCABULAIRE (SANS API CLAUDE)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Règles de vocabulaire pour la Pass 5
+ * Ces règles peuvent être chargées depuis un fichier JSON ou définies ici
+ * Pour mettre à jour : utilisez l'interface admin à /admin/vocabulary.php
+ */
+const VOCABULARY_RULES = {
+  version: '1.0',
+  rules: [
+    {
+      id: 'rule-001',
+      enabled: true,
+      type: 'exact',
+      variants: ['scanner', 'scanneur', 'scanneurs', 'Scanners', 'SCANNER'],
+      replace: 'scanner',
+      category: 'medical',
+      reason: 'Uniformisation terminologie médicale'
+    },
+    {
+      id: 'rule-002',
+      enabled: true,
+      type: 'exact',
+      variants: ['covid', 'Covid', 'COVID', 'covid-19', 'Covid-19', 'COVID-19', 'covid 19'],
+      replace: 'COVID-19',
+      category: 'medical',
+      reason: 'Normalisation acronyme'
+    },
+    {
+      id: 'rule-003',
+      enabled: true,
+      type: 'regex',
+      search: '\\bau\\s*niveau\\s*de\\b',
+      replace: 'à propos de',
+      category: 'expressions',
+      options: { flags: 'gi' },
+      reason: 'Expression impropre'
+    }
+  ]
+}
+
+/**
+ * Normalise un texte pour le matching souple
+ */
+function normalizeFuzzy(text, options = {}) {
+  let normalized = text
+
+  // Ignorer la casse
+  if (options.ignoreCase) {
+    normalized = normalized.toLowerCase()
+  }
+
+  // Ignorer les accents (approximation simple pour JavaScript)
+  if (options.ignoreAccents) {
+    normalized = normalized
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+  }
+
+  // Ignorer les tirets et espaces
+  if (options.ignoreHyphens) {
+    normalized = normalized.replace(/[-\s]+/g, '')
+  }
+
+  // Ignorer les "s" finaux
+  if (options.ignorePlural) {
+    normalized = normalized.replace(/s\b/gi, '')
+  }
+
+  return normalized
+}
+
+/**
+ * Applique une règle de vocabulaire à un texte
+ */
+function applyVocabularyRule(text, rule) {
+  if (!rule.enabled) {
+    return { text, matched: false, corrections: [] }
+  }
+
+  let corrected = text
+  const corrections = []
+
+  try {
+    switch (rule.type) {
+      case 'exact':
+        // Recherche de variantes exactes
+        if (rule.variants && Array.isArray(rule.variants)) {
+          rule.variants.forEach(variant => {
+            // Échapper les caractères spéciaux regex
+            const escapedVariant = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // Recherche avec limites de mots
+            const pattern = new RegExp(`\\b${escapedVariant}\\b`, 'g')
+
+            const matches = corrected.match(pattern)
+            if (matches && matches.length > 0) {
+              corrected = corrected.replace(pattern, rule.replace)
+              corrections.push({
+                type: 'vocabulary',
+                original: variant,
+                corrected: rule.replace,
+                reason: rule.reason || 'Règle de vocabulaire',
+                count: matches.length
+              })
+            }
+          })
+        }
+        break
+
+      case 'souple':
+        // Recherche souple avec normalisation
+        const options = rule.options || {}
+        const search = rule.search || ''
+
+        if (search) {
+          // Pour la recherche souple, on utilise une regex insensible à la casse
+          let flags = 'g'
+          if (options.ignoreCase) flags += 'i'
+
+          const pattern = new RegExp(`\\b${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, flags)
+          const matches = corrected.match(pattern)
+
+          if (matches && matches.length > 0) {
+            corrected = corrected.replace(pattern, rule.replace)
+            corrections.push({
+              type: 'vocabulary',
+              original: search,
+              corrected: rule.replace,
+              reason: rule.reason || 'Règle de vocabulaire',
+              count: matches.length
+            })
+          }
+        }
+        break
+
+      case 'regex':
+        // Recherche avec regex personnalisée
+        const regexFlags = rule.options?.flags || 'g'
+        const regexPattern = new RegExp(rule.search, regexFlags)
+        const regexMatches = corrected.match(regexPattern)
+
+        if (regexMatches && regexMatches.length > 0) {
+          corrected = corrected.replace(regexPattern, rule.replace)
+          corrections.push({
+            type: 'vocabulary',
+            original: rule.search,
+            corrected: rule.replace,
+            reason: rule.reason || 'Règle de vocabulaire',
+            count: regexMatches.length
+          })
+        }
+        break
+    }
+  } catch (error) {
+    console.error(`[Pass 5] Error applying rule ${rule.id}:`, error.message)
+  }
+
+  return {
+    text: corrected,
+    matched: corrections.length > 0,
+    corrections
+  }
+}
+
+/**
+ * Applique toutes les règles de vocabulaire à un bloc
+ */
+function applyVocabularyRules(block) {
+  let corrected = block.text
+  const allCorrections = []
+
+  VOCABULARY_RULES.rules.forEach(rule => {
+    const result = applyVocabularyRule(corrected, rule)
+    if (result.matched) {
+      corrected = result.text
+      allCorrections.push(...result.corrections)
+    }
+  })
+
+  return {
+    ...block,
+    text: corrected,
+    corrections: allCorrections.length > 0 ? allCorrections : [],
+    correctedByPass5: allCorrections.length > 0
+  }
 }
 
 /**

@@ -32,3 +32,6 @@ Thumbs.db
 # Backup
 *.bak
 *.backup
+
+# Configuration vocabulaire (règles personnalisées)
+frontend/config/vocabulary-rules.json
