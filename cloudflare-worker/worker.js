@@ -790,16 +790,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected by Claude`)
 
-    // Si on n'exécute que Pass 1, retourner maintenant
-    if (pass === 1) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 1 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: blocksAfterPass1,
-        debugLogs: debugLogs,
-        pass0Stats: pass0Stats
-      }
-    }
+    // IMPORTANT : Ne plus retourner ici même si pass === 1
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // Pour les passes 2, 3, 4 : utiliser les blocs d'entrée
@@ -854,16 +846,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       blocksAfterPass2 = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks)
     }
 
-    // Si on n'exécute que Pass 2, retourner maintenant
-    if (pass === 2) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 2 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: blocksAfterPass2,
-        debugLogs: debugLogs,
-        pass0Stats: null
-      }
-    }
+    // IMPORTANT : Ne plus retourner ici même si pass === 2
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -917,16 +901,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       blocksAfterPass3 = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, originalBlocks)
     }
 
-    // Si on n'exécute que Pass 3, retourner maintenant
-    if (pass === 3) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 3 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: blocksAfterPass3,
-        debugLogs: debugLogs,
-        pass0Stats: null
-      }
-    }
+    // IMPORTANT : Ne plus retourner ici même si pass === 3
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -996,16 +972,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, originalBlocks)
     }
 
-    // Si on n'exécute que Pass 4, retourner maintenant
-    if (pass === 4) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 4 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: finalBlocks,
-        debugLogs: debugLogs,
-        pass0Stats: null
-      }
-    }
+    // IMPORTANT : Ne plus retourner ici même si pass === 4
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // ═══════════════════════════════════════════════════════════════
