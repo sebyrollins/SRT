@@ -138,6 +138,31 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
     block.corrections = block.originalCorrections.map(c => ({...c}))
     delete block.originalCorrections
 
+    // IMPORTANT : Restaurer les types originaux de chaque correction restaurée
+    block.corrections.forEach((correction, idx) => {
+      const corrId = `${blockIndex}-${idx}`
+
+      // Restaurer le type original si modifié
+      if (correction.hasOwnProperty('originalType')) {
+        correction.type = correction.originalType
+        delete correction.originalType
+      }
+      // Restaurer la suggestion originale si modifiée
+      if (correction.hasOwnProperty('originalSuggestion')) {
+        correction.corrected = correction.originalSuggestion
+        delete correction.originalSuggestion
+      }
+      // Restaurer la raison originale si elle existe
+      if (correction.hasOwnProperty('originalReason')) {
+        correction.reason = correction.originalReason
+        delete correction.originalReason
+      }
+      // Retirer le flag de modification manuelle
+      if (correction.isManuallyEdited) {
+        correction.isManuallyEdited = false
+      }
+    })
+
     // Restaurer le texte corrigé original
     if (block.hasOwnProperty('originalCorrected')) {
       block.corrected = block.originalCorrected
@@ -407,7 +432,57 @@ export function resetBlockToInitialState(blockIndex, AppState, SRTParser, update
   })
 
   // Si originalCorrected existe, le restaurer directement (plus simple et fiable)
+  // MAIS il faut d'abord restaurer les types des corrections !
   if (block.hasOwnProperty('originalCorrected')) {
+    // IMPORTANT : Restaurer d'abord les types et suggestions des corrections
+    block.corrections.forEach((correction, idx) => {
+      // Restaurer le type original si modifié
+      if (correction.hasOwnProperty('originalType')) {
+        correction.type = correction.originalType
+        delete correction.originalType
+      }
+      // Restaurer la suggestion originale si modifiée
+      if (correction.hasOwnProperty('originalSuggestion')) {
+        correction.corrected = correction.originalSuggestion
+        delete correction.originalSuggestion
+      }
+      // Restaurer la raison originale si elle existe
+      if (correction.hasOwnProperty('originalReason')) {
+        correction.reason = correction.originalReason
+        delete correction.originalReason
+      }
+      // Retirer le flag de modification manuelle
+      if (correction.isManuallyEdited) {
+        correction.isManuallyEdited = false
+      }
+    })
+
+    // Restaurer originalCorrections si présent (cas modification globale)
+    if (block.hasOwnProperty('originalCorrections')) {
+      block.corrections = block.originalCorrections.map(c => ({...c}))
+      delete block.originalCorrections
+
+      // Restaurer aussi les types des corrections restaurées
+      block.corrections.forEach((correction, idx) => {
+        if (correction.hasOwnProperty('originalType')) {
+          correction.type = correction.originalType
+          delete correction.originalType
+        }
+        if (correction.hasOwnProperty('originalSuggestion')) {
+          correction.corrected = correction.originalSuggestion
+          delete correction.originalSuggestion
+        }
+        if (correction.hasOwnProperty('originalReason')) {
+          correction.reason = correction.originalReason
+          delete correction.originalReason
+        }
+        if (correction.isManuallyEdited) {
+          correction.isManuallyEdited = false
+        }
+      })
+    }
+
+    // Ensuite restaurer le texte corrigé
     block.corrected = block.originalCorrected
     delete block.originalCorrected
 
