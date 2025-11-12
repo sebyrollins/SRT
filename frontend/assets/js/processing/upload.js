@@ -506,7 +506,7 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
     // Envoyer au Worker Cloudflare en 4 passes séquentielles
     const result = await sendToWorkerMultiPass(content, filename, DOM, updateProgressUI)
     const correctedBlocks = result.blocks
-    const pass0Stats = result.pass0Stats
+    let pass0Stats = result.pass0Stats
 
     // Transformer les apostrophes et compter les conversions
     const curlyApostrophesCount = convertStraightApostrophesToCurly(correctedBlocks)
