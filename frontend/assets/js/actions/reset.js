@@ -55,6 +55,50 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
 
   const correction = block.corrections[corrIndex]
 
+  // CAS SPÉCIAL : Retour à l'original (toutes corrections rejetées)
+  // Si le texte actuel = original et on a originalCorrected, restaurer le texte corrigé
+  if (block.corrected === block.original && block.hasOwnProperty('originalCorrected')) {
+    console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex} retour à l'original, restauration du texte corrigé`)
+
+    // Restaurer le texte corrigé original
+    block.corrected = block.originalCorrected
+    delete block.originalCorrected
+
+    // Restaurer toutes les corrections à leur état original
+    block.corrections.forEach((corr, idx) => {
+      const corrId = `${blockIndex}-${idx}`
+
+      // Restaurer le type original
+      if (corr.hasOwnProperty('originalType')) {
+        corr.type = corr.originalType
+        delete corr.originalType
+      }
+      if (corr.hasOwnProperty('originalSuggestion')) {
+        corr.corrected = corr.originalSuggestion
+        delete corr.originalSuggestion
+      }
+      if (corr.hasOwnProperty('originalReason')) {
+        corr.reason = corr.originalReason
+        delete corr.originalReason
+      }
+
+      // Retirer le flag de modification manuelle
+      corr.isManuallyEdited = false
+
+      // Dévalider la correction
+      AppState.validatedCorrections.delete(corrId)
+    })
+
+    // Mettre à jour les stats
+    const stats = SRTParser.calculateStats(AppState.blocks)
+    updateStats(stats)
+
+    // Mettre à jour l'affichage
+    renderBlocksTable()
+    updateMinimap()
+    return
+  }
+
   // CAS SPÉCIAL : Bloc sans correction initiale (wasNoCorrection)
   // Revenir au statut "aucune correction"
   if (correction.wasNoCorrection) {
@@ -296,9 +340,15 @@ export function resetBlockToInitialState(blockIndex, AppState, SRTParser, update
       AppState.genderSwitched.delete(correctionId)
     })
 
-    // Supprimer toutes les corrections et restaurer le texte original
+    // Supprimer toutes les corrections et restaurer le texte corrigé original
     block.corrections = []
-    block.corrected = block.original
+
+    // Restaurer le texte corrigé original (pas l'original avec fautes)
+    if (block.hasOwnProperty('originalCorrected')) {
+      block.corrected = block.originalCorrected
+      delete block.originalCorrected
+    }
+    // Si pas d'originalCorrected, c'est que le texte n'a jamais été modifié, donc on ne touche pas
 
     // Mettre à jour les stats et la jauge
     const stats = SRTParser.calculateStats(AppState.blocks)
@@ -350,7 +400,22 @@ export function resetBlockToInitialState(blockIndex, AppState, SRTParser, update
     }
   })
 
-  // Reconstruire block.corrected en appliquant toutes les corrections restaurées
+  // Si originalCorrected existe, le restaurer directement (plus simple et fiable)
+  if (block.hasOwnProperty('originalCorrected')) {
+    block.corrected = block.originalCorrected
+    delete block.originalCorrected
+
+    // Mettre à jour les stats et la jauge
+    const stats = SRTParser.calculateStats(AppState.blocks)
+    updateStats(stats)
+
+    // Re-render pour mettre à jour l'affichage
+    renderBlocksTable()
+    updateMinimap()
+    return
+  }
+
+  // Sinon, reconstruire block.corrected en appliquant toutes les corrections restaurées
   // SAUF les corrections de type "doubt" qui ne sont PAS validées (par défaut = original)
   // On trie les corrections par position pour les appliquer dans l'ordre
   const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)

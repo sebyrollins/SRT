@@ -132,6 +132,11 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
 
     // Cas 2 : Retour au texte original → Passer en doute validé (refus des corrections)
     if (processedValue === block.original) {
+      // Sauvegarder le texte corrigé original si pas déjà fait
+      if (!block.hasOwnProperty('originalCorrected')) {
+        block.originalCorrected = oldCorrected
+      }
+
       if (block.corrections && block.corrections.length > 0) {
         block.corrections.forEach((correction, idx) => {
           const correctionId = `${block.index}-${idx}`
@@ -282,6 +287,11 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
       })
 
       if (foundMatch) {
+        // Sauvegarder le texte corrigé original si pas déjà fait
+        if (!block.hasOwnProperty('originalCorrected')) {
+          block.originalCorrected = oldCorrected
+        }
+
         // Marquer chaque correction individuellement
         oldCorrections.forEach((correction, idx) => {
           const correctionId = `${block.index}-${idx}`
@@ -319,6 +329,11 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
       } else {
         // Aucune combinaison ne correspond → créer une nouvelle correction manuelle
         console.log(`Bloc #${block.index}: Modification manuelle, aucune combinaison ne correspond`)
+
+        // Sauvegarder le texte corrigé original si pas déjà fait
+        if (!block.hasOwnProperty('originalCorrected')) {
+          block.originalCorrected = oldCorrected
+        }
 
         // Sauvegarder les corrections originales pour pouvoir les restaurer
         if (!block.hasOwnProperty('originalCorrections')) {
