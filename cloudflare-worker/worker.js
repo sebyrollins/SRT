@@ -978,10 +978,10 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
   // ═══════════════════════════════════════════════════════════════
   // PASS 5 : VOCABULAIRE (SANS API CLAUDE - GRATUIT)
-  // Cette passe s'exécute TOUJOURS (sauf si Pass 0 uniquement)
-  // car elle ne coûte rien et est très rapide
+  // Cette passe s'exécute après la Pass 4 (dernière passe) ou en mode "toutes les passes"
+  // PAS lors des passes intermédiaires isolées (1, 2, 3) pour éviter les doublons
   // ═══════════════════════════════════════════════════════════════
-  if (pass !== 0) {
+  if (pass === null || pass === 4 || pass === 5) {
     console.log('[processSRT] ========================================')
     console.log('[processSRT] Starting Pass 5: Vocabulary corrections (no API cost)')
     console.log('[processSRT] ========================================')
@@ -1423,8 +1423,9 @@ function applyVocabularyRule(text, rule) {
  * @param {Object} vocabularyRules - Règles de vocabulaire à appliquer
  */
 function applyVocabularyRules(block, vocabularyRules) {
-  let corrected = block.text
-  const allCorrections = []
+  // Partir du texte déjà corrigé par les passes précédentes
+  let corrected = block.corrected || block.text || ''
+  const vocabularyCorrections = []
 
   const rules = vocabularyRules?.rules || []
 
@@ -1432,15 +1433,19 @@ function applyVocabularyRules(block, vocabularyRules) {
     const result = applyVocabularyRule(corrected, rule)
     if (result.matched) {
       corrected = result.text
-      allCorrections.push(...result.corrections)
+      vocabularyCorrections.push(...result.corrections)
     }
   })
 
+  // Fusionner les corrections existantes avec les nouvelles corrections de vocabulaire
+  const existingCorrections = block.corrections || []
+  const allCorrections = [...existingCorrections, ...vocabularyCorrections]
+
   return {
     ...block,
-    text: corrected,
-    corrections: allCorrections.length > 0 ? allCorrections : [],
-    correctedByPass5: allCorrections.length > 0
+    corrected: corrected,  // Mettre à jour le champ "corrected", pas "text"
+    corrections: allCorrections,  // Fusionner toutes les corrections
+    correctedByPass5: vocabularyCorrections.length > 0
   }
 }
 
