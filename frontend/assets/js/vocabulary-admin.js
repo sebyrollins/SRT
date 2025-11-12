@@ -506,6 +506,7 @@ ${escapeHtml(result.text)}
                     <strong>${escapeHtml(corr.original)}</strong> → <strong style="color: #10b981;">${escapeHtml(corr.corrected)}</strong>
                     <br>
                     <small style="color: #6b7280;">${escapeHtml(corr.reason)} (${corr.count} occurrence(s))</small>
+                    ${corr.pattern ? `<br><small style="color: #9ca3af; font-family: monospace;">Pattern: ${escapeHtml(corr.pattern)}</small>` : ''}
                 </div>
             `).join('')}
         `;

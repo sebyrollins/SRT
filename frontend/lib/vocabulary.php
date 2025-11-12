@@ -299,6 +299,9 @@ function applyVocabularyRule($text, $rule) {
                 // Cela permet d'ignorer les "s" sur CHAQUE mot de l'expression
                 $pattern = buildFuzzyPattern($search, $options);
 
+                // Debug: log du pattern généré
+                error_log('[vocabulary] Generated fuzzy pattern: ' . $pattern . ' for search: "' . $search . '" with options: ' . json_encode($options));
+
                 $count = preg_match_all($pattern, $corrected, $matchesArray);
 
                 if ($count > 0) {
@@ -315,8 +318,12 @@ function applyVocabularyRule($text, $rule) {
                         'original' => $search,
                         'corrected' => $rule['replace'],
                         'reason' => $rule['reason'] ?? 'Règle de vocabulaire',
-                        'count' => $count
+                        'count' => $count,
+                        'pattern' => $pattern // Debug: afficher le pattern généré
                     ];
+                } else {
+                    // Debug: si aucun match, log le pattern quand même
+                    error_log('[vocabulary] No match for pattern: ' . $pattern . ' against text: "' . substr($corrected, 0, 100) . '"');
                 }
             }
             break;
