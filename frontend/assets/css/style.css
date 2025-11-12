@@ -1996,8 +1996,9 @@ body {
 /* ===== Navigation Minimap (intégrée visuellement dans la colonne validation) ===== */
 .navigation-minimap {
   position: fixed;
-  /* Positionné au bord droit, visuellement dans la colonne validation */
-  right: max(calc((100vw - 1400px) / 2), 0px);
+  /* Aligné avec le bord droit du bloc statistique */
+  right: max(calc((100vw - 1400px) / 2 + var(--spacing-lg)), var(--spacing-lg));
+  /* Commence au niveau des blocs de correction (après stats + header tableau) */
   top: calc(var(--stats-height) + 60px);
   bottom: 20px;
   width: 40px;
