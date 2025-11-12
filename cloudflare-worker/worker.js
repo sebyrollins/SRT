@@ -3,10 +3,6 @@
  * Utilise l'API Claude Sonnet 4 pour corriger le texte
  */
 
-// URL de l'API pour récupérer les règles de vocabulaire
-// À configurer via les variables d'environnement Cloudflare (wrangler.toml ou dashboard)
-const VOCABULARY_API_URL = 'https://votre-domaine.com/api/vocabulary-rules.php'
-
 // Cache des règles de vocabulaire (en mémoire)
 let CACHED_VOCABULARY_RULES = null
 let CACHE_TIMESTAMP = 0
@@ -1169,6 +1165,13 @@ async function loadVocabularyRules() {
   if (CACHED_VOCABULARY_RULES && (now - CACHE_TIMESTAMP < CACHE_DURATION)) {
     console.log('[Pass 5] Using cached vocabulary rules')
     return CACHED_VOCABULARY_RULES
+  }
+
+  // Vérifier que la variable d'environnement VOCABULARY_API_URL est définie
+  if (typeof VOCABULARY_API_URL === 'undefined' || !VOCABULARY_API_URL) {
+    console.error('[Pass 5] VOCABULARY_API_URL environment variable is not defined')
+    console.log('[Pass 5] Falling back to default rules')
+    return getDefaultVocabularyRules()
   }
 
   try {
