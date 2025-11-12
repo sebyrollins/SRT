@@ -1351,10 +1351,12 @@ function applyVocabularyRule(text, rule) {
 
             const matches = corrected.match(pattern)
             if (matches && matches.length > 0) {
+              // Stocker le texte exact trouvé (le premier match) comme original
+              const foundText = matches[0]
               corrected = corrected.replace(pattern, rule.replace)
               corrections.push({
-                type: 'vocabulary',
-                original: variant,
+                type: 'fault',
+                original: foundText,  // Texte réellement trouvé, pas le pattern
                 corrected: rule.replace,
                 reason: rule.reason || 'Règle de vocabulaire',
                 count: matches.length
@@ -1376,10 +1378,12 @@ function applyVocabularyRule(text, rule) {
           const matches = corrected.match(pattern)
 
           if (matches && matches.length > 0) {
+            // Stocker le texte exact trouvé (le premier match) comme original
+            const foundText = matches[0]
             corrected = corrected.replace(pattern, rule.replace)
             corrections.push({
-              type: 'vocabulary',
-              original: search,
+              type: 'fault',
+              original: foundText,  // Texte réellement trouvé, pas le pattern
               corrected: rule.replace,
               reason: rule.reason || 'Règle de vocabulaire',
               count: matches.length
@@ -1395,10 +1399,12 @@ function applyVocabularyRule(text, rule) {
         const regexMatches = corrected.match(regexPattern)
 
         if (regexMatches && regexMatches.length > 0) {
+          // Stocker le texte exact trouvé (le premier match) comme original
+          const foundText = regexMatches[0]
           corrected = corrected.replace(regexPattern, rule.replace)
           corrections.push({
-            type: 'vocabulary',
-            original: rule.search,
+            type: 'fault',
+            original: foundText,  // Texte réellement trouvé, pas le pattern
             corrected: rule.replace,
             reason: rule.reason || 'Règle de vocabulaire',
             count: regexMatches.length

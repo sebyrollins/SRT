@@ -196,9 +196,9 @@ export function getBlockMinimapClass(block, AppState) {
     const hasDoubt = block.corrections.some(c => c.type === 'doubt')
 
     if (hasFault) {
-      return 'minimap-validated'
+      return 'minimap-validated-fault'  // Vert clair pour fautes validées
     } else if (hasDoubt) {
-      return 'minimap-validated-doubt'
+      return 'minimap-validated-doubt'  // Orange clair pour doutes validés
     } else {
       return 'minimap-validated'
     }
@@ -238,7 +238,7 @@ export function updateMinimap(DOM, AppState) {
     if (!minimapBlock) return
 
     // Retirer toutes les classes d'état
-    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
+    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-fault', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
 
     // Ajouter la nouvelle classe
     const blockClass = getBlockMinimapClass(block, state)
