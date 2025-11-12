@@ -611,8 +611,8 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
     console.log(`[mergePass1AndPass2] Merging block #${blockPass1.index}`)
     console.log(`  - True original: "${trueOriginal.substring(0, 60)}..."`)
-    console.log(`  - After Pass 1: "${blockPass1.corrected.substring(0, 60)}..."`)
-    console.log(`  - After Pass 2: "${blockPass2.corrected.substring(0, 60)}..."`)
+    console.log(`  - After Pass 1: "${(blockPass1.corrected || blockPass1.text || blockPass1.original || '').substring(0, 60)}..."`)
+    console.log(`  - After Pass 2: "${(blockPass2.corrected || blockPass2.text || blockPass2.original || '').substring(0, 60)}..."`)
     console.log(`  - Pass 1: ${blockPass1.corrections?.length || 0} corrections`)
     console.log(`  - Pass 2: ${blockPass2.corrections?.length || 0} corrections`)
 
@@ -626,7 +626,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
       blockPass1.corrections || [],
       blockPass2.corrections || [],
       trueOriginal,
-      blockPass1.corrected,  // Texte après la passe 1 (pour valider les corrections de passe 2)
+      blockPass1.corrected || blockPass1.text || blockPass1.original,  // Texte après la passe 1 (ou original si Pass 1 non exécutée)
       blockPass1.index       // Index du bloc pour les logs
     )
 
