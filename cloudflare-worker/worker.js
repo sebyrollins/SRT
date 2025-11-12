@@ -3,6 +3,15 @@
  * Utilise l'API Claude Sonnet 4 pour corriger le texte
  */
 
+// URL de l'API pour récupérer les règles de vocabulaire
+// À configurer via les variables d'environnement Cloudflare (wrangler.toml ou dashboard)
+const VOCABULARY_API_URL = 'https://votre-domaine.com/api/vocabulary-rules.php'
+
+// Cache des règles de vocabulaire (en mémoire)
+let CACHED_VOCABULARY_RULES = null
+let CACHE_TIMESTAMP = 0
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request))
 })
@@ -1013,8 +1022,15 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     const pass5StartTime = Date.now()
 
+    // Charger les règles de vocabulaire depuis l'API
+    const vocabularyRules = await loadVocabularyRules()
+    const rulesCount = vocabularyRules?.rules?.length || 0
+    console.log(`[processSRT] Pass 5: Using ${rulesCount} vocabulary rules`)
+
     // Appliquer les règles de vocabulaire à tous les blocs finaux
-    const blocksWithVocabulary = finalBlocks.map(block => applyVocabularyRules(block))
+    const blocksWithVocabulary = finalBlocks.map(block =>
+      applyVocabularyRules(block, vocabularyRules)
+    )
 
     // Compter les blocs modifiés
     const modifiedBlocks = blocksWithVocabulary.filter(b => b.correctedByPass5)
@@ -1043,7 +1059,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           modifiedBlocks: modifiedBlocks.length,
           totalBlocks: blocksWithVocabulary.length,
           totalCorrections: totalCorrections,
-          rulesApplied: VOCABULARY_RULES.rules.filter(r => r.enabled).length
+          rulesApplied: rulesCount
         }
       }
     }
@@ -1144,42 +1160,97 @@ function cleanAnnotations(text) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Règles de vocabulaire pour la Pass 5
- * Ces règles peuvent être chargées depuis un fichier JSON ou définies ici
- * Pour mettre à jour : utilisez l'interface admin à /admin/vocabulary.php
+ * Charge les règles de vocabulaire depuis l'API
+ * Utilise un cache pour éviter trop d'appels
  */
-const VOCABULARY_RULES = {
-  version: '1.0',
-  rules: [
-    {
-      id: 'rule-001',
-      enabled: true,
-      type: 'exact',
-      variants: ['scanner', 'scanneur', 'scanneurs', 'Scanners', 'SCANNER'],
-      replace: 'scanner',
-      category: 'medical',
-      reason: 'Uniformisation terminologie médicale'
-    },
-    {
-      id: 'rule-002',
-      enabled: true,
-      type: 'exact',
-      variants: ['covid', 'Covid', 'COVID', 'covid-19', 'Covid-19', 'COVID-19', 'covid 19'],
-      replace: 'COVID-19',
-      category: 'medical',
-      reason: 'Normalisation acronyme'
-    },
-    {
-      id: 'rule-003',
-      enabled: true,
-      type: 'regex',
-      search: '\\bau\\s*niveau\\s*de\\b',
-      replace: 'à propos de',
-      category: 'expressions',
-      options: { flags: 'gi' },
-      reason: 'Expression impropre'
+async function loadVocabularyRules() {
+  // Vérifier le cache
+  const now = Date.now()
+  if (CACHED_VOCABULARY_RULES && (now - CACHE_TIMESTAMP < CACHE_DURATION)) {
+    console.log('[Pass 5] Using cached vocabulary rules')
+    return CACHED_VOCABULARY_RULES
+  }
+
+  try {
+    console.log('[Pass 5] Fetching vocabulary rules from API:', VOCABULARY_API_URL)
+
+    const response = await fetch(VOCABULARY_API_URL, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+      // Timeout après 5 secondes
+      signal: AbortSignal.timeout(5000)
+    })
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`)
     }
-  ]
+
+    const data = await response.json()
+
+    if (data.success && data.rules) {
+      console.log(`[Pass 5] Loaded ${data.rules.length} vocabulary rules from API`)
+
+      // Mettre en cache
+      CACHED_VOCABULARY_RULES = {
+        version: data.version || '1.0',
+        rules: data.rules
+      }
+      CACHE_TIMESTAMP = now
+
+      return CACHED_VOCABULARY_RULES
+    } else {
+      throw new Error('Invalid API response format')
+    }
+
+  } catch (error) {
+    console.error('[Pass 5] Failed to load vocabulary rules from API:', error.message)
+    console.log('[Pass 5] Falling back to default rules')
+
+    // Fallback : règles par défaut
+    return getDefaultVocabularyRules()
+  }
+}
+
+/**
+ * Règles de vocabulaire par défaut (fallback)
+ * Utilisées si l'API ne répond pas
+ */
+function getDefaultVocabularyRules() {
+  return {
+    version: '1.0',
+    rules: [
+      {
+        id: 'rule-001',
+        enabled: true,
+        type: 'exact',
+        variants: ['scanner', 'scanneur', 'scanneurs', 'Scanners', 'SCANNER'],
+        replace: 'scanner',
+        category: 'medical',
+        reason: 'Uniformisation terminologie médicale'
+      },
+      {
+        id: 'rule-002',
+        enabled: true,
+        type: 'exact',
+        variants: ['covid', 'Covid', 'COVID', 'covid-19', 'Covid-19', 'COVID-19', 'covid 19'],
+        replace: 'COVID-19',
+        category: 'medical',
+        reason: 'Normalisation acronyme'
+      },
+      {
+        id: 'rule-003',
+        enabled: true,
+        type: 'regex',
+        search: '\\bau\\s*niveau\\s*de\\b',
+        replace: 'à propos de',
+        category: 'expressions',
+        options: { flags: 'gi' },
+        reason: 'Expression impropre'
+      }
+    ]
+  }
 }
 
 /**
@@ -1375,12 +1446,16 @@ function applyVocabularyRule(text, rule) {
 
 /**
  * Applique toutes les règles de vocabulaire à un bloc
+ * @param {Object} block - Bloc SRT à corriger
+ * @param {Object} vocabularyRules - Règles de vocabulaire à appliquer
  */
-function applyVocabularyRules(block) {
+function applyVocabularyRules(block, vocabularyRules) {
   let corrected = block.text
   const allCorrections = []
 
-  VOCABULARY_RULES.rules.forEach(rule => {
+  const rules = vocabularyRules?.rules || []
+
+  rules.forEach(rule => {
     const result = applyVocabularyRule(corrected, rule)
     if (result.matched) {
       corrected = result.text
