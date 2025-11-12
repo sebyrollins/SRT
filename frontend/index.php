@@ -237,8 +237,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                     <table class="blocks-table">
                         <thead class="blocks-table-header sticky-header">
                             <tr>
-                                <th class="col-text">Texte corrigé</th>
-                                <th class="col-validation">Validations</th>
+                                <th class="col-text">
+                                    <div class="col-text-header">
+                                        <span>Texte corrigé</span>
+                                        <div class="text-size-control">
+                                            <label for="textSizeSlider" class="text-size-label">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <text x="2" y="18" font-size="16" font-weight="bold">A</text>
+                                                </svg>
+                                            </label>
+                                            <input type="range" id="textSizeSlider" class="text-size-slider"
+                                                   min="0.7" max="1.5" step="0.1" value="1.0"
+                                                   title="Ajuster la taille du texte">
+                                        </div>
+                                    </div>
+                                </th>
+                                <th class="col-validation">
+                                    Validations
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="blocksTableBody">
@@ -249,14 +265,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
 
             </section>
 
-        </div>
-
-        <!-- Minimap de navigation -->
-        <div class="navigation-minimap" id="navigationMinimap" style="display: none;">
-            <div class="minimap-title">≡</div>
-            <div class="minimap-blocks" id="minimapBlocks">
-                <!-- Généré dynamiquement -->
+            <!-- Minimap de navigation à droite de la colonne validation -->
+            <div class="navigation-minimap" id="navigationMinimap" style="display: none;">
+                <div class="minimap-title">≡</div>
+                <div class="minimap-blocks" id="minimapBlocks">
+                    <!-- Généré dynamiquement -->
+                </div>
             </div>
+
         </div>
 
         <!-- Modal d'édition -->

@@ -25,21 +25,54 @@ export function renderMinimap(DOM) {
  * @param {Object} AppState - État de l'application (global)
  */
 export function rebuildMinimap(DOM, AppState) {
-  if (!DOM.minimapBlocks) return
+  if (!DOM || !DOM.minimapBlocks) {
+    console.warn('[Minimap] DOM or minimapBlocks not available')
+    return
+  }
 
   // Utiliser AppState global si non fourni
   const state = AppState || window.AppState
 
+  if (!state || !state.blocks || state.blocks.length === 0) {
+    console.warn('[Minimap] No blocks to display')
+    return
+  }
+
   // Vider la minimap
   DOM.minimapBlocks.innerHTML = ''
 
-  // Récupérer les dimensions
-  const minimapHeight = DOM.minimapBlocks.offsetHeight
+  // Utiliser requestAnimationFrame pour s'assurer que le DOM est à jour
+  // après le resize et que les media queries CSS sont appliquées
+  requestAnimationFrame(() => {
+    // Double requestAnimationFrame pour garantir que le reflow est complet
+    requestAnimationFrame(() => {
+      // Récupérer les dimensions (la hauteur peut changer avec le responsive)
+      const minimapHeight = DOM.minimapBlocks.offsetHeight
+      const windowWidth = window.innerWidth
+      const windowHeight = window.innerHeight
 
-  if (minimapHeight === 0) return
+      if (minimapHeight === 0) {
+        console.warn('[Minimap] Container height is 0, skipping rebuild')
+        return
+      }
 
-  console.log(`[Minimap] Container height: ${minimapHeight}px`)
-  console.log(`[Minimap] Total blocks: ${state.blocks.length}`)
+      console.log(`[Minimap] Rebuild - Container: ${minimapHeight}px, Window: ${windowWidth}x${windowHeight}px`)
+      console.log(`[Minimap] Total blocks: ${state.blocks.length}`)
+
+      // Appeler la fonction interne qui fait le vrai travail
+      buildMinimapBlocks(DOM, state, minimapHeight, windowWidth)
+    })
+  })
+}
+
+/**
+ * Construit les blocs de la minimap (fonction interne)
+ * @param {Object} DOM - Références DOM
+ * @param {Object} state - État de l'application
+ * @param {number} minimapHeight - Hauteur du conteneur
+ * @param {number} windowWidth - Largeur de la fenêtre
+ */
+function buildMinimapBlocks(DOM, state, minimapHeight, windowWidth) {
 
   // Première passe : collecter les données des blocs
   const blocksData = []
@@ -66,12 +99,37 @@ export function rebuildMinimap(DOM, AppState) {
 
   if (visibleBlocksCount === 0) return
 
-  // Déterminer le gap entre les blocs
+  // Déterminer le gap entre les blocs (responsive selon la largeur de fenêtre)
   let gap = 3
-  if (visibleBlocksCount > 100) {
+  let minBlockHeight = 3
+
+  // Ajuster selon la taille d'écran pour le responsive
+  if (windowWidth <= 359) {
+    // Très petit écran
+    gap = 0.5
+    minBlockHeight = 1
+  } else if (windowWidth <= 480) {
+    // Mobile portrait
     gap = 1
-  } else if (visibleBlocksCount > 50) {
+    minBlockHeight = 1
+  } else if (windowWidth <= 767) {
+    // Mobile paysage
+    gap = 1
+    minBlockHeight = 2
+  } else if (windowWidth <= 1024) {
+    // Tablette
     gap = 2
+    minBlockHeight = 2
+  } else {
+    // Desktop
+    if (visibleBlocksCount > 100) {
+      gap = 1
+    } else if (visibleBlocksCount > 50) {
+      gap = 2
+    } else {
+      gap = 3
+    }
+    minBlockHeight = 3
   }
 
   // Calculer l'espace total pour les gaps
@@ -80,10 +138,10 @@ export function rebuildMinimap(DOM, AppState) {
   // Calculer la hauteur disponible pour les blocs
   const availableHeightForBlocks = minimapHeight - totalGapsHeight
 
-  // Hauteur uniforme pour chaque bloc (minimum 3px)
-  const uniformBlockHeight = Math.max(3, availableHeightForBlocks / visibleBlocksCount)
+  // Hauteur uniforme pour chaque bloc (avec minimum responsive)
+  const uniformBlockHeight = Math.max(minBlockHeight, availableHeightForBlocks / visibleBlocksCount)
 
-  console.log(`[Minimap] ${visibleBlocksCount} visible blocks, gap: ${gap}px, uniform height: ${uniformBlockHeight.toFixed(1)}px`)
+  console.log(`[Minimap] ${visibleBlocksCount} visible blocks, gap: ${gap}px, uniform height: ${uniformBlockHeight.toFixed(1)}px (min: ${minBlockHeight}px)`)
 
   // Deuxième passe : créer les blocs avec taille uniforme
   blocksData.forEach(({ block, blockClass, isHidden }) => {
@@ -280,12 +338,24 @@ export function onScrollThrottled() {
  * @param {Object} DOM - Références DOM (optionnel)
  */
 export function onResizeThrottled(DOM) {
-  if (resizeTimeout) return
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout)
+  }
 
   resizeTimeout = setTimeout(() => {
-    console.log('[Minimap] Window resized, rebuilding minimap')
+    console.log('[Minimap] Window resized, rebuilding minimap...')
+
+    // Utiliser window.DOM si DOM n'est pas fourni
+    const domRef = DOM || window.DOM
+
+    if (!domRef || !domRef.minimapBlocks) {
+      console.warn('[Minimap] Cannot rebuild - DOM not available')
+      resizeTimeout = null
+      return
+    }
+
     // Reconstruire complètement la minimap avec les nouvelles dimensions
-    rebuildMinimap(DOM || window.DOM)
+    rebuildMinimap(domRef)
     resizeTimeout = null
-  }, 200)
+  }, 100) // 100ms pour resize rapide et réactif
 }

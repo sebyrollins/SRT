@@ -22,15 +22,58 @@ function convertApostrophes(text) {
 }
 
 /**
+ * Applique un ensemble de corrections à un texte original
+ * @param {string} originalText - Texte original
+ * @param {Array} corrections - Liste de toutes les corrections
+ * @param {Array} indexesToApply - Indices des corrections à appliquer
+ * @returns {string} - Texte avec les corrections appliquées
+ */
+function applyCorrections(originalText, corrections, indexesToApply) {
+  // Trier les corrections par position (de la fin vers le début pour éviter les décalages de position)
+  const sortedCorrections = corrections
+    .map((corr, idx) => ({ corr, idx }))
+    .filter(item => indexesToApply.includes(item.idx))
+    .sort((a, b) => b.corr.position - a.corr.position)
+
+  let result = originalText
+  for (const { corr } of sortedCorrections) {
+    const before = result.substring(0, corr.position)
+    const after = result.substring(corr.position + corr.original.length)
+    result = before + corr.corrected + after
+  }
+  return result
+}
+
+/**
  * Édite le texte complet d'un bloc
  * @param {number} blockIndex - Index du bloc
- * @param {Object} AppState - État de l'application
+ * @param {Object|string} AppStateOrNewText - État de l'application OU nouveau texte (pour édition inline)
  * @param {Object} SRTParser - Parser SRT
  * @param {Function} updateStats - Fonction de mise à jour des stats
  * @param {Function} renderBlocksTable - Fonction de rendu du tableau
  * @param {Function} updateMinimap - Fonction de mise à jour de la minimap
  */
-export function editBlockText(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap) {
+export function editBlockText(blockIndex, AppStateOrNewText, SRTParser, updateStats, renderBlocksTable, updateMinimap) {
+  // Si le deuxième argument est une string, c'est l'édition inline directe
+  if (typeof AppStateOrNewText === 'string') {
+    const newText = AppStateOrNewText
+    // Récupérer les dépendances depuis window pour l'édition inline
+    const AppState = window.AppState
+    const block = AppState.blocks.find(b => b.index === blockIndex)
+    if (!block) return
+
+    // Sauvegarder la suggestion originale de Claude si pas déjà fait
+    if (!block.hasOwnProperty('originalCorrected')) {
+      block.originalCorrected = block.corrected
+    }
+
+    // Utiliser SRTParser depuis les paramètres de fonction (défini dans la signature)
+    processBlockEdit(newText, block, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+    return
+  }
+
+  // Sinon, c'est l'ancien système avec modal
+  const AppState = AppStateOrNewText
   const block = AppState.blocks.find(b => b.index === blockIndex)
   if (!block) return
 
@@ -52,28 +95,72 @@ export function editBlockText(blockIndex, AppState, SRTParser, updateStats, rend
 
   // Callback de sauvegarde
   const handleSave = (newValue) => {
+    processBlockEdit(newValue, block, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+  }
+
+  // Ouvrir le modal avec le système réutilisable
+  openEditModal({
+    originalText: block.original,
+    suggestedText: suggestionToShow,
+    currentValue: block.corrected,
+    showSuggestion: false, // Cacher la section suggestion pour l'édition de bloc entier
+    onSave: handleSave,
+    multiline: true // Mode textarea avec Ctrl+Enter
+  })
+}
+
+/**
+ * Traite l'édition d'un bloc (factorisation de la logique commune)
+ * @param {string} newValue - Nouvelle valeur
+ * @param {Object} block - Bloc à éditer
+ * @param {Object} AppState - État de l'application
+ * @param {Object} SRTParser - Parser SRT
+ * @param {Function} updateStats - Fonction de mise à jour des stats
+ * @param {Function} renderBlocksTable - Fonction de rendu du tableau
+ * @param {Function} updateMinimap - Fonction de mise à jour de la minimap
+ */
+function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap) {
     const processedValue = convertApostrophes(newValue)
     const oldCorrected = block.corrected
 
     // Cas 1 : Aucun changement par rapport à la suggestion de Claude actuelle
+    // L'utilisateur a cliqué et sorti sans modifier → ne rien faire
+    // (toutes les corrections sont déjà validées puisqu'on vérifie avant d'autoriser l'édition)
     if (processedValue === oldCorrected) {
       return
     }
 
-    // Cas 2 : Retour au texte original → Dévalider les corrections (ne pas les supprimer)
+    // Cas 2 : Retour au texte original → Passer en doute validé (refus des corrections)
     if (processedValue === block.original) {
-      // Dévalider toutes les corrections de ce bloc (mais les garder)
+      // Sauvegarder le texte corrigé original si pas déjà fait
+      if (!block.hasOwnProperty('originalCorrected')) {
+        block.originalCorrected = oldCorrected
+      }
+
       if (block.corrections && block.corrections.length > 0) {
-        block.corrections.forEach((_, idx) => {
+        block.corrections.forEach((correction, idx) => {
           const correctionId = `${block.index}-${idx}`
-          AppState.validatedCorrections.delete(correctionId)
+
+          // Sauvegarder le type original si pas déjà fait
+          if (!correction.hasOwnProperty('originalType')) {
+            correction.originalType = correction.type
+          }
+          if (!correction.hasOwnProperty('originalSuggestion')) {
+            correction.originalSuggestion = correction.corrected
+          }
+
+          // Passer en doute (refus de la correction)
+          correction.type = 'doubt'
+          correction.reason = 'Correction refusée par l\'utilisateur'
+          correction.isManuallyEdited = true
+
+          // VALIDER cette correction en tant que doute
+          AppState.validatedCorrections.add(correctionId)
         })
       }
 
-      // Restaurer le texte corrigé original de Claude (pas l'original avec fautes)
-      if (block.hasOwnProperty('originalCorrected') && block.originalCorrected !== undefined) {
-        block.corrected = block.originalCorrected
-      }
+      // Mettre le texte corrigé = texte original (refus des corrections)
+      block.corrected = block.original
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
@@ -129,39 +216,145 @@ export function editBlockText(blockIndex, AppState, SRTParser, updateStats, rend
 
     // Cas 4 : Modification du texte (différent de l'original et de la suggestion)
     if (processedValue && processedValue !== block.original && processedValue !== oldCorrected) {
-      // Supprimer toutes les anciennes corrections de ce bloc
       const oldCorrections = block.corrections ? [...block.corrections] : []
+
+      if (oldCorrections.length === 0) {
+        // Pas de corrections → créer une correction de type doute validée
+        console.log(`Bloc #${block.index}: Pas de corrections, création d'une correction doute`)
+
+        // Sauvegarder l'état original si pas déjà fait
+        if (!block.hasOwnProperty('originalCorrected')) {
+          block.originalCorrected = block.corrected
+        }
+
+        block.corrections = [{
+          type: 'doubt',
+          original: block.original,
+          corrected: processedValue,
+          reason: 'Modifié manuellement',
+          position: 0,
+          isManuallyEdited: true,
+          wasNoCorrection: true  // Flag pour identifier ce cas spécial
+        }]
+
+        block.corrected = processedValue
+
+        // Valider automatiquement cette correction en doute
+        AppState.validatedCorrections.add(`${block.index}-0`)
+
+        // Mettre à jour les stats
+        const stats = SRTParser.calculateStats(AppState.blocks)
+        updateStats(stats)
+
+        // Re-render
+        renderBlocksTable()
+        updateMinimap()
+        return
+      }
+
+      // Analyser chaque correction pour voir si elle a été acceptée ou rejetée
+      // Tester toutes les combinaisons possibles (2^n)
+      let foundMatch = false
+      let acceptedCorrections = []
+
+      const numCorrections = oldCorrections.length
+      const maxCombinations = 1 << numCorrections // 2^n
+
+      for (let mask = 0; mask < maxCombinations; mask++) {
+        const correctionIndexesToApply = []
+        for (let i = 0; i < numCorrections; i++) {
+          if (mask & (1 << i)) {
+            correctionIndexesToApply.push(i)
+          }
+        }
+
+        // Reconstruire le texte avec cette combinaison de corrections
+        const reconstructed = applyCorrections(block.original, oldCorrections, correctionIndexesToApply)
+
+        if (reconstructed === processedValue) {
+          // On a trouvé la combinaison correspondante !
+          acceptedCorrections = correctionIndexesToApply
+          foundMatch = true
+          console.log(`Bloc #${block.index}: Corrections acceptées: ${acceptedCorrections.join(', ')}`)
+          break
+        }
+      }
+
+      // Dévalider toutes les corrections d'abord
       oldCorrections.forEach((_, idx) => {
         const correctionId = `${block.index}-${idx}`
         AppState.validatedCorrections.delete(correctionId)
       })
 
-      // Déterminer le type original
-      const originalType = (oldCorrections.length > 0 && oldCorrections[0].originalType)
-        ? oldCorrections[0].originalType
-        : (oldCorrections.length > 0 ? oldCorrections[0].type : 'fault')
-      const originalReason = (oldCorrections.length > 0) ? oldCorrections[0].reason : 'Correction manuelle'
+      if (foundMatch) {
+        // Sauvegarder le texte corrigé original si pas déjà fait
+        if (!block.hasOwnProperty('originalCorrected')) {
+          block.originalCorrected = oldCorrected
+        }
 
-      // Toute modification différente de la suggestion de Claude → passer en doute validé
-      console.log(`Bloc #${block.index}: Modification différente de la suggestion → doute validé`)
+        // Marquer chaque correction individuellement
+        oldCorrections.forEach((correction, idx) => {
+          const correctionId = `${block.index}-${idx}`
 
-      // Remplacer par UNE SEULE correction
-      block.corrections = [{
-        type: 'doubt',
-        original: block.original,
-        corrected: processedValue,
-        reason: 'Modifié manuellement',
-        position: 0,
-        originalSuggestion: oldCorrected,
-        originalType: originalType,
-        originalReason: originalReason,
-        isManuallyEdited: true
-      }]
+          if (acceptedCorrections.includes(idx)) {
+            // Correction acceptée → garder le type original et valider
+            // Sauvegarder le type original si pas déjà fait
+            if (!correction.hasOwnProperty('originalType')) {
+              correction.originalType = correction.type
+            }
+            // Garder le type original (fault ou doubt)
+            correction.isManuallyEdited = false
+            // Valider cette correction
+            AppState.validatedCorrections.add(correctionId)
+          } else {
+            // Correction rejetée → passer en doute validé
+            // Sauvegarder le type original si pas déjà fait
+            if (!correction.hasOwnProperty('originalType')) {
+              correction.originalType = correction.type
+            }
+            correction.type = 'doubt'
+            correction.reason = 'Correction rejetée par l\'utilisateur'
+            correction.isManuallyEdited = true
+            // Valider cette correction en tant que doute
+            AppState.validatedCorrections.add(correctionId)
+          }
+        })
 
-      block.corrected = processedValue
+        // Mettre à jour le texte corrigé
+        block.corrected = processedValue
 
-      // Valider automatiquement cette correction
-      AppState.validatedCorrections.add(`${block.index}-0`)
+        // Déterminer le type global du bloc (le plus restrictif)
+        const hasDoubt = oldCorrections.some(c => c.type === 'doubt')
+        console.log(`Bloc #${block.index}: Type global = ${hasDoubt ? 'doubt' : 'fault'}`)
+      } else {
+        // Aucune combinaison ne correspond → créer une nouvelle correction manuelle
+        console.log(`Bloc #${block.index}: Modification manuelle, aucune combinaison ne correspond`)
+
+        // Sauvegarder le texte corrigé original si pas déjà fait
+        if (!block.hasOwnProperty('originalCorrected')) {
+          block.originalCorrected = oldCorrected
+        }
+
+        // Sauvegarder les corrections originales pour pouvoir les restaurer
+        if (!block.hasOwnProperty('originalCorrections')) {
+          block.originalCorrections = oldCorrections.map(c => ({...c}))
+        }
+
+        block.corrections = [{
+          type: 'doubt',
+          original: block.original,
+          corrected: processedValue,
+          reason: 'Modifié manuellement',
+          position: 0,
+          originalSuggestion: oldCorrected,
+          isManuallyEdited: true
+        }]
+
+        block.corrected = processedValue
+
+        // Valider automatiquement cette correction en doute
+        AppState.validatedCorrections.add(`${block.index}-0`)
+      }
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
@@ -171,17 +364,6 @@ export function editBlockText(blockIndex, AppState, SRTParser, updateStats, rend
       renderBlocksTable()
       updateMinimap()
     }
-  }
-
-  // Ouvrir le modal avec le système réutilisable
-  openEditModal({
-    originalText: block.original,
-    suggestedText: suggestionToShow,
-    currentValue: block.corrected,
-    showSuggestion: false, // Cacher la section suggestion pour l'édition de bloc entier
-    onSave: handleSave,
-    multiline: true // Mode textarea avec Ctrl+Enter
-  })
 }
 
 /**

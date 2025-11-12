@@ -42,6 +42,7 @@ import {
 import { openEditModal } from './ui/modal.js'
 import { showSection as showSectionUI } from './ui/sections.js'
 import { updateProgress as updateProgressUI } from './ui/progress.js'
+import { initTextSizeControl } from './ui/textSize.js'
 
 // Imports des modules de rendu
 import { updateStats as updateStatsModule } from './rendering/stats.js'
@@ -220,6 +221,9 @@ function initEventListeners() {
   document.querySelectorAll('.stat-filter').forEach(filterBtn => {
     filterBtn.addEventListener('click', handleFilterClick)
   })
+
+  // Contrôle de la taille du texte
+  initTextSizeControl(DOM)
 }
 
 /**
@@ -300,9 +304,17 @@ function toggleGender(blockIndex, corrIndex) {
 
 /**
  * Édite le texte complet d'un bloc (wrapper pour le module actions)
+ * @param {number} blockIndex - Index du bloc
+ * @param {string} [newText] - Nouveau texte (optionnel, pour édition inline)
  */
-function editBlockText(blockIndex) {
-  editBlockTextModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+function editBlockText(blockIndex, newText) {
+  if (newText !== undefined) {
+    // Mode édition inline : passer le nouveau texte directement
+    editBlockTextModule(blockIndex, newText, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+  } else {
+    // Mode édition modale : passer AppState
+    editBlockTextModule(blockIndex, AppState, SRTParser, updateStats, renderBlocksTable, updateMinimap)
+  }
 }
 
 /**
@@ -431,6 +443,69 @@ function showConfirm(message) {
     document.addEventListener('keydown', handleEscape)
   })
 }
+
+/**
+ * Affiche une alerte centrée
+ * @param {string} message - Message à afficher
+ * @returns {Promise<void>}
+ */
+function customAlert(message) {
+  return new Promise((resolve) => {
+    // Créer l'overlay
+    const overlay = document.createElement('div')
+    overlay.className = 'custom-alert-overlay'
+
+    // Créer la boîte d'alerte
+    const alertBox = document.createElement('div')
+    alertBox.className = 'custom-alert-box'
+
+    // Icône d'avertissement
+    const icon = document.createElement('div')
+    icon.className = 'custom-alert-icon'
+    icon.textContent = '⚠️'
+
+    // Message
+    const messageEl = document.createElement('div')
+    messageEl.className = 'custom-alert-message'
+    messageEl.textContent = message
+
+    // Bouton OK
+    const okButton = document.createElement('button')
+    okButton.className = 'custom-alert-button'
+    okButton.textContent = 'OK'
+    okButton.style.marginTop = '10px'
+    okButton.onclick = () => {
+      document.body.removeChild(overlay)
+      document.removeEventListener('keydown', handleEscape)
+      resolve()
+    }
+
+    // Assembler
+    alertBox.appendChild(icon)
+    alertBox.appendChild(messageEl)
+    alertBox.appendChild(okButton)
+    overlay.appendChild(alertBox)
+
+    // Ajouter au body
+    document.body.appendChild(overlay)
+
+    // Focus sur le bouton OK
+    okButton.focus()
+
+    // Fermer avec Escape ou Enter
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        document.body.removeChild(overlay)
+        document.removeEventListener('keydown', handleEscape)
+        resolve()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+  })
+}
+
+// Exposer customAlert globalement
+window.customAlert = customAlert
 
 /**
  * Réinitialise l'application (wrapper pour le module processing)

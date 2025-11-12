@@ -2,6 +2,8 @@
  * BlocksTable - Rendu du tableau principal des blocs
  */
 
+import { enableInlineEdit } from '../actions/inlineEdit.js'
+
 /**
  * Affiche le tableau des blocs (texte + validations)
  * @param {Object} DOM - Références DOM
@@ -63,7 +65,6 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
     headerCellRight.className = 'block-header block-header-right'
 
     const hasNoCorrections = !block.corrections || block.corrections.length === 0
-    const shouldShowEditButton = (allValidated && block.corrections && block.corrections.length > 0) || hasNoCorrections
     const hasCorrections = block.corrections && block.corrections.length > 0
 
     const hasValidatedCorrections = hasCorrections && block.corrections.some((correction, idx) =>
@@ -81,10 +82,6 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
       buttonsHtml.push(`<button class="btn-header-validate-all" data-block-index="${block.index}" title="Valider toutes les corrections de ce bloc"><span>✓</span><span>tout</span></button>`)
     }
 
-    if (shouldShowEditButton) {
-      buttonsHtml.push(`<button class="btn-header-edit" data-block-index="${block.index}" title="Modifier le texte complet">✏️</button>`)
-    }
-
     if (hasValidatedCorrections) {
       buttonsHtml.push(`<button class="btn-header-reset" data-block-index="${block.index}" title="Réinitialiser ce bloc">⟲</button>`)
     }
@@ -96,11 +93,6 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
         const validateAllBtn = headerCellRight.querySelector('.btn-header-validate-all')
         if (validateAllBtn && actions.validateAllBlockCorrections) {
           validateAllBtn.onclick = () => actions.validateAllBlockCorrections(block.index)
-        }
-
-        const editBtn = headerCellRight.querySelector('.btn-header-edit')
-        if (editBtn && actions.editBlockText) {
-          editBtn.onclick = () => actions.editBlockText(block.index)
         }
 
         const resetBtn = headerCellRight.querySelector('.btn-header-reset')
@@ -141,8 +133,42 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
     correctedEl.innerHTML = `
       <div class="block-label">CORRIGÉ :</div>
-      <div class="block-content">${SRTParser.escapeHtml(finalCorrectedText)}</div>
+      <div class="block-content" data-editable="true">${SRTParser.escapeHtml(finalCorrectedText)}</div>
     `
+
+    // Ajouter l'édition inline au clic sur le texte corrigé
+    setTimeout(() => {
+      const contentEl = correctedEl.querySelector('.block-content')
+      if (contentEl) {
+        contentEl.addEventListener('click', () => {
+          // Vérifier si toutes les corrections sont validées avant d'autoriser l'édition
+          if (block.corrections && block.corrections.length > 0) {
+            const allValidated = block.corrections.every((_, idx) => {
+              const correctionId = `${block.index}-${idx}`
+              return AppState.validatedCorrections.has(correctionId)
+            })
+
+            if (!allValidated) {
+              // Afficher une alerte si des corrections ne sont pas validées
+              window.customAlert('Validez d\'abord toutes les corrections de ce bloc avant de l\'éditer.')
+              return
+            }
+          }
+
+          // Autoriser l'édition si toutes les corrections sont validées (ou aucune correction)
+          enableInlineEdit(contentEl, block.index, (blockIndex, newText) => {
+            // Callback de sauvegarde - utiliser l'action editBlockText
+            if (actions.editBlockText) {
+              actions.editBlockText(blockIndex, newText)
+            }
+          })
+        })
+
+        // Ajouter une indication visuelle au survol
+        contentEl.style.cursor = 'text'
+        contentEl.title = 'Cliquer pour éditer'
+      }
+    }, 0)
 
     textCell.appendChild(originalEl)
     textCell.appendChild(correctedEl)
@@ -191,21 +217,36 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
           ? 'DOUTE'
           : (correction.isManuallyEdited ? 'MODIFIÉ' : 'FAUTE')
 
-        cardEl.innerHTML = `
-          <div class="validation-header">
-            <span class="validation-type-badge badge-${correction.type}">
-              ${badgeText}
-            </span>
-          </div>
-          <div class="validation-correction">
-            <div class="validation-correction-text">
-              <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
-              →
-              <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
+        // Cas spécial : bloc sans correction initiale modifié
+        if (correction.wasNoCorrection) {
+          cardEl.innerHTML = `
+            <div class="validation-header">
+              <span class="validation-type-badge badge-${correction.type}">
+                ${badgeText}
+              </span>
             </div>
-            <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
-          </div>
-        `
+            <div class="validation-correction">
+              <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
+            </div>
+          `
+        } else {
+          // Affichage normal avec texte original → corrigé
+          cardEl.innerHTML = `
+            <div class="validation-header">
+              <span class="validation-type-badge badge-${correction.type}">
+                ${badgeText}
+              </span>
+            </div>
+            <div class="validation-correction">
+              <div class="validation-correction-text">
+                <span class="original">${SRTParser.escapeHtml(correction.original)}</span>
+                →
+                <span class="corrected">${SRTParser.escapeHtml(displayText)}</span>
+              </div>
+              <div class="validation-correction-reason">${SRTParser.escapeHtml(correction.reason)}</div>
+            </div>
+          `
+        }
 
         const actionsEl = document.createElement('div')
         actionsEl.className = 'validation-actions'
@@ -220,15 +261,6 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
             resetBtn.onclick = () => actions.resetToOriginalSuggestion(block.index, corrIndex)
           }
           actionsEl.appendChild(resetBtn)
-
-          const editBtn = document.createElement('button')
-          editBtn.className = 'btn-icon-only btn-icon-edit'
-          editBtn.innerHTML = '✏️'
-          editBtn.title = 'Modifier'
-          if (actions.editCorrection) {
-            editBtn.onclick = () => actions.editCorrection(block.index, corrIndex)
-          }
-          actionsEl.appendChild(editBtn)
         }
         // PRIORITÉ 2 : Doutes de GENRE
         else if (correction.type === 'doubt' && correction.alternative) {
@@ -242,15 +274,6 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
             toggleBtn.onclick = () => actions.toggleGender(block.index, corrIndex)
           }
           actionsEl.appendChild(toggleBtn)
-
-          const editBtn = document.createElement('button')
-          editBtn.className = 'btn-icon-only btn-icon-edit'
-          editBtn.innerHTML = '✏️'
-          editBtn.title = 'Modifier'
-          if (actions.editCorrection) {
-            editBtn.onclick = () => actions.editCorrection(block.index, corrIndex)
-          }
-          actionsEl.appendChild(editBtn)
         }
         // PRIORITÉ 3 : Corrections normales non validées
         else if (!isValidated) {
@@ -262,14 +285,6 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
             validateBtn.onclick = () => actions.validateSingleCorrection(block.index, corrIndex)
           }
 
-          const editBtn = document.createElement('button')
-          editBtn.className = 'btn-icon-only btn-icon-edit'
-          editBtn.innerHTML = '✏️'
-          editBtn.title = 'Modifier'
-          if (actions.editCorrection) {
-            editBtn.onclick = () => actions.editCorrection(block.index, corrIndex)
-          }
-
           const rejectBtn = document.createElement('button')
           rejectBtn.className = 'btn-icon-only btn-icon-reject'
           rejectBtn.innerHTML = '✕'
@@ -279,19 +294,7 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
           }
 
           actionsEl.appendChild(validateBtn)
-          actionsEl.appendChild(editBtn)
           actionsEl.appendChild(rejectBtn)
-        }
-        // Si validé mais pas toutes validées
-        else if (!allCorrectionsValidated) {
-          const editBtn = document.createElement('button')
-          editBtn.className = 'btn-icon-only btn-icon-edit'
-          editBtn.innerHTML = '✏️'
-          editBtn.title = 'Modifier'
-          if (actions.editCorrection) {
-            editBtn.onclick = () => actions.editCorrection(block.index, corrIndex)
-          }
-          actionsEl.appendChild(editBtn)
         }
 
         if (actionsEl.children.length > 0) {
