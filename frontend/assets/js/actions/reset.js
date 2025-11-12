@@ -279,6 +279,12 @@ export function rejectCorrection(blockIndex, corrIndex, AppState, SRTParser, upd
   const correction = block.corrections[corrIndex]
   if (!correction) return
 
+  // Sauvegarder le texte corrigé original de Claude AVANT de le modifier
+  // Pour permettre la réinitialisation correcte après modification inline
+  if (!block.hasOwnProperty('originalCorrected')) {
+    block.originalCorrected = block.corrected
+  }
+
   // Sauvegarder la suggestion originale, le type et la raison si pas déjà fait
   if (!correction.hasOwnProperty('originalSuggestion')) {
     correction.originalSuggestion = correction.corrected
