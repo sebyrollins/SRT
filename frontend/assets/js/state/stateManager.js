@@ -144,8 +144,71 @@ export function resetBlock(blockIndex) {
 
 /**
  * Reset - Réinitialise toutes les validations et états de genre
+ * Restaure tous les blocs à leur état initial
  */
 export function resetAllValidations() {
+  // Restaurer tous les blocs à leur état original
+  AppState.blocks.forEach(block => {
+    if (!block.corrections || block.corrections.length === 0) {
+      return
+    }
+
+    // CAS SPÉCIAL : Bloc créé sans corrections (wasNoCorrection)
+    // Supprimer toutes les corrections créées
+    if (block.corrections.length === 1 && block.corrections[0].wasNoCorrection) {
+      block.corrections = []
+
+      // Restaurer le texte corrigé original
+      if (block.hasOwnProperty('originalCorrected')) {
+        block.corrected = block.originalCorrected
+        delete block.originalCorrected
+      }
+      return
+    }
+
+    // CAS SPÉCIAL : Bloc avec corrections originales remplacées
+    // Restaurer les corrections originales
+    if (block.hasOwnProperty('originalCorrections')) {
+      block.corrections = block.originalCorrections.map(c => ({...c}))
+      delete block.originalCorrections
+    }
+
+    // Restaurer chaque correction à son état original
+    block.corrections.forEach((correction, corrIndex) => {
+      const correctionId = `${block.index}-${corrIndex}`
+
+      // Restaurer la suggestion originale si elle a été modifiée
+      if (correction.hasOwnProperty('originalSuggestion')) {
+        correction.corrected = correction.originalSuggestion
+        delete correction.originalSuggestion
+      }
+
+      // Restaurer le type original si modifié
+      if (correction.hasOwnProperty('originalType')) {
+        correction.type = correction.originalType
+        delete correction.originalType
+      }
+
+      // Restaurer la raison originale si elle existe
+      if (correction.hasOwnProperty('originalReason')) {
+        correction.reason = correction.originalReason
+        delete correction.originalReason
+      }
+
+      // Retirer le flag de modification manuelle
+      if (correction.isManuallyEdited) {
+        correction.isManuallyEdited = false
+      }
+    })
+
+    // Restaurer le texte corrigé original si disponible
+    if (block.hasOwnProperty('originalCorrected')) {
+      block.corrected = block.originalCorrected
+      delete block.originalCorrected
+    }
+  })
+
+  // Vider les validations et états de genre
   AppState.validatedCorrections.clear()
   AppState.genderSwitched.clear()
 }
