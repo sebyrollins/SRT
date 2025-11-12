@@ -837,11 +837,11 @@ body {
 }
 
 .blocks-table-header .col-text {
-  width: 60%;
+  width: 66.66%;
 }
 
 .blocks-table-header .col-validation {
-  width: 40%;
+  width: 33.34%;
 }
 
 /* Header avec slider de taille de texte */
@@ -1991,31 +1991,21 @@ body {
   justify-content: flex-end;
 }
 
-/* ===== En-tête de validation avec minimap intégrée ===== */
-.validation-header-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  width: 100%;
-}
-
-.validation-title {
-  font-weight: 600;
-  text-align: center;
-}
-
-/* ===== Navigation Minimap (intégrée dans la colonne validation) ===== */
+/* ===== Navigation Minimap (à droite de la colonne validation) ===== */
 .navigation-minimap {
+  position: fixed;
+  right: 20px;
+  top: calc(var(--stats-height) + 60px);
+  bottom: 20px;
+  width: 50px;
   background: var(--color-surface);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  width: 50px;
-  max-height: 400px;
   padding: 8px;
-  /* Plus de transparence ni de position fixe */
+  z-index: 150;
+  max-height: calc(100vh - var(--stats-height) - 80px);
 }
 
 .minimap-title {
@@ -2129,13 +2119,16 @@ body {
   opacity: 1;
 }
 
-/* ===== Minimap Responsive Design (intégrée dans le header de colonne) ===== */
+/* ===== Minimap Responsive Design ===== */
 
-/* Tablette et mobile : ajuster la taille de la minimap intégrée */
+/* Tablette (768px - 1024px) : minimap plus petite */
 @media (max-width: 1024px) and (min-width: 768px) {
   .navigation-minimap {
+    right: 12px;
+    top: calc(var(--stats-height) + 50px);
+    bottom: 12px;
     width: 40px;
-    max-height: 350px;
+    max-height: calc(100vh - var(--stats-height) - 62px);
     padding: 6px;
   }
 
@@ -2163,8 +2156,11 @@ body {
 /* Mobile paysage (481px - 767px) : minimap très compacte */
 @media (max-width: 767px) and (min-width: 481px) {
   .navigation-minimap {
+    right: 8px;
+    top: calc(var(--stats-height) + 40px);
+    bottom: 8px;
     width: 32px;
-    max-height: 300px;
+    max-height: calc(100vh - var(--stats-height) - 48px);
     padding: 4px;
   }
 
@@ -2189,12 +2185,22 @@ body {
   }
 }
 
-/* Mobile portrait (< 480px) : minimap compacte */
+/* Mobile portrait (< 480px) : minimap compacte et semi-transparente */
 @media (max-width: 480px) {
   .navigation-minimap {
+    right: 8px;
+    top: calc(var(--stats-height) + 30px);
+    bottom: 8px;
     width: 28px;
-    max-height: 250px;
+    max-height: calc(100vh - var(--stats-height) - 38px);
     padding: 4px;
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+  }
+
+  .navigation-minimap:hover,
+  .navigation-minimap:active {
+    opacity: 1;
   }
 
   .minimap-title {
@@ -2227,7 +2233,10 @@ body {
 @media (max-width: 359px) {
   .navigation-minimap {
     width: 24px;
-    max-height: 200px;
+    right: 4px;
+    top: calc(var(--stats-height) + 24px);
+    bottom: 4px;
+    max-height: calc(100vh - var(--stats-height) - 28px);
     padding: 3px;
   }
 
