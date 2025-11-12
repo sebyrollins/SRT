@@ -1228,8 +1228,14 @@ function buildFuzzyPattern(search, options = {}) {
 
     // Si ignorePlural, rendre le "s" final optionnel pour chaque mot
     if (options.ignorePlural) {
-      // Ajouter s? à la fin (s optionnel)
-      pattern += 's?'
+      // Si le pattern se termine déjà par "s", le remplacer par "s?" (optionnel)
+      if (/s$/.test(pattern)) {
+        // Remplacer le "s" final par "s?" pour le rendre optionnel
+        pattern = pattern.replace(/s$/, 's?')
+      } else {
+        // Sinon, ajouter "s?" à la fin
+        pattern += 's?'
+      }
     }
 
     // Si ignoreAccents, construire une version avec variantes d'accents

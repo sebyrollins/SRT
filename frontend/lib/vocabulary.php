@@ -179,9 +179,12 @@ function buildFuzzyPattern($search, $options = []) {
 
         // Si ignorePlural, rendre le "s" final optionnel pour chaque mot
         if (isset($options['ignorePlural']) && $options['ignorePlural']) {
-            // Si le mot ne se termine pas déjà par "s?"
-            if (!preg_match('/s\?$/', $pattern)) {
-                // Ajouter s? à la fin (s optionnel)
+            // Si le pattern se termine déjà par "s", le remplacer par "s?" (optionnel)
+            if (preg_match('/s$/', $pattern)) {
+                // Remplacer le "s" final par "s?" pour le rendre optionnel
+                $pattern = preg_replace('/s$/', 's?', $pattern);
+            } else {
+                // Sinon, ajouter "s?" à la fin
                 $pattern .= 's?';
             }
         }
