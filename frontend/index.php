@@ -252,7 +252,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
                                         </div>
                                     </div>
                                 </th>
-                                <th class="col-validation">Validations</th>
+                                <th class="col-validation">
+                                    <div class="validation-header-container">
+                                        <div class="validation-title">Validations</div>
+                                        <!-- Minimap de navigation intégrée -->
+                                        <div class="navigation-minimap" id="navigationMinimap" style="display: none;">
+                                            <div class="minimap-title">≡</div>
+                                            <div class="minimap-blocks" id="minimapBlocks">
+                                                <!-- Généré dynamiquement -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="blocksTableBody">
@@ -263,14 +274,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
 
             </section>
 
-        </div>
-
-        <!-- Minimap de navigation -->
-        <div class="navigation-minimap" id="navigationMinimap" style="display: none;">
-            <div class="minimap-title">≡</div>
-            <div class="minimap-blocks" id="minimapBlocks">
-                <!-- Généré dynamiquement -->
-            </div>
         </div>
 
         <!-- Modal d'édition -->

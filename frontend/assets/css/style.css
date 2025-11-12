@@ -837,11 +837,11 @@ body {
 }
 
 .blocks-table-header .col-text {
-  width: 66.66%;
+  width: 60%;
 }
 
 .blocks-table-header .col-validation {
-  width: 33.34%;
+  width: 40%;
 }
 
 /* Header avec slider de taille de texte */
@@ -1991,34 +1991,31 @@ body {
   justify-content: flex-end;
 }
 
-/* ===== Navigation Minimap ===== */
+/* ===== En-tête de validation avec minimap intégrée ===== */
+.validation-header-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+}
+
+.validation-title {
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ===== Navigation Minimap (intégrée dans la colonne validation) ===== */
 .navigation-minimap {
-  position: fixed;
-  /* Position et dimensions définies via media queries pour responsive design */
   background: var(--color-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
-  z-index: 250; /* Au-dessus de la stats-bar (z-index: 200) */
   display: flex;
   flex-direction: column;
-
-  /* Transparence pour ne pas gêner la lecture du contenu */
-  opacity: 0.4;
-  transition: opacity 0.3s ease;
-
-  /* Valeurs par défaut (desktop) - positionné plus bas, sous le bloc progression */
-  right: 20px;
-  top: calc(var(--stats-height) + 60px); /* Sous la barre de stats avec marge importante */
-  bottom: 20px;
   width: 50px;
-  height: calc(100vh - var(--stats-height) - 80px); /* Hauteur ajustée pour la nouvelle position */
+  max-height: 400px;
   padding: 8px;
-}
-
-/* Opacité complète au survol pour meilleure visibilité */
-.navigation-minimap:hover,
-.navigation-minimap:focus-within {
-  opacity: 1;
+  /* Plus de transparence ni de position fixe */
 }
 
 .minimap-title {
@@ -2052,7 +2049,7 @@ body {
 }
 
 .minimap-block:hover {
-  transform: scaleY(1.3);
+  transform: scaleY(0.7);
   z-index: 1;
 }
 
@@ -2132,27 +2129,14 @@ body {
   opacity: 1;
 }
 
-/* ===== Minimap Responsive Design ===== */
+/* ===== Minimap Responsive Design (intégrée dans le header de colonne) ===== */
 
-/* Desktop (défaut) : minimap normale sous la barre de stats */
-@media (min-width: 1025px) {
-  .navigation-minimap {
-    right: 20px;
-    top: calc(var(--stats-height) + 60px);
-    bottom: 20px;
-    width: 50px;
-    height: calc(100vh - var(--stats-height) - 80px);
-  }
-}
-
-/* Tablette (768px - 1024px) : minimap plus petite, sous la barre de stats */
+/* Tablette et mobile : ajuster la taille de la minimap intégrée */
 @media (max-width: 1024px) and (min-width: 768px) {
   .navigation-minimap {
-    right: 12px;
-    top: calc(var(--stats-height) + 50px);
-    bottom: 12px;
     width: 40px;
-    height: calc(100vh - var(--stats-height) - 62px);
+    max-height: 350px;
+    padding: 6px;
   }
 
   .minimap-title {
@@ -2170,17 +2154,18 @@ body {
     font-size: 0.7rem;
     padding: 3px 6px;
   }
+
+  .minimap-block:hover {
+    transform: scaleY(0.8);
+  }
 }
 
-/* Mobile paysage (481px - 767px) : minimap très compacte sous la barre de stats */
+/* Mobile paysage (481px - 767px) : minimap très compacte */
 @media (max-width: 767px) and (min-width: 481px) {
   .navigation-minimap {
-    right: 8px;
-    top: calc(var(--stats-height) + 40px);
-    bottom: 8px;
     width: 32px;
-    height: calc(100vh - var(--stats-height) - 48px);
-    padding: 6px;
+    max-height: 300px;
+    padding: 4px;
   }
 
   .minimap-title {
@@ -2195,7 +2180,7 @@ body {
   }
 
   .minimap-block:hover {
-    transform: scaleY(1.2);
+    transform: scaleY(0.8);
   }
 
   /* Masquer le tooltip sur mobile */
@@ -2204,22 +2189,12 @@ body {
   }
 }
 
-/* Mobile portrait (< 480px) : minimap semi-transparente sous la barre de stats */
+/* Mobile portrait (< 480px) : minimap compacte */
 @media (max-width: 480px) {
   .navigation-minimap {
-    right: 8px;
-    top: calc(var(--stats-height) + 30px);
-    bottom: 8px;
     width: 28px;
-    height: calc(100vh - var(--stats-height) - 38px);
+    max-height: 250px;
     padding: 4px;
-    opacity: 0.3; /* Encore plus transparent sur mobile */
-    transition: opacity 0.3s ease;
-  }
-
-  .navigation-minimap:hover,
-  .navigation-minimap:active {
-    opacity: 1;
   }
 
   .minimap-title {
@@ -2232,7 +2207,7 @@ body {
   }
 
   .minimap-block:hover {
-    transform: scaleY(1.15);
+    transform: scaleY(0.85);
   }
 
   /* Masquer le tooltip sur mobile */
@@ -2252,10 +2227,7 @@ body {
 @media (max-width: 359px) {
   .navigation-minimap {
     width: 24px;
-    right: 4px;
-    top: calc(var(--stats-height) + 24px);
-    bottom: 4px;
-    height: calc(100vh - var(--stats-height) - 28px);
+    max-height: 200px;
     padding: 3px;
   }
 
