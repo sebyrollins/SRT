@@ -988,6 +988,19 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     const pass5StartTime = Date.now()
 
+    // DEBUG: Vérifier la structure de finalBlocks AVANT Pass 5
+    if (finalBlocks.length > 0) {
+      console.log('[DEBUG PASS 5] Sample block structure BEFORE vocabulary:', {
+        index: finalBlocks[0].index,
+        hasOriginal: 'original' in finalBlocks[0],
+        originalValue: finalBlocks[0].original,
+        hasText: 'text' in finalBlocks[0],
+        textValue: finalBlocks[0].text,
+        hasCorrected: 'corrected' in finalBlocks[0],
+        keys: Object.keys(finalBlocks[0])
+      })
+    }
+
     // Charger les règles de vocabulaire depuis l'API
     const vocabularyRules = await loadVocabularyRules()
     const rulesCount = vocabularyRules?.rules?.length || 0
