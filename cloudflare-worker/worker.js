@@ -1305,6 +1305,28 @@ function normalizeFuzzy(text, options = {}) {
 }
 
 /**
+ * Normalise un texte SRT pour la comparaison (gère multi-lignes, espaces, etc.)
+ */
+function normalizeForComparison(text) {
+  if (!text) return ''
+
+  return text
+    .toLowerCase()
+    .trim()
+    // Normaliser tous les types d'espaces (insécables, multiples, etc.)
+    .replace(/\s+/g, ' ')
+    // Normaliser les retours à la ligne
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Supprimer espaces en début/fin de chaque ligne
+    .split('\n').map(line => line.trim()).join('\n')
+    // Normaliser les apostrophes
+    .replace(/['']/g, "'")
+    // Normaliser les guillemets
+    .replace(/[""]/g, '"')
+}
+
+/**
  * Construit un pattern regex pour la recherche souple
  * Permet d'ignorer les "s" sur CHAQUE mot de l'expression
  */
@@ -1980,9 +2002,10 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
       // Valider que l'original retourné par Claude correspond au texte du bloc
       // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
-      const normalizedClaudeOriginal = correctedBlock.original?.toLowerCase().trim()
+      // Utiliser une normalisation robuste pour gérer espaces insécables, multi-lignes, etc.
+      const normalizedClaudeOriginal = normalizeForComparison(correctedBlock.original || '')
       const originalBlockText = originalBlock.original || originalBlock.text
-      let normalizedBlockText = originalBlockText.toLowerCase().trim()
+      let normalizedBlockText = normalizeForComparison(originalBlockText)
 
       if (normalizedClaudeOriginal && normalizedClaudeOriginal !== normalizedBlockText) {
         // Pour Pass 4, Claude peut se tromper d'index de ±1 car il y a beaucoup de blocs
@@ -1996,7 +2019,7 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
           let foundCorrectBlock = null
           for (const adjacentBlock of adjacentBlocks) {
             const adjacentText = adjacentBlock.original || adjacentBlock.text
-            const normalizedAdjacent = adjacentText.toLowerCase().trim()
+            const normalizedAdjacent = normalizeForComparison(adjacentText)
             if (normalizedAdjacent === normalizedClaudeOriginal) {
               foundCorrectBlock = adjacentBlock
               console.log(`[correctWithClaude] Pass 4 - Block #${correctedBlock.index}: Index mismatch, found correct text in block #${adjacentBlock.index}`)
@@ -2008,7 +2031,7 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
             // Utiliser le bon bloc et corriger l'index
             originalBlock = foundCorrectBlock
             const foundText = foundCorrectBlock.original || foundCorrectBlock.text
-            normalizedBlockText = foundText.toLowerCase().trim()
+            normalizedBlockText = normalizeForComparison(foundText)
             correctedBlock.index = foundCorrectBlock.index
           } else {
             const expectedText = originalBlock.original || originalBlock.text
