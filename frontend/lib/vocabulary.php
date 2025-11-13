@@ -213,9 +213,9 @@ function buildFuzzyPattern($search, $options = []) {
 
         // Si ignoreApostrophes, accepter apostrophe droite, courbe ou espace
         if (isset($options['ignoreApostrophes']) && $options['ignoreApostrophes']) {
-            // Remplacer les apostrophes (droite échappée \' et courbe ')
-            $pattern = str_replace('\\\'', '[\''\s]', $pattern);  // Apostrophe droite échappée
-            $pattern = str_replace(''', '[\''\s]', $pattern);     // Apostrophe courbe (U+2019)
+            // Remplacer les apostrophes (droite échappée \' et courbe U+2019)
+            $pattern = str_replace("\\'", "['\\x{2019}\\s]", $pattern);  // Apostrophe droite échappée
+            $pattern = str_replace("\u{2019}", "['\\x{2019}\\s]", $pattern);  // Apostrophe courbe (U+2019)
         }
 
         $patterns[] = '\b' . $pattern . '\b';
