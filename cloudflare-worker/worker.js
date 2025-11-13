@@ -1054,8 +1054,39 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
+  // ═══════════════════════════════════════════════════════════════
+  // NORMALISATION FINALE : Garantir que tous les blocs ont 'original'
+  // ═══════════════════════════════════════════════════════════════
+  const normalizedBlocks = finalBlocks.map(block => {
+    // Si le bloc a déjà 'original', tout va bien
+    if (block.original) {
+      // Supprimer 'text' si présent pour éviter la confusion
+      const { text, ...blockWithoutText } = block
+      return blockWithoutText
+    }
+
+    // Si le bloc a 'text' mais pas 'original', utiliser 'text' comme 'original'
+    if (block.text) {
+      console.warn(`[processSRT] Block #${block.index} has 'text' but no 'original', normalizing...`)
+      const { text, ...rest } = block
+      return {
+        ...rest,
+        original: text,
+        corrected: block.corrected || text
+      }
+    }
+
+    // Cas rare : ni 'original' ni 'text'
+    console.error(`[processSRT] Block #${block.index} has neither 'original' nor 'text'!`)
+    return {
+      ...block,
+      original: '',
+      corrected: block.corrected || ''
+    }
+  })
+
   return {
-    blocks: finalBlocks,
+    blocks: normalizedBlocks,
     debugLogs: debugLogs,
     pass0Stats: pass === null && typeof pass0Stats !== 'undefined' ? pass0Stats : null
   }
