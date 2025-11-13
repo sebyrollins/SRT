@@ -203,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_config'])) {
     if (!isset($config['general'])) {
         $config['general'] = [];
     }
-    $config['general']['maxFileSize'] = intval($_POST['max_file_size'] ?? 5);
+    $config['general']['maxFileSize'] = intval($_POST['max_file_size'] ?? 200);
     $config['general']['maintenanceMode'] = isset($_POST['maintenance_mode']) && $_POST['maintenance_mode'] === '1';
 
     // Worker
@@ -230,7 +230,7 @@ if (!$config) {
     $config = [
         'version' => '1.0',
         'general' => [
-            'maxFileSize' => 5,
+            'maxFileSize' => 200,
             'maintenanceMode' => false
         ],
         'worker' => [
@@ -243,7 +243,7 @@ if (!$config) {
 // S'assurer que les paramètres généraux existent
 if (!isset($config['general'])) {
     $config['general'] = [
-        'maxFileSize' => 5,
+        'maxFileSize' => 200,
         'maintenanceMode' => false
     ];
 }
@@ -445,17 +445,17 @@ if (!isset($config['general'])) {
                 <h2>⚙️ Paramètres généraux</h2>
 
                 <div class="form-group">
-                    <label for="max_file_size">Taille maximale des fichiers SRT (en Mo)</label>
+                    <label for="max_file_size">Taille maximale des fichiers SRT (en Ko)</label>
                     <input
                         type="number"
                         id="max_file_size"
                         name="max_file_size"
                         min="1"
-                        max="50"
-                        value="<?php echo htmlspecialchars($config['general']['maxFileSize'] ?? 5); ?>"
+                        max="200"
+                        value="<?php echo htmlspecialchars($config['general']['maxFileSize'] ?? 200); ?>"
                         required
                     >
-                    <small>La taille maximale autorisée pour les fichiers SRT uploadés (entre 1 et 50 Mo)</small>
+                    <small>La taille maximale autorisée pour les fichiers SRT uploadés (entre 1 et 200 Ko)</small>
                 </div>
 
                 <div class="form-group">
