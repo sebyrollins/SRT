@@ -147,8 +147,10 @@ function startNewRule() {
     document.getElementById('regexPattern').value = '';
     document.getElementById('regexFlags').value = 'gi';
 
-    // Changer le texte du bouton
-    document.getElementById('btnAddRule').textContent = '💾 Ajouter la règle';
+    // Changer le tooltip du bouton
+    const btnAddRule = document.getElementById('btnAddRule');
+    btnAddRule.textContent = '💾';
+    btnAddRule.title = 'Ajouter la règle';
 
     // Scroller vers le formulaire
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -327,7 +329,9 @@ function resetForm() {
     AppState.currentVariants = [];
     AppState.editingRuleId = null;
     renderVariantsList();
-    document.getElementById('btnAddRule').textContent = '💾 Ajouter la règle';
+    const btnAddRule = document.getElementById('btnAddRule');
+    btnAddRule.textContent = '💾';
+    btnAddRule.title = 'Ajouter la règle';
 }
 
 /**
@@ -441,8 +445,10 @@ function editRule(ruleId) {
         document.getElementById('regexFlags').value = rule.options?.flags || 'gi';
     }
 
-    // Changer le texte du bouton
-    document.getElementById('btnAddRule').textContent = '💾 Mettre à jour la règle';
+    // Changer le tooltip du bouton
+    const btnAddRule = document.getElementById('btnAddRule');
+    btnAddRule.textContent = '💾';
+    btnAddRule.title = 'Mettre à jour la règle';
 
     // Scroller vers le formulaire
     window.scrollTo({ top: 0, behavior: 'smooth' });

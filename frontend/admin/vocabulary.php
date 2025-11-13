@@ -650,8 +650,8 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         <div class="vocab-header">
             <h1>📚 Gestion du vocabulaire - Pass 5</h1>
             <div class="header-actions">
-                <button id="btnNewRule" class="btn btn-primary">➕ Nouvelle règle</button>
-                <button id="btnTestRules" class="btn btn-primary">🧪 Tester</button>
+                <button id="btnNewRule" class="btn btn-primary" title="Nouvelle règle">📝</button>
+                <button id="btnTestRules" class="btn btn-primary" title="Tester les règles">🧪</button>
                 <button id="btnSave" class="btn btn-success">💾 Sauvegarder</button>
                 <a href="index.php" class="btn btn-secondary">← Retour</a>
             </div>
@@ -660,7 +660,7 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         <!-- Section d'ajout de règle - Collapsible -->
         <div class="add-rule-section">
             <div class="add-rule-header" id="addRuleToggle">
-                <h2><span style="color: white;">➕</span> Formulaire de règle</h2>
+                <h2>Formulaire de règle</h2>
                 <span class="collapse-icon collapsed">▼</span>
             </div>
             <div class="add-rule-content" id="addRuleContent">
@@ -768,7 +768,7 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
                 <input type="text" id="reason" placeholder="Uniformisation terminologie">
             </div>
 
-            <button type="button" class="btn btn-primary" id="btnAddRule">💾 Ajouter la règle</button>
+            <button type="button" class="btn btn-primary" id="btnAddRule" title="Ajouter la règle">💾</button>
             </div>
         </div>
 
