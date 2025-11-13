@@ -814,10 +814,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     currentChunks.forEach((chunk, chunkIndex) => {
       // Convertir les blocs au format SRT simple pour la détection
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
       const srtChunk = chunk.map(b => ({
         index: b.index,
         timecode: b.timecode,
-        text: b.corrected || b.text
+        text: b.corrected || b.original || b.text
       }))
 
       if (needsSecondPass(srtChunk)) {
@@ -825,7 +826,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         const inputChunk = chunk.map(b => ({
           index: b.index,
           timecode: b.timecode,
-          text: b.corrected || b.text
+          text: b.corrected || b.original || b.text
         }))
         chunksNeedingPass2.push({ chunkIndex, chunk: inputChunk })
       }
@@ -869,10 +870,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     currentChunks.forEach((chunk, chunkIndex) => {
       // Convertir les blocs au format SRT simple pour la détection
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
       const srtChunk = chunk.map(b => ({
         index: b.index,
         timecode: b.timecode,
-        text: b.corrected || b.text
+        text: b.corrected || b.original || b.text
       }))
 
       if (needsPass3(srtChunk)) {
@@ -880,7 +882,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         const inputChunk = chunk.map(b => ({
           index: b.index,
           timecode: b.timecode,
-          text: b.corrected || b.text
+          text: b.corrected || b.original || b.text
         }))
         chunksNeedingPass3.push({ chunkIndex, chunk: inputChunk })
       }
@@ -925,7 +927,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     currentChunks.forEach((chunk, chunkIndex) => {
       // Vérifier si le chunk contient "je" (toute casse : je/Je/JE) ou "j'" (apostrophe droite/courbe)
-      const chunkText = chunk.map(b => b.corrected || b.text).join(' ')
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+      const chunkText = chunk.map(b => b.corrected || b.original || b.text).join(' ')
       const containsJe = /\bje\b|\bj['\u2019]/i.test(chunkText)
 
       if (!containsJe) {
@@ -936,7 +939,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const inputChunk = chunk.map(b => ({
         index: b.index,
         timecode: b.timecode,
-        text: b.corrected || b.text
+        text: b.corrected || b.original || b.text
       }))
       chunksNeedingPass4.push({ chunkIndex, chunk: inputChunk })
     })
@@ -1976,8 +1979,10 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
       }
 
       // Valider que l'original retourné par Claude correspond au texte du bloc
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
       const normalizedClaudeOriginal = correctedBlock.original?.toLowerCase().trim()
-      let normalizedBlockText = originalBlock.text.toLowerCase().trim()
+      const originalBlockText = originalBlock.original || originalBlock.text
+      let normalizedBlockText = originalBlockText.toLowerCase().trim()
 
       if (normalizedClaudeOriginal && normalizedClaudeOriginal !== normalizedBlockText) {
         // Pour Pass 4, Claude peut se tromper d'index de ±1 car il y a beaucoup de blocs
@@ -1990,7 +1995,8 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
           let foundCorrectBlock = null
           for (const adjacentBlock of adjacentBlocks) {
-            const normalizedAdjacent = adjacentBlock.text.toLowerCase().trim()
+            const adjacentText = adjacentBlock.original || adjacentBlock.text
+            const normalizedAdjacent = adjacentText.toLowerCase().trim()
             if (normalizedAdjacent === normalizedClaudeOriginal) {
               foundCorrectBlock = adjacentBlock
               console.log(`[correctWithClaude] Pass 4 - Block #${correctedBlock.index}: Index mismatch, found correct text in block #${adjacentBlock.index}`)
@@ -2001,17 +2007,20 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
           if (foundCorrectBlock) {
             // Utiliser le bon bloc et corriger l'index
             originalBlock = foundCorrectBlock
-            normalizedBlockText = foundCorrectBlock.text.toLowerCase().trim()
+            const foundText = foundCorrectBlock.original || foundCorrectBlock.text
+            normalizedBlockText = foundText.toLowerCase().trim()
             correctedBlock.index = foundCorrectBlock.index
           } else {
+            const expectedText = originalBlock.original || originalBlock.text
             console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text and no adjacent match found`)
-            console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+            console.warn(`[correctWithClaude]   Expected: "${expectedText.substring(0, 60)}..."`)
             console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
             return null
           }
         } else {
+          const expectedText = originalBlock.original || originalBlock.text
           console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
-          console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+          console.warn(`[correctWithClaude]   Expected: "${expectedText.substring(0, 60)}..."`)
           console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
           // Ne pas retourner ce bloc, il y a une confusion d'index
           return null
@@ -2028,7 +2037,8 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
           }
 
           // VALIDATION : Vérifier que la correction appartient bien à ce bloc
-          const blockTextToCheck = pass === 1 ? originalBlock.text : originalBlock.text  // Pour pass 2, on vérifie contre le texte d'entrée
+          // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+          const blockTextToCheck = originalBlock.original || originalBlock.text
 
           // DEBUG Pass 4 : Log validation
           if (pass === 4) {
@@ -2083,7 +2093,8 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
       // Récupérer le texte original depuis NOS blocs parsés (source de vérité)
       // Ne PAS faire confiance à correctedBlock.original qui peut être incorrect
-      const originalText = originalBlock ? originalBlock.text : ''
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+      const originalText = originalBlock ? (originalBlock.original || originalBlock.text) : ''
 
       // TOUJOURS reconstruire le texte corrigé nous-mêmes
       // Ne JAMAIS faire confiance à correctedBlock.corrected de Claude (peut être incorrect)
