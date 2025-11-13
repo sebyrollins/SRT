@@ -28,12 +28,23 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
   blocksToDisplay.forEach(block => {
     // Protection : S'assurer que les propriétés essentielles existent
-    if (!block.original && !block.text) {
-      console.error(`[renderBlocksTable] Block #${block.index} has no 'original' or 'text' property`, block)
-      block.original = block.corrected || block.text || ''
+    // Vérifier block.original
+    if (!block.original) {
+      if (block.text) {
+        console.warn(`[renderBlocksTable] Block #${block.index} has no 'original', using 'text'`)
+        block.original = block.text
+      } else if (block.corrected) {
+        console.warn(`[renderBlocksTable] Block #${block.index} has no 'original', using 'corrected'`)
+        block.original = block.corrected
+      } else {
+        console.error(`[renderBlocksTable] Block #${block.index} has no text property at all`, block)
+        block.original = ''
+      }
     }
+
+    // Vérifier block.corrected
     if (!block.corrected) {
-      console.warn(`[renderBlocksTable] Block #${block.index} has no 'corrected' property, using 'original'`, block)
+      console.warn(`[renderBlocksTable] Block #${block.index} has no 'corrected', using 'original'`)
       block.corrected = block.original || block.text || ''
     }
 

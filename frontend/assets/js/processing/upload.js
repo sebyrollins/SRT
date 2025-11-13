@@ -520,6 +520,18 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
     // Nettoyer les objets correction.corrected pour les corrections de doute
     cleanDoubtCorrectionsObjects(correctedBlocks)
 
+    // Debug: Vérifier la structure des blocs
+    if (correctedBlocks.length > 0) {
+      console.log('[processUploadedFile] Sample block structure:', {
+        index: correctedBlocks[0].index,
+        hasOriginal: 'original' in correctedBlocks[0],
+        hasText: 'text' in correctedBlocks[0],
+        hasCorrected: 'corrected' in correctedBlocks[0],
+        hasTimecode: 'timecode' in correctedBlocks[0],
+        keys: Object.keys(correctedBlocks[0])
+      })
+    }
+
     // Sauvegarder les blocs
     setBlocks(correctedBlocks)
 
