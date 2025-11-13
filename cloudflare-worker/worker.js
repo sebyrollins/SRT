@@ -1311,6 +1311,13 @@ function buildFuzzyPattern(search, options = {}) {
       pattern = pattern.replace(/\\-/g, '[-\\s]?').replace(/\\ /g, '[-\\s]?')
     }
 
+    // Si ignoreApostrophes, accepter apostrophe droite, courbe ou espace
+    if (options.ignoreApostrophes) {
+      // Remplacer les apostrophes (droite échappée \' et courbe non-échappée ')
+      pattern = pattern.replace(/\\'/g, '[\'\\u2019\\s]')  // Apostrophe droite échappée
+      pattern = pattern.replace(/'/g, '[\'\\u2019\\s]')    // Apostrophe courbe (U+2019)
+    }
+
     patterns.push(`\\b${pattern}\\b`)
   })
 

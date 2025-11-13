@@ -538,6 +538,10 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
                             <input type="checkbox" id="optIgnoreHyphens">
                             <label for="optIgnoreHyphens">Ignorer tirets et espaces</label>
                         </div>
+                        <div class="checkbox-option">
+                            <input type="checkbox" id="optIgnoreApostrophes">
+                            <label for="optIgnoreApostrophes">Ignorer apostrophes (' ' espace)</label>
+                        </div>
                     </div>
                 </div>
             </div>

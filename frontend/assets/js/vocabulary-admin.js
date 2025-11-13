@@ -182,7 +182,8 @@ function addOrUpdateRule() {
             ignoreCase: document.getElementById('optIgnoreCase').checked,
             ignoreAccents: document.getElementById('optIgnoreAccents').checked,
             ignorePlural: document.getElementById('optIgnorePlural').checked,
-            ignoreHyphens: document.getElementById('optIgnoreHyphens').checked
+            ignoreHyphens: document.getElementById('optIgnoreHyphens').checked,
+            ignoreApostrophes: document.getElementById('optIgnoreApostrophes').checked
         };
     } else if (type === 'regex') {
         const pattern = document.getElementById('regexPattern').value.trim();
@@ -283,6 +284,7 @@ function renderRuleCard(rule) {
         if (rule.options?.ignoreAccents) options.push('accents');
         if (rule.options?.ignorePlural) options.push('pluriel');
         if (rule.options?.ignoreHyphens) options.push('tirets');
+        if (rule.options?.ignoreApostrophes) options.push('apostrophes');
 
         variantsHtml = `
             <div class="rule-variants">
@@ -364,6 +366,7 @@ function editRule(ruleId) {
         document.getElementById('optIgnoreAccents').checked = rule.options?.ignoreAccents ?? false;
         document.getElementById('optIgnorePlural').checked = rule.options?.ignorePlural ?? false;
         document.getElementById('optIgnoreHyphens').checked = rule.options?.ignoreHyphens ?? false;
+        document.getElementById('optIgnoreApostrophes').checked = rule.options?.ignoreApostrophes ?? false;
     } else if (rule.type === 'regex') {
         document.getElementById('regexPattern').value = rule.search || '';
         document.getElementById('regexFlags').value = rule.options?.flags || 'gi';
