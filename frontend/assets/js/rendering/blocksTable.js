@@ -27,6 +27,16 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
   }
 
   blocksToDisplay.forEach(block => {
+    // Protection : S'assurer que les propriétés essentielles existent
+    if (!block.original && !block.text) {
+      console.error(`[renderBlocksTable] Block #${block.index} has no 'original' or 'text' property`, block)
+      block.original = block.corrected || block.text || ''
+    }
+    if (!block.corrected) {
+      console.warn(`[renderBlocksTable] Block #${block.index} has no 'corrected' property, using 'original'`, block)
+      block.corrected = block.original || block.text || ''
+    }
+
     // Vérifier si toutes les corrections sont validées
     const allValidated = block.corrections && block.corrections.length > 0 &&
       block.corrections.every((c, idx) => AppState.validatedCorrections.has(`${block.index}-${idx}`))
