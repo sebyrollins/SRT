@@ -283,10 +283,10 @@ if (!$isAuthenticated) {
                 <div class="admin-card-icon">⚙️</div>
                 <h2>Configuration</h2>
                 <p>
-                    Paramétrez l'application : URL du worker, limites de fichiers,
-                    options de correction et autres paramètres globaux.
+                    Paramétrez l'application : URL du worker, prompts des passes de correction
+                    et autres paramètres globaux.
                 </p>
-                <a href="#" class="admin-card-link" style="background: #9ca3af; cursor: not-allowed;">Bientôt disponible</a>
+                <a href="config.php" class="admin-card-link">Configurer</a>
             </div>
         </div>
 

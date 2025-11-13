@@ -35,3 +35,6 @@ Thumbs.db
 
 # Configuration vocabulaire (règles personnalisées)
 frontend/config/vocabulary-rules.json
+
+# Configuration application (paramètres par environnement)
+frontend/config/app-config.json
