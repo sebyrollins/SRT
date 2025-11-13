@@ -314,12 +314,10 @@ function renderRuleCard(rule) {
         patternText = rule.search || '';
     }
 
-    // Badges de type
-    const typeLabels = {
-        'exact': 'Exact',
-        'souple': 'Souple',
-        'regex': 'Regex'
-    };
+    // Récupérer la catégorie depuis AppState
+    const category = AppState.categories.find(c => c.id === rule.category);
+    const categoryName = category ? category.name : rule.category;
+    const categoryColor = category ? category.color : '#6b7280';
 
     return `
         <div class="rule-card ${rule.enabled ? '' : 'disabled'}" data-rule-id="${rule.id}" title="${escapeHtml(rule.reason || '')}">
@@ -335,9 +333,9 @@ function renderRuleCard(rule) {
                 </div>
             </div>
 
-            <!-- Partie droite : type + boutons -->
+            <!-- Partie droite : catégorie + boutons -->
             <div class="rule-meta">
-                <span class="rule-type-badge ${rule.type}">${typeLabels[rule.type] || rule.type}</span>
+                <span class="rule-type-badge" style="background: ${categoryColor}; color: white;">${escapeHtml(categoryName)}</span>
                 <div class="rule-actions">
                     <button class="btn-icon edit" onclick="editRule('${rule.id}')" title="Modifier">✏️</button>
                     <button class="btn-icon toggle ${rule.enabled ? '' : 'disabled-rule'}" onclick="toggleRule('${rule.id}')" title="${rule.enabled ? 'Désactiver' : 'Activer'}">

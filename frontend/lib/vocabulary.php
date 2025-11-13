@@ -432,9 +432,9 @@ function getDefaultCategories() {
     return [
         [
             'id' => 'medical',
-            'name' => 'Vocabulaire médical',
+            'name' => 'Lieu',
             'color' => '#10b981',
-            'description' => 'Termes et expressions du domaine médical'
+            'description' => 'Noms de lieux et localisations'
         ],
         [
             'id' => 'expressions',
