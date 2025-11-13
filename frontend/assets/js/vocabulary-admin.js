@@ -38,6 +38,17 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialise tous les event listeners
  */
 function initializeEventListeners() {
+    // Toggle section d'ajout/modification (collapsible)
+    document.getElementById('addRuleToggle').addEventListener('click', toggleAddRuleSection);
+
+    // Ouvrir/fermer le modal de test
+    document.getElementById('btnTestRules').addEventListener('click', openTestModal);
+    document.getElementById('testModal').addEventListener('click', (e) => {
+        if (e.target.id === 'testModal') {
+            closeTestModal();
+        }
+    });
+
     // Changement de type de règle
     document.querySelectorAll('input[name="ruleType"]').forEach(radio => {
         radio.addEventListener('change', handleRuleTypeChange);
@@ -64,6 +75,35 @@ function initializeEventListeners() {
     // Tester les règles
     document.getElementById('btnTest').addEventListener('click', testAllRules);
 }
+
+/**
+ * Toggle la section d'ajout/modification de règle
+ */
+function toggleAddRuleSection() {
+    const content = document.getElementById('addRuleContent');
+    const icon = document.querySelector('.collapse-icon');
+
+    content.classList.toggle('expanded');
+    icon.classList.toggle('collapsed');
+}
+
+/**
+ * Ouvre le modal de test
+ */
+function openTestModal() {
+    document.getElementById('testModal').classList.add('show');
+}
+
+/**
+ * Ferme le modal de test
+ */
+function closeTestModal() {
+    document.getElementById('testModal').classList.remove('show');
+}
+
+// Rendre les fonctions accessibles globalement pour les attributs onclick
+window.openTestModal = openTestModal;
+window.closeTestModal = closeTestModal;
 
 /**
  * Gestion du changement de type de règle
@@ -261,78 +301,50 @@ function renderRulesList() {
 }
 
 /**
- * Affiche une carte de règle
+ * Affiche une carte de règle - Version compacte (1 ligne)
  */
 function renderRuleCard(rule) {
-    const category = AppState.categories.find(c => c.id === rule.category);
-    const categoryColor = category ? category.color : '#6b7280';
-    const categoryName = category ? category.name : rule.category;
-
-    let variantsHtml = '';
-    if (rule.type === 'exact' && rule.variants) {
-        variantsHtml = `
-            <div class="rule-variants">
-                <div class="rule-variants-title">Variantes détectées (${rule.variants.length}) :</div>
-                <div class="variants-tags">
-                    ${rule.variants.map(v => `<span class="variant-tag">${escapeHtml(v)}</span>`).join('')}
-                </div>
-            </div>
-        `;
-    } else if (rule.type === 'souple') {
-        const options = [];
-        if (rule.options?.ignoreCase) options.push('casse');
-        if (rule.options?.ignoreAccents) options.push('accents');
-        if (rule.options?.ignorePlural) options.push('pluriel');
-        if (rule.options?.ignoreHyphens) options.push('tirets');
-        if (rule.options?.ignoreApostrophes) options.push('apostrophes');
-
-        variantsHtml = `
-            <div class="rule-variants">
-                <div class="rule-variants-title">🔧 Type: Souple (${options.join(', ')})</div>
-                <div class="variant-tag">Recherche : ${escapeHtml(rule.search)}</div>
-            </div>
-        `;
-    } else if (rule.type === 'regex') {
-        variantsHtml = `
-            <div class="rule-variants">
-                <div class="rule-variants-title">🔧 Type: Regex</div>
-                <div class="variant-tag">Pattern : ${escapeHtml(rule.search)}</div>
-                ${rule.options?.flags ? `<div class="variant-tag">Flags : ${escapeHtml(rule.options.flags)}</div>` : ''}
-            </div>
-        `;
+    // Déterminer le texte pattern à afficher
+    let patternText = '';
+    if (rule.type === 'exact') {
+        patternText = rule.variants && rule.variants.length > 0
+            ? rule.variants.join(', ')
+            : 'Variantes';
+    } else {
+        patternText = rule.search || '';
     }
 
-    const displayText = rule.type === 'exact'
-        ? (rule.variants ? rule.variants[0] : 'Variante') + ` (${rule.variants?.length || 0} variantes)`
-        : rule.search;
+    // Badges de type
+    const typeLabels = {
+        'exact': 'Exact',
+        'souple': 'Souple',
+        'regex': 'Regex'
+    };
 
     return `
-        <div class="rule-card ${rule.enabled ? '' : 'disabled'}" data-rule-id="${rule.id}">
-            <div class="rule-header">
-                <div class="rule-title">
-                    <h3>${rule.enabled ? '✅' : '✗'} ${escapeHtml(displayText)} → ${escapeHtml(rule.replace)}</h3>
-                    <div class="rule-meta">
-                        <span class="category-badge" style="background-color: ${categoryColor}">
-                            📁 ${escapeHtml(categoryName)}
-                        </span>
-                        ${rule.stats?.usageCount ? `<span>📊 ${rule.stats.usageCount} utilisations</span>` : ''}
+        <div class="rule-card ${rule.enabled ? '' : 'disabled'}" data-rule-id="${rule.id}" title="${escapeHtml(rule.reason || '')}">
+            <!-- Partie gauche : statut + règle -->
+            <div class="rule-info">
+                <div class="rule-status ${rule.enabled ? 'active' : 'inactive'}"></div>
+                <div class="rule-content">
+                    <div class="rule-main">
+                        <span class="rule-pattern">${escapeHtml(patternText)}</span>
+                        <span class="rule-arrow">→</span>
+                        <span class="rule-replace">${escapeHtml(rule.replace)}</span>
                     </div>
                 </div>
             </div>
 
-            ${variantsHtml}
-
-            <div class="rule-reason">
-                💬 ${escapeHtml(rule.reason)}
-            </div>
-
-            <div class="rule-actions">
-                <button class="btn btn-secondary" onclick="editRule('${rule.id}')">✏️ Modifier</button>
-                <button class="btn btn-secondary" onclick="testRule('${rule.id}')">🔄 Tester</button>
-                <button class="btn ${rule.enabled ? 'btn-secondary' : 'btn-success'}" onclick="toggleRule('${rule.id}')">
-                    ${rule.enabled ? '⏸️ Désactiver' : '✅ Activer'}
-                </button>
-                <button class="btn btn-danger" onclick="deleteRule('${rule.id}')">❌ Supprimer</button>
+            <!-- Partie droite : type + boutons -->
+            <div class="rule-meta">
+                <span class="rule-type-badge ${rule.type}">${typeLabels[rule.type] || rule.type}</span>
+                <div class="rule-actions">
+                    <button class="btn-icon edit" onclick="editRule('${rule.id}')" title="Modifier">✏️</button>
+                    <button class="btn-icon toggle ${rule.enabled ? '' : 'disabled-rule'}" onclick="toggleRule('${rule.id}')" title="${rule.enabled ? 'Désactiver' : 'Activer'}">
+                        ${rule.enabled ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                    <button class="btn-icon delete" onclick="deleteRule('${rule.id}')" title="Supprimer">🗑️</button>
+                </div>
             </div>
         </div>
     `;
@@ -346,6 +358,14 @@ function editRule(ruleId) {
     if (!rule) return;
 
     AppState.editingRuleId = ruleId;
+
+    // Ouvrir la section d'ajout si elle est fermée
+    const content = document.getElementById('addRuleContent');
+    const icon = document.querySelector('.collapse-icon');
+    if (!content.classList.contains('expanded')) {
+        content.classList.add('expanded');
+        icon.classList.remove('collapsed');
+    }
 
     // Sélectionner le type
     document.querySelector(`input[name="ruleType"][value="${rule.type}"]`).checked = true;

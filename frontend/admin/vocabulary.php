@@ -166,12 +166,54 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
             background: #dc2626;
         }
 
+        /* Section d'ajout/modification - Collapsible */
         .add-rule-section {
             background: var(--color-bg-secondary, #f9fafb);
-            padding: 2rem;
             border-radius: 8px;
             margin-bottom: 2rem;
-            border: 2px dashed var(--color-border, #d1d5db);
+            border: 2px solid var(--color-border, #d1d5db);
+            overflow: hidden;
+        }
+
+        .add-rule-header {
+            padding: 1rem 1.5rem;
+            background: var(--color-primary, #4f46e5);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .add-rule-header:hover {
+            background: var(--color-primary-dark, #4338ca);
+        }
+
+        .add-rule-header h2 {
+            margin: 0;
+            font-size: 1.125rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .collapse-icon {
+            transition: transform 0.3s;
+            font-size: 1.5rem;
+        }
+
+        .collapse-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .add-rule-content {
+            padding: 2rem;
+            display: none;
+        }
+
+        .add-rule-content.expanded {
+            display: block;
         }
 
         .form-group {
@@ -288,121 +330,245 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
             align-items: center;
         }
 
+        /* Règles en mode compact - 1 ligne */
         .rule-card {
             background: white;
             border: 1px solid var(--color-border, #e5e7eb);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            transition: box-shadow 0.2s;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
         }
 
         .rule-card:hover {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: #fafbfc;
         }
 
         .rule-card.disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             background: #f9fafb;
         }
 
-        .rule-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 1rem;
-        }
-
-        .rule-title {
+        .rule-info {
             flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 0;
         }
 
-        .rule-title h3 {
-            margin: 0 0 0.5rem 0;
+        .rule-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .rule-status.active {
+            background: #10b981;
+        }
+
+        .rule-status.inactive {
+            background: #9ca3af;
+        }
+
+        .rule-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .rule-main {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .rule-pattern {
+            font-family: monospace;
             color: var(--color-text-primary, #1f2937);
-            font-size: 1.125rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rule-arrow {
+            color: var(--color-text-secondary, #6b7280);
+            flex-shrink: 0;
+        }
+
+        .rule-replace {
+            font-family: monospace;
+            color: #10b981;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .rule-meta {
             display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            font-size: 0.875rem;
-            color: var(--color-text-secondary, #6b7280);
-        }
-
-        .rule-meta span {
-            display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 0.75rem;
+            flex-shrink: 0;
         }
 
-        .category-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
+        .rule-type-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
             font-size: 0.75rem;
             font-weight: 600;
-            color: white;
+            white-space: nowrap;
         }
 
-        .rule-variants {
-            margin: 1rem 0;
-            padding: 1rem;
-            background: #f9fafb;
-            border-radius: 4px;
+        .rule-type-badge.exact {
+            background: #dbeafe;
+            color: #1e40af;
         }
 
-        .rule-variants-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-            color: var(--color-text-secondary, #6b7280);
+        .rule-type-badge.souple {
+            background: #fef3c7;
+            color: #92400e;
         }
 
-        .variants-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+        .rule-type-badge.regex {
+            background: #fce7f3;
+            color: #9f1239;
         }
 
-        .variant-tag {
-            padding: 0.25rem 0.75rem;
-            background: white;
-            border: 1px solid var(--color-border, #d1d5db);
-            border-radius: 4px;
-            font-size: 0.875rem;
-            font-family: monospace;
-        }
-
-        .rule-reason {
-            color: var(--color-text-secondary, #6b7280);
-            font-style: italic;
-            margin: 1rem 0;
-        }
-
+        /* Boutons d'action avec icônes uniquement */
         .rule-actions {
             display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
+            gap: 0.25rem;
+            flex-shrink: 0;
         }
 
-        .rule-actions button {
-            padding: 0.5rem 1rem;
-            font-size: 0.875rem;
+        .btn-icon {
+            padding: 0.5rem;
+            border: 1px solid var(--color-border, #d1d5db);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
         }
 
-        .tester-section {
+        .btn-icon:hover {
+            background: var(--color-bg-secondary, #f3f4f6);
+            transform: translateY(-1px);
+        }
+
+        .btn-icon.edit {
+            color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .btn-icon.edit:hover {
             background: #eff6ff;
-            padding: 2rem;
-            border-radius: 8px;
-            margin-top: 2rem;
-            border: 2px solid #3b82f6;
         }
 
-        .tester-section h3 {
+        .btn-icon.toggle {
+            color: #10b981;
+            border-color: #10b981;
+        }
+
+        .btn-icon.toggle:hover {
+            background: #f0fdf4;
+        }
+
+        .btn-icon.toggle.disabled-rule {
+            color: #9ca3af;
+            border-color: #9ca3af;
+        }
+
+        .btn-icon.toggle.disabled-rule:hover {
+            background: #f9fafb;
+        }
+
+        .btn-icon.delete {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .btn-icon.delete:hover {
+            background: #fef2f2;
+        }
+
+        /* Modal pour le testeur */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.2s;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            animation: slideUp 0.3s;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--color-border, #e5e7eb);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
             color: #1e40af;
-            margin-top: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--color-text-secondary, #6b7280);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover {
+            background: var(--color-bg-secondary, #f3f4f6);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
         }
 
         .tester-input {
@@ -410,10 +576,10 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         }
 
         .tester-output {
-            background: white;
+            background: #f9fafb;
             padding: 1.5rem;
             border-radius: 4px;
-            border: 1px solid #bfdbfe;
+            border: 1px solid var(--color-border, #d1d5db);
             margin-top: 1rem;
         }
 
@@ -423,11 +589,27 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         }
 
         .correction-item {
-            padding: 0.5rem;
+            padding: 0.75rem;
             background: #f0fdf4;
             border-left: 3px solid #10b981;
             margin-bottom: 0.5rem;
             border-radius: 4px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .hidden {
@@ -468,14 +650,19 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         <div class="vocab-header">
             <h1>📚 Gestion du vocabulaire - Pass 5</h1>
             <div class="header-actions">
+                <button id="btnTestRules" class="btn btn-primary">🧪 Tester</button>
                 <button id="btnSave" class="btn btn-success">💾 Sauvegarder</button>
                 <a href="index.php" class="btn btn-secondary">← Retour</a>
             </div>
         </div>
 
-        <!-- Section d'ajout de règle -->
+        <!-- Section d'ajout de règle - Collapsible -->
         <div class="add-rule-section">
-            <h2 style="margin-top: 0;">➕ Ajouter une nouvelle règle</h2>
+            <div class="add-rule-header" id="addRuleToggle">
+                <h2>➕ Ajouter une nouvelle règle</h2>
+                <span class="collapse-icon collapsed">▼</span>
+            </div>
+            <div class="add-rule-content" id="addRuleContent">
 
             <div class="form-group">
                 <label>Type de recherche :</label>
@@ -581,6 +768,7 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
             </div>
 
             <button type="button" class="btn btn-primary" id="btnAddRule">💾 Ajouter la règle</button>
+            </div>
         </div>
 
         <!-- Liste des règles -->
@@ -603,15 +791,23 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
             <div id="rulesList"></div>
         </div>
 
-        <!-- Testeur de règles -->
-        <div class="tester-section">
-            <h3>🧪 Testeur de règles</h3>
-            <div class="tester-input">
-                <label for="testText">Texte de test :</label>
-                <textarea id="testText" placeholder="Le scanneur montre une anomalie au niveau de la thyroïde..."></textarea>
+    </div>
+
+    <!-- Modal Testeur de règles -->
+    <div id="testModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🧪 Testeur de règles</h3>
+                <button class="modal-close" onclick="closeTestModal()">✕</button>
             </div>
-            <button type="button" class="btn btn-primary" id="btnTest">🧪 Tester toutes les règles</button>
-            <div id="testOutput" class="tester-output hidden"></div>
+            <div class="modal-body">
+                <div class="tester-input">
+                    <label for="testText">Texte de test :</label>
+                    <textarea id="testText" placeholder="Le scanneur montre une anomalie au niveau de la thyroïde..." style="width: 100%; min-height: 100px; padding: 0.75rem; border: 1px solid var(--color-border, #d1d5db); border-radius: 4px; font-family: inherit; font-size: 1rem; resize: vertical;"></textarea>
+                </div>
+                <button type="button" class="btn btn-primary" id="btnTest">🧪 Tester toutes les règles</button>
+                <div id="testOutput" class="tester-output hidden"></div>
+            </div>
         </div>
     </div>
 
