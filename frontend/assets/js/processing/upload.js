@@ -508,6 +508,22 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
     const correctedBlocks = result.blocks
     let pass0Stats = result.pass0Stats
 
+    // Debug: Vérifier la structure des blocs AVANT les transformations
+    if (correctedBlocks.length > 0) {
+      console.log('[processUploadedFile] Block structure FROM WORKER (before transformations):', {
+        index: correctedBlocks[0].index,
+        hasOriginal: 'original' in correctedBlocks[0],
+        originalValue: correctedBlocks[0].original,
+        originalType: typeof correctedBlocks[0].original,
+        hasText: 'text' in correctedBlocks[0],
+        textValue: correctedBlocks[0].text ? correctedBlocks[0].text.substring(0, 50) : null,
+        hasCorrected: 'corrected' in correctedBlocks[0],
+        correctedValue: correctedBlocks[0].corrected ? correctedBlocks[0].corrected.substring(0, 50) : null,
+        hasTimecode: 'timecode' in correctedBlocks[0],
+        keys: Object.keys(correctedBlocks[0])
+      })
+    }
+
     // Transformer les apostrophes et compter les conversions
     const curlyApostrophesCount = convertStraightApostrophesToCurly(correctedBlocks)
 
@@ -519,18 +535,6 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
 
     // Nettoyer les objets correction.corrected pour les corrections de doute
     cleanDoubtCorrectionsObjects(correctedBlocks)
-
-    // Debug: Vérifier la structure des blocs
-    if (correctedBlocks.length > 0) {
-      console.log('[processUploadedFile] Sample block structure:', {
-        index: correctedBlocks[0].index,
-        hasOriginal: 'original' in correctedBlocks[0],
-        hasText: 'text' in correctedBlocks[0],
-        hasCorrected: 'corrected' in correctedBlocks[0],
-        hasTimecode: 'timecode' in correctedBlocks[0],
-        keys: Object.keys(correctedBlocks[0])
-      })
-    }
 
     // Sauvegarder les blocs
     setBlocks(correctedBlocks)
