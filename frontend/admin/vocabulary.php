@@ -650,6 +650,7 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         <div class="vocab-header">
             <h1>📚 Gestion du vocabulaire - Pass 5</h1>
             <div class="header-actions">
+                <button id="btnNewRule" class="btn btn-primary">➕ Nouvelle règle</button>
                 <button id="btnTestRules" class="btn btn-primary">🧪 Tester</button>
                 <button id="btnSave" class="btn btn-success">💾 Sauvegarder</button>
                 <a href="index.php" class="btn btn-secondary">← Retour</a>
@@ -659,7 +660,7 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
         <!-- Section d'ajout de règle - Collapsible -->
         <div class="add-rule-section">
             <div class="add-rule-header" id="addRuleToggle">
-                <h2>➕ Ajouter une nouvelle règle</h2>
+                <h2><span style="color: white;">➕</span> Formulaire de règle</h2>
                 <span class="collapse-icon collapsed">▼</span>
             </div>
             <div class="add-rule-content" id="addRuleContent">

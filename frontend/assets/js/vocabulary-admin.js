@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
  * Initialise tous les event listeners
  */
 function initializeEventListeners() {
+    // Nouvelle règle
+    document.getElementById('btnNewRule').addEventListener('click', startNewRule);
+
     // Toggle section d'ajout/modification (collapsible)
     document.getElementById('addRuleToggle').addEventListener('click', toggleAddRuleSection);
 
@@ -104,6 +107,54 @@ function closeTestModal() {
 // Rendre les fonctions accessibles globalement pour les attributs onclick
 window.openTestModal = openTestModal;
 window.closeTestModal = closeTestModal;
+
+/**
+ * Démarre la création d'une nouvelle règle (réinitialise le formulaire)
+ */
+function startNewRule() {
+    // Réinitialiser l'état d'édition
+    AppState.editingRuleId = null;
+    AppState.currentVariants = [];
+
+    // Ouvrir la section si elle est fermée
+    const content = document.getElementById('addRuleContent');
+    const icon = document.querySelector('.collapse-icon');
+    if (!content.classList.contains('expanded')) {
+        content.classList.add('expanded');
+        icon.classList.remove('collapsed');
+    }
+
+    // Réinitialiser le type de règle (exact par défaut)
+    document.querySelector('input[name="ruleType"][value="exact"]').checked = true;
+    handleRuleTypeChange({ target: { value: 'exact' } });
+
+    // Vider tous les champs
+    document.getElementById('replacement').value = '';
+    document.getElementById('category').value = AppState.categories[0]?.id || 'medical';
+    document.getElementById('reason').value = '';
+
+    // Champs spécifiques
+    document.getElementById('newVariantInput').value = '';
+    renderVariantsList();
+
+    document.getElementById('soupleSearch').value = '';
+    document.getElementById('optIgnoreCase').checked = true;
+    document.getElementById('optIgnoreAccents').checked = true;
+    document.getElementById('optIgnorePlural').checked = false;
+    document.getElementById('optIgnoreHyphens').checked = false;
+    document.getElementById('optIgnoreApostrophes').checked = false;
+
+    document.getElementById('regexPattern').value = '';
+    document.getElementById('regexFlags').value = 'gi';
+
+    // Changer le texte du bouton
+    document.getElementById('btnAddRule').textContent = '💾 Ajouter la règle';
+
+    // Scroller vers le formulaire
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    showToast('Formulaire réinitialisé pour une nouvelle règle', 'success');
+}
 
 /**
  * Gestion du changement de type de règle
