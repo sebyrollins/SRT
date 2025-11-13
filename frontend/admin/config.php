@@ -17,12 +17,172 @@ $configFile = __DIR__ . '/../config/app-config.json';
 $message = '';
 $messageType = '';
 
+// Récupérer les prompts par défaut du worker
+function getDefaultPrompts() {
+    return [
+        'pass1' => 'Corrige les sous-titres comme un professionnel de l\'orthographe, conjugaison, grammaire et typographie, tout en respectant le parlé de la personne dans ce fichier SRT.
+
+Format de réponse JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte EXACT du bloc (non modifié)",
+      "corrected": "texte du bloc avec TOUTES les corrections APPLIQUÉES",
+      "corrections": [
+        {"type": "fault", "original": "rendez vous", "corrected": "rendez-vous", "reason": "Tiret manquant"}
+      ]
+    }
+  ]
+}
+
+IMPORTANT:
+- "original" = texte tel quel, sans rien changer
+- "corrected" = texte avec TOUTES les fautes corrigées
+- "corrections" = liste des corrections individuelles
+
+Types : "fault" (faute à corriger), "doubt" (ambiguïté)
+Si aucune correction dans un bloc, ne pas inclure le bloc dans la réponse.',
+
+        'pass2' => 'Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique ces règles :
+
+1. INSTITUTIONS :
+   ✗ le gouvernement, l\'assemblée nationale, le sénat, le parlement
+   ✓ le Gouvernement, l\'Assemblée nationale, le Sénat, le Parlement
+
+2. ESPACES MILLIERS + ORDINAUX :
+   ✗ 10000, 1000e
+   ✓ 10 000, 1 000 e
+
+3. TRAITS D\'UNION :
+   ✗ au dela, par dessus, rendez vous, au dessus, en dessous
+   ✓ au-delà, par-dessus, rendez-vous, au-dessus, en-dessous
+
+4. MAJUSCULES ABUSIVES :
+   ✗ la Plaque, le Bâtiment
+   ✓ la plaque, le bâtiment
+
+Format JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
+      "corrections": [
+        {"type": "fault", "original": "le gouvernement", "corrected": "le Gouvernement", "reason": "Institution"},
+        {"type": "fault", "original": "au dela", "corrected": "au-delà", "reason": "Trait d\'union manquant"},
+        {"type": "fault", "original": "10000", "corrected": "10 000", "reason": "Espace milliers"}
+      ]
+    }
+  ]
+}
+
+IMPORTANT : Toutes les corrections sont de type "fault"',
+
+        'pass3' => 'Tu reçois un texte DÉJÀ CORRIGÉ.
+Applique CES DEUX règles :
+
+1. MINISTÈRES :
+   Quand tu vois "ministère de/du..." :
+   - "ministère" en minuscule
+   - "de", "du", "des", "de la", "de l\'" en minuscule
+   - MAJUSCULE première lettre de tous les autres mots
+
+   ✗ ministère de l\'écologie et des territoires
+   ✓ ministère de l\'Écologie et des Territoires
+
+2. MONSIEUR / MADAME / MADEMOISELLE :
+   Dans un discours oral (SRT), minuscule sauf début de phrase
+
+   ✗ Bonjour Monsieur, Merci Madame, Mesdames et Messieurs
+   ✓ Bonjour monsieur, Merci madame, Mesdames et messieurs
+
+   ✗ Monsieur le président, Monsieur le Président
+   ✓ Monsieur le président, monsieur le Président
+
+Format JSON :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte reçu",
+      "corrected": "texte corrigé",
+      "corrections": [
+        {"type": "fault", "original": "...", "corrected": "...", "reason": "..."}
+      ]
+    }
+  ]
+}
+
+IMPORTANT : Toutes les corrections sont de type "fault"',
+
+        'pass4' => 'Tu corriges des sous-titres français.
+
+RÈGLE UNIQUE À APPLIQUER :
+Quand tu vois "je" + verbe d\'état (être, devenir, rester, paraître, sembler, etc.) + adjectif/participe passé accordable,
+tu DOIS créer UNE SEULE correction de type "doubt" qui englobe TOUTE l\'expression "je + verbe + adjectif".
+
+IMPORTANT : Ne crée qu\'UNE SEULE correction par ambiguïté détectée, pas plusieurs variations du même cas.
+
+POURQUOI ? Dans un sous-titre, on ne sait pas si "je" est un homme ou une femme.
+
+EXEMPLES :
+- "je suis venu" → corrected: "je suis venu", alternative: "je suis venue"
+- "je suis engagée" → corrected: "je suis engagée", alternative: "je suis engagé"
+- "je reste très attachée" → corrected: "je reste très attachée", alternative: "je reste très attaché"
+- "je ne suis plus compétitrice" → corrected: "je ne suis plus compétitrice", alternative: "je ne suis plus compétiteur"
+- "Je semble perdue" → corrected: "Je semble perdue", alternative: "Je semble perdu"
+
+FORMAT DE RÉPONSE :
+{
+  "blocks": [
+    {
+      "index": 1,
+      "original": "texte exact reçu",
+      "corrected": "texte exact reçu",
+      "corrections": [
+        {
+          "type": "doubt",
+          "original": "je suis venu",
+          "corrected": "je suis venu",
+          "alternative": "je suis venue",
+          "reason": "Genre du locuteur inconnu"
+        }
+      ]
+    }
+  ]
+}
+
+NOTES :
+- "corrected" doit être identique à "original" (forme du texte)
+- "alternative" doit contenir l\'autre forme de genre
+- Si aucune ambiguïté trouvée : {"blocks": []}'
+    ];
+}
+
 // Charger la configuration actuelle
 function loadConfig() {
     global $configFile;
     if (file_exists($configFile)) {
         $content = file_get_contents($configFile);
-        return json_decode($content, true);
+        $config = json_decode($content, true);
+
+        // Si les prompts sont vides, initialiser avec les valeurs par défaut
+        $defaultPrompts = getDefaultPrompts();
+        if (!isset($config['prompts']) || empty($config['prompts'])) {
+            $config['prompts'] = $defaultPrompts;
+        } else {
+            // Vérifier chaque prompt individuellement
+            foreach (['pass1', 'pass2', 'pass3', 'pass4'] as $pass) {
+                if (!isset($config['prompts'][$pass]) || empty($config['prompts'][$pass])) {
+                    $config['prompts'][$pass] = $defaultPrompts[$pass];
+                }
+            }
+        }
+
+        return $config;
     }
     return null;
 }
@@ -39,7 +199,17 @@ $config = loadConfig();
 
 // Traiter la sauvegarde
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_config'])) {
+    // Paramètres généraux
+    if (!isset($config['general'])) {
+        $config['general'] = [];
+    }
+    $config['general']['maxFileSize'] = intval($_POST['max_file_size'] ?? 5);
+    $config['general']['maintenanceMode'] = isset($_POST['maintenance_mode']) && $_POST['maintenance_mode'] === '1';
+
+    // Worker
     $config['worker']['url'] = $_POST['worker_url'] ?? '';
+
+    // Prompts
     $config['prompts']['pass1'] = $_POST['prompt_pass1'] ?? '';
     $config['prompts']['pass2'] = $_POST['prompt_pass2'] ?? '';
     $config['prompts']['pass3'] = $_POST['prompt_pass3'] ?? '';
@@ -56,14 +226,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_config'])) {
 
 // Valeurs par défaut si pas de config
 if (!$config) {
+    $defaultPrompts = getDefaultPrompts();
     $config = [
-        'worker' => ['url' => ''],
-        'prompts' => [
-            'pass1' => '',
-            'pass2' => '',
-            'pass3' => '',
-            'pass4' => ''
-        ]
+        'version' => '1.0',
+        'general' => [
+            'maxFileSize' => 5,
+            'maintenanceMode' => false
+        ],
+        'worker' => [
+            'url' => 'https://srt-corrector-worker.sraynal.workers.dev'
+        ],
+        'prompts' => $defaultPrompts
+    ];
+}
+
+// S'assurer que les paramètres généraux existent
+if (!isset($config['general'])) {
+    $config['general'] = [
+        'maxFileSize' => 5,
+        'maintenanceMode' => false
     ];
 }
 ?>
@@ -259,6 +440,47 @@ if (!$config) {
         <?php endif; ?>
 
         <form method="POST">
+            <!-- Section Paramètres généraux -->
+            <div class="config-section">
+                <h2>⚙️ Paramètres généraux</h2>
+
+                <div class="form-group">
+                    <label for="max_file_size">Taille maximale des fichiers SRT (en Mo)</label>
+                    <input
+                        type="number"
+                        id="max_file_size"
+                        name="max_file_size"
+                        min="1"
+                        max="50"
+                        value="<?php echo htmlspecialchars($config['general']['maxFileSize'] ?? 5); ?>"
+                        required
+                    >
+                    <small>La taille maximale autorisée pour les fichiers SRT uploadés (entre 1 et 50 Mo)</small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            id="maintenance_mode"
+                            name="maintenance_mode"
+                            value="1"
+                            <?php echo ($config['general']['maintenanceMode'] ?? false) ? 'checked' : ''; ?>
+                            style="width: auto; cursor: pointer;"
+                        >
+                        <span>Activer le mode maintenance</span>
+                    </label>
+                    <small style="margin-left: 1.75rem;">
+                        Lorsque activé, affiche un message de maintenance aux utilisateurs et désactive le traitement des fichiers
+                    </small>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>ℹ️ Mode maintenance :</strong> Utilisez cette option pour effectuer des mises à jour sans perturber les utilisateurs.</p>
+                    <p>Un message clair sera affiché sur la page d'accueil indiquant que le site est temporairement indisponible.</p>
+                </div>
+            </div>
+
             <!-- Section Worker -->
             <div class="config-section">
                 <h2>🔗 Configuration du Worker Cloudflare</h2>

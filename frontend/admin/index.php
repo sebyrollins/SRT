@@ -10,6 +10,23 @@ session_start();
 // Configuration de l'authentification
 $ADMIN_PASSWORD = getenv('ADMIN_PASSWORD') ?: 'admin123'; // Par défaut, à changer en production !
 
+// Charger la configuration de l'application
+$configFile = __DIR__ . '/../config/app-config.json';
+$appConfig = null;
+$workerUrl = 'Non configuré';
+$maintenanceMode = false;
+
+if (file_exists($configFile)) {
+    $configContent = file_get_contents($configFile);
+    $appConfig = json_decode($configContent, true);
+    if ($appConfig && isset($appConfig['worker']['url'])) {
+        $workerUrl = $appConfig['worker']['url'];
+    }
+    if ($appConfig && isset($appConfig['general']['maintenanceMode'])) {
+        $maintenanceMode = $appConfig['general']['maintenanceMode'];
+    }
+}
+
 // Vérification de l'authentification
 $isAuthenticated = false;
 
@@ -293,10 +310,12 @@ if (!$isAuthenticated) {
         <div class="admin-info">
             <h3>ℹ️ Informations</h3>
             <ul>
-                <li><strong>Version :</strong> 1.0</li>
+                <li><strong>Version :</strong> <?php echo htmlspecialchars($appConfig['version'] ?? '1.0'); ?></li>
                 <li><strong>Environnement :</strong> Production</li>
-                <li><strong>Worker URL :</strong> <?php echo htmlspecialchars(defined('WORKER_URL') ? WORKER_URL : 'Non configuré'); ?></li>
+                <li><strong>Worker URL :</strong> <code><?php echo htmlspecialchars($workerUrl); ?></code></li>
+                <li><strong>Mode maintenance :</strong> <?php echo $maintenanceMode ? '🔴 Activé' : '🟢 Désactivé'; ?></li>
                 <li><strong>Fichier de règles :</strong> <code>/frontend/config/vocabulary-rules.json</code></li>
+                <li><strong>Dernière mise à jour config :</strong> <?php echo htmlspecialchars($appConfig['lastUpdate'] ?? 'N/A'); ?></li>
             </ul>
         </div>
 
