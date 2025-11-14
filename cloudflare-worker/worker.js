@@ -790,6 +790,19 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected by Claude`)
 
+    // DEBUG: Vérifier la structure des blocs APRÈS fusion Pass 0 + Pass 1
+    if (blocksAfterPass1.length > 0) {
+      console.log('[DEBUG] Sample block AFTER Pass 1 fusion:', {
+        index: blocksAfterPass1[0].index,
+        hasOriginal: 'original' in blocksAfterPass1[0],
+        originalValue: blocksAfterPass1[0].original ? blocksAfterPass1[0].original.substring(0, 30) : null,
+        hasText: 'text' in blocksAfterPass1[0],
+        textValue: blocksAfterPass1[0].text ? blocksAfterPass1[0].text.substring(0, 30) : null,
+        hasCorrected: 'corrected' in blocksAfterPass1[0],
+        keys: Object.keys(blocksAfterPass1[0])
+      })
+    }
+
     // IMPORTANT : Ne plus retourner ici même si pass === 1
     // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
