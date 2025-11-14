@@ -1042,6 +1042,18 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
     // Mettre à jour finalBlocks avec les corrections de vocabulaire
     finalBlocks = blocksWithVocabulary
 
+    // DEBUG: Vérifier la structure APRÈS Pass 5
+    if (finalBlocks.length > 0) {
+      console.log('[DEBUG] Sample block AFTER Pass 5:', {
+        index: finalBlocks[0].index,
+        hasOriginal: 'original' in finalBlocks[0],
+        originalValue: finalBlocks[0].original ? finalBlocks[0].original.substring(0, 30) : null,
+        hasText: 'text' in finalBlocks[0],
+        textValue: finalBlocks[0].text ? finalBlocks[0].text.substring(0, 30) : null,
+        keys: Object.keys(finalBlocks[0])
+      })
+    }
+
     // Si on n'exécute que Pass 5, retourner maintenant
     if (pass === 5) {
       const totalTime = Date.now() - startTime
