@@ -1085,7 +1085,30 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
   // ═══════════════════════════════════════════════════════════════
   // NORMALISATION FINALE : Garantir que tous les blocs ont 'original'
   // ═══════════════════════════════════════════════════════════════
+  // DEBUG: Vérifier finalBlocks AVANT normalisation
+  if (finalBlocks.length > 0) {
+    console.log('[DEBUG] finalBlocks BEFORE normalization:', {
+      index: finalBlocks[0].index,
+      hasOriginal: 'original' in finalBlocks[0],
+      originalValue: finalBlocks[0].original ? finalBlocks[0].original.substring(0, 30) : null,
+      hasText: 'text' in finalBlocks[0],
+      textValue: finalBlocks[0].text ? finalBlocks[0].text.substring(0, 30) : null,
+      keys: Object.keys(finalBlocks[0])
+    })
+  }
+
   const normalizedBlocks = finalBlocks.map(block => {
+    // DEBUG: Log détaillé pour chaque bloc pendant la normalisation
+    const debugInfo = {
+      index: block.index,
+      hasOriginal: 'original' in block,
+      originalIsTruthy: !!block.original,
+      originalType: typeof block.original,
+      originalValue: block.original,
+      hasText: 'text' in block,
+      textValue: block.text
+    }
+
     // Si le bloc a déjà 'original', tout va bien
     if (block.original) {
       // Supprimer 'text' si présent pour éviter la confusion
@@ -1095,7 +1118,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     // Si le bloc a 'text' mais pas 'original', utiliser 'text' comme 'original'
     if (block.text) {
-      console.warn(`[processSRT] Block #${block.index} has 'text' but no 'original', normalizing...`)
+      console.warn(`[processSRT] Block #${block.index} has 'text' but no 'original', normalizing...`, debugInfo)
       const { text, ...rest } = block
       return {
         ...rest,
