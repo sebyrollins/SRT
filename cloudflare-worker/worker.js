@@ -761,7 +761,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
     const pass1Map = new Map()
     pass1Blocks.forEach(block => pass1Map.set(block.index, block))
 
-    const blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
+    blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
       const pass1Block = pass1Map.get(pass0Block.index)
 
       if (pass1Block) {
