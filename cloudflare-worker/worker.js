@@ -3,6 +3,11 @@
  * Utilise l'API Claude Sonnet 4 pour corriger le texte
  */
 
+// Cache des règles de vocabulaire (en mémoire)
+let CACHED_VOCABULARY_RULES = null
+let CACHE_TIMESTAMP = 0
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event.request))
 })
@@ -606,8 +611,8 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 
     console.log(`[mergePass1AndPass2] Merging block #${blockPass1.index}`)
     console.log(`  - True original: "${trueOriginal.substring(0, 60)}..."`)
-    console.log(`  - After Pass 1: "${blockPass1.corrected.substring(0, 60)}..."`)
-    console.log(`  - After Pass 2: "${blockPass2.corrected.substring(0, 60)}..."`)
+    console.log(`  - After Pass 1: "${(blockPass1.corrected || blockPass1.text || blockPass1.original || '').substring(0, 60)}..."`)
+    console.log(`  - After Pass 2: "${(blockPass2.corrected || blockPass2.text || blockPass2.original || '').substring(0, 60)}..."`)
     console.log(`  - Pass 1: ${blockPass1.corrections?.length || 0} corrections`)
     console.log(`  - Pass 2: ${blockPass2.corrections?.length || 0} corrections`)
 
@@ -621,7 +626,7 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
       blockPass1.corrections || [],
       blockPass2.corrections || [],
       trueOriginal,
-      blockPass1.corrected,  // Texte après la passe 1 (pour valider les corrections de passe 2)
+      blockPass1.corrected || blockPass1.text || blockPass1.original,  // Texte après la passe 1 (ou original si Pass 1 non exécutée)
       blockPass1.index       // Index du bloc pour les logs
     )
 
@@ -756,7 +761,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
     const pass1Map = new Map()
     pass1Blocks.forEach(block => pass1Map.set(block.index, block))
 
-    const blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
+    blocksAfterPass1 = blocksAfterPass0.map(pass0Block => {
       const pass1Block = pass1Map.get(pass0Block.index)
 
       if (pass1Block) {
@@ -785,16 +790,21 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     console.log(`[processSRT] Pass 1 completed: ${pass1Blocks.length}/${blocks.length} blocks corrected by Claude`)
 
-    // Si on n'exécute que Pass 1, retourner maintenant
-    if (pass === 1) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 1 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: blocksAfterPass1,
-        debugLogs: debugLogs,
-        pass0Stats: pass0Stats
-      }
+    // DEBUG: Vérifier la structure des blocs APRÈS fusion Pass 0 + Pass 1
+    if (blocksAfterPass1.length > 0) {
+      console.log('[DEBUG] Sample block AFTER Pass 1 fusion:', {
+        index: blocksAfterPass1[0].index,
+        hasOriginal: 'original' in blocksAfterPass1[0],
+        originalValue: blocksAfterPass1[0].original ? blocksAfterPass1[0].original.substring(0, 30) : null,
+        hasText: 'text' in blocksAfterPass1[0],
+        textValue: blocksAfterPass1[0].text ? blocksAfterPass1[0].text.substring(0, 30) : null,
+        hasCorrected: 'corrected' in blocksAfterPass1[0],
+        keys: Object.keys(blocksAfterPass1[0])
+      })
     }
+
+    // IMPORTANT : Ne plus retourner ici même si pass === 1
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // Pour les passes 2, 3, 4 : utiliser les blocs d'entrée
@@ -817,10 +827,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     currentChunks.forEach((chunk, chunkIndex) => {
       // Convertir les blocs au format SRT simple pour la détection
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
       const srtChunk = chunk.map(b => ({
         index: b.index,
         timecode: b.timecode,
-        text: b.corrected || b.text
+        text: b.corrected || b.original || b.text
       }))
 
       if (needsSecondPass(srtChunk)) {
@@ -828,7 +839,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         const inputChunk = chunk.map(b => ({
           index: b.index,
           timecode: b.timecode,
-          text: b.corrected || b.text
+          text: b.corrected || b.original || b.text
         }))
         chunksNeedingPass2.push({ chunkIndex, chunk: inputChunk })
       }
@@ -849,16 +860,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       blocksAfterPass2 = mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks)
     }
 
-    // Si on n'exécute que Pass 2, retourner maintenant
-    if (pass === 2) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 2 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: blocksAfterPass2,
-        debugLogs: debugLogs,
-        pass0Stats: null
-      }
-    }
+    // IMPORTANT : Ne plus retourner ici même si pass === 2
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -880,10 +883,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     currentChunks.forEach((chunk, chunkIndex) => {
       // Convertir les blocs au format SRT simple pour la détection
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
       const srtChunk = chunk.map(b => ({
         index: b.index,
         timecode: b.timecode,
-        text: b.corrected || b.text
+        text: b.corrected || b.original || b.text
       }))
 
       if (needsPass3(srtChunk)) {
@@ -891,7 +895,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         const inputChunk = chunk.map(b => ({
           index: b.index,
           timecode: b.timecode,
-          text: b.corrected || b.text
+          text: b.corrected || b.original || b.text
         }))
         chunksNeedingPass3.push({ chunkIndex, chunk: inputChunk })
       }
@@ -912,16 +916,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       blocksAfterPass3 = mergePass1AndPass2(blocksAfterPass2, pass3Blocks, originalBlocks)
     }
 
-    // Si on n'exécute que Pass 3, retourner maintenant
-    if (pass === 3) {
-      const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 3 ONLY: Completed in ${totalTime}ms ===`)
-      return {
-        blocks: blocksAfterPass3,
-        debugLogs: debugLogs,
-        pass0Stats: null
-      }
-    }
+    // IMPORTANT : Ne plus retourner ici même si pass === 3
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -944,7 +940,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
 
     currentChunks.forEach((chunk, chunkIndex) => {
       // Vérifier si le chunk contient "je" (toute casse : je/Je/JE) ou "j'" (apostrophe droite/courbe)
-      const chunkText = chunk.map(b => b.corrected || b.text).join(' ')
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+      const chunkText = chunk.map(b => b.corrected || b.original || b.text).join(' ')
       const containsJe = /\bje\b|\bj['\u2019]/i.test(chunkText)
 
       if (!containsJe) {
@@ -955,7 +952,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const inputChunk = chunk.map(b => ({
         index: b.index,
         timecode: b.timecode,
-        text: b.corrected || b.text
+        text: b.corrected || b.original || b.text
       }))
       chunksNeedingPass4.push({ chunkIndex, chunk: inputChunk })
     })
@@ -991,14 +988,86 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       finalBlocks = mergePass1AndPass2(blocksAfterPass3, pass4Blocks, originalBlocks)
     }
 
-    // Si on n'exécute que Pass 4, retourner maintenant
-    if (pass === 4) {
+    // IMPORTANT : Ne plus retourner ici même si pass === 4
+    // car la Pass 5 (vocabulaire) doit toujours s'exécuter après
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PASS 5 : VOCABULAIRE (SANS API CLAUDE - GRATUIT)
+  // Cette passe s'exécute après la Pass 4 (dernière passe) ou en mode "toutes les passes"
+  // PAS lors des passes intermédiaires isolées (1, 2, 3) pour éviter les doublons
+  // ═══════════════════════════════════════════════════════════════
+  if (pass === null || pass === 4 || pass === 5) {
+    console.log('[processSRT] ========================================')
+    console.log('[processSRT] Starting Pass 5: Vocabulary corrections (no API cost)')
+    console.log('[processSRT] ========================================')
+
+    const pass5StartTime = Date.now()
+
+    // DEBUG: Vérifier la structure de finalBlocks AVANT Pass 5
+    if (finalBlocks.length > 0) {
+      console.log('[DEBUG PASS 5] Sample block structure BEFORE vocabulary:', {
+        index: finalBlocks[0].index,
+        hasOriginal: 'original' in finalBlocks[0],
+        originalValue: finalBlocks[0].original,
+        hasText: 'text' in finalBlocks[0],
+        textValue: finalBlocks[0].text,
+        hasCorrected: 'corrected' in finalBlocks[0],
+        keys: Object.keys(finalBlocks[0])
+      })
+    }
+
+    // Charger les règles de vocabulaire depuis l'API
+    const vocabularyRules = await loadVocabularyRules()
+    const rulesCount = vocabularyRules?.rules?.length || 0
+    console.log(`[processSRT] Pass 5: Using ${rulesCount} vocabulary rules`)
+
+    // Appliquer les règles de vocabulaire à tous les blocs finaux
+    const blocksWithVocabulary = finalBlocks.map(block =>
+      applyVocabularyRules(block, vocabularyRules)
+    )
+
+    // Compter les blocs modifiés
+    const modifiedBlocks = blocksWithVocabulary.filter(b => b.correctedByPass5)
+    const totalCorrections = blocksWithVocabulary.reduce((sum, b) =>
+      sum + (b.corrections?.length || 0), 0
+    )
+
+    console.log(`[processSRT] Pass 5 completed:`)
+    console.log(`[processSRT]   - ${modifiedBlocks.length}/${blocksWithVocabulary.length} blocks modified`)
+    console.log(`[processSRT]   - ${totalCorrections} vocabulary corrections applied`)
+    console.log(`[processSRT]   - Duration: ${Date.now() - pass5StartTime}ms`)
+    console.log(`[processSRT]   - Cost: $0.00 (no API call)`)
+
+    // Mettre à jour finalBlocks avec les corrections de vocabulaire
+    finalBlocks = blocksWithVocabulary
+
+    // DEBUG: Vérifier la structure APRÈS Pass 5
+    if (finalBlocks.length > 0) {
+      console.log('[DEBUG] Sample block AFTER Pass 5:', {
+        index: finalBlocks[0].index,
+        hasOriginal: 'original' in finalBlocks[0],
+        originalValue: finalBlocks[0].original ? finalBlocks[0].original.substring(0, 30) : null,
+        hasText: 'text' in finalBlocks[0],
+        textValue: finalBlocks[0].text ? finalBlocks[0].text.substring(0, 30) : null,
+        keys: Object.keys(finalBlocks[0])
+      })
+    }
+
+    // Si on n'exécute que Pass 5, retourner maintenant
+    if (pass === 5) {
       const totalTime = Date.now() - startTime
-      console.log(`[processSRT] === PASS 4 ONLY: Completed in ${totalTime}ms ===`)
+      console.log(`[processSRT] === PASS 5 ONLY: Completed in ${totalTime}ms ===`)
       return {
         blocks: finalBlocks,
         debugLogs: debugLogs,
-        pass0Stats: null
+        pass0Stats: null,
+        pass5Stats: {
+          modifiedBlocks: modifiedBlocks.length,
+          totalBlocks: blocksWithVocabulary.length,
+          totalCorrections: totalCorrections,
+          rulesApplied: rulesCount
+        }
       }
     }
   }
@@ -1013,8 +1082,62 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
   console.log(`[processSRT]   Total processing time: ${endTime - startTime}ms`)
   console.log(`[processSRT] ========================================`)
 
+  // ═══════════════════════════════════════════════════════════════
+  // NORMALISATION FINALE : Garantir que tous les blocs ont 'original'
+  // ═══════════════════════════════════════════════════════════════
+  // DEBUG: Vérifier finalBlocks AVANT normalisation
+  if (finalBlocks.length > 0) {
+    console.log('[DEBUG] finalBlocks BEFORE normalization:', {
+      index: finalBlocks[0].index,
+      hasOriginal: 'original' in finalBlocks[0],
+      originalValue: finalBlocks[0].original ? finalBlocks[0].original.substring(0, 30) : null,
+      hasText: 'text' in finalBlocks[0],
+      textValue: finalBlocks[0].text ? finalBlocks[0].text.substring(0, 30) : null,
+      keys: Object.keys(finalBlocks[0])
+    })
+  }
+
+  const normalizedBlocks = finalBlocks.map(block => {
+    // DEBUG: Log détaillé pour chaque bloc pendant la normalisation
+    const debugInfo = {
+      index: block.index,
+      hasOriginal: 'original' in block,
+      originalIsTruthy: !!block.original,
+      originalType: typeof block.original,
+      originalValue: block.original,
+      hasText: 'text' in block,
+      textValue: block.text
+    }
+
+    // Si le bloc a déjà 'original', tout va bien
+    if (block.original) {
+      // Supprimer 'text' si présent pour éviter la confusion
+      const { text, ...blockWithoutText } = block
+      return blockWithoutText
+    }
+
+    // Si le bloc a 'text' mais pas 'original', utiliser 'text' comme 'original'
+    if (block.text) {
+      console.warn(`[processSRT] Block #${block.index} has 'text' but no 'original', normalizing...`, debugInfo)
+      const { text, ...rest } = block
+      return {
+        ...rest,
+        original: text,
+        corrected: block.corrected || text
+      }
+    }
+
+    // Cas rare : ni 'original' ni 'text'
+    console.error(`[processSRT] Block #${block.index} has neither 'original' nor 'text'!`)
+    return {
+      ...block,
+      original: '',
+      corrected: block.corrected || ''
+    }
+  })
+
   return {
-    blocks: finalBlocks,
+    blocks: normalizedBlocks,
     debugLogs: debugLogs,
     pass0Stats: pass === null && typeof pass0Stats !== 'undefined' ? pass0Stats : null
   }
@@ -1091,6 +1214,369 @@ function cleanAnnotations(text) {
   // Supprimer les annotations entre parenthèses à la fin du texte
   // Pattern: texte suivi optionnellement d'un espace puis (annotation)
   return text.replace(/\s*\([^)]*\)\s*$/g, '').trim()
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PASS 5 : VOCABULAIRE (SANS API CLAUDE)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Charge les règles de vocabulaire depuis l'API
+ * Utilise un cache pour éviter trop d'appels
+ */
+async function loadVocabularyRules() {
+  // Vérifier le cache
+  const now = Date.now()
+  if (CACHED_VOCABULARY_RULES && (now - CACHE_TIMESTAMP < CACHE_DURATION)) {
+    console.log('[Pass 5] Using cached vocabulary rules')
+    return CACHED_VOCABULARY_RULES
+  }
+
+  // Vérifier que la variable d'environnement VOCABULARY_API_URL est définie
+  if (typeof VOCABULARY_API_URL === 'undefined' || !VOCABULARY_API_URL) {
+    console.error('[Pass 5] VOCABULARY_API_URL environment variable is not defined')
+    console.log('[Pass 5] Falling back to default rules')
+    return getDefaultVocabularyRules()
+  }
+
+  try {
+    console.log('[Pass 5] Fetching vocabulary rules from API:', VOCABULARY_API_URL)
+
+    const response = await fetch(VOCABULARY_API_URL, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+      // Timeout après 5 secondes
+      signal: AbortSignal.timeout(5000)
+    })
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.success && data.rules) {
+      console.log(`[Pass 5] Loaded ${data.rules.length} vocabulary rules from API`)
+
+      // Mettre en cache
+      CACHED_VOCABULARY_RULES = {
+        version: data.version || '1.0',
+        rules: data.rules
+      }
+      CACHE_TIMESTAMP = now
+
+      return CACHED_VOCABULARY_RULES
+    } else {
+      throw new Error('Invalid API response format')
+    }
+
+  } catch (error) {
+    console.error('[Pass 5] Failed to load vocabulary rules from API:', error.message)
+    console.log('[Pass 5] Falling back to default rules')
+
+    // Fallback : règles par défaut
+    return getDefaultVocabularyRules()
+  }
+}
+
+/**
+ * Règles de vocabulaire par défaut (fallback)
+ * Utilisées si l'API ne répond pas
+ */
+function getDefaultVocabularyRules() {
+  return {
+    version: '1.0',
+    rules: [
+      {
+        id: 'rule-001',
+        enabled: true,
+        type: 'exact',
+        variants: ['scanner', 'scanneur', 'scanneurs', 'Scanners', 'SCANNER'],
+        replace: 'scanner',
+        category: 'medical',
+        reason: 'Uniformisation terminologie médicale'
+      },
+      {
+        id: 'rule-002',
+        enabled: true,
+        type: 'exact',
+        variants: ['covid', 'Covid', 'COVID', 'covid-19', 'Covid-19', 'COVID-19', 'covid 19'],
+        replace: 'COVID-19',
+        category: 'medical',
+        reason: 'Normalisation acronyme'
+      },
+      {
+        id: 'rule-003',
+        enabled: true,
+        type: 'regex',
+        search: '\\bau\\s*niveau\\s*de\\b',
+        replace: 'à propos de',
+        category: 'expressions',
+        options: { flags: 'gi' },
+        reason: 'Expression impropre'
+      }
+    ]
+  }
+}
+
+/**
+ * Normalise un texte pour le matching souple
+ */
+function normalizeFuzzy(text, options = {}) {
+  let normalized = text
+
+  // Ignorer la casse
+  if (options.ignoreCase) {
+    normalized = normalized.toLowerCase()
+  }
+
+  // Ignorer les accents (approximation simple pour JavaScript)
+  if (options.ignoreAccents) {
+    normalized = normalized
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+  }
+
+  // Ignorer les tirets et espaces
+  if (options.ignoreHyphens) {
+    normalized = normalized.replace(/[-\s]+/g, '')
+  }
+
+  // Ignorer les "s" finaux
+  if (options.ignorePlural) {
+    normalized = normalized.replace(/s\b/gi, '')
+  }
+
+  return normalized
+}
+
+/**
+ * Normalise un texte SRT pour la comparaison (gère multi-lignes, espaces, etc.)
+ */
+function normalizeForComparison(text) {
+  if (!text) return ''
+
+  return text
+    .toLowerCase()
+    .trim()
+    // Normaliser tous les types d'espaces (insécables, multiples, etc.)
+    .replace(/\s+/g, ' ')
+    // Normaliser les retours à la ligne
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Supprimer espaces en début/fin de chaque ligne
+    .split('\n').map(line => line.trim()).join('\n')
+    // Normaliser les apostrophes
+    .replace(/['']/g, "'")
+    // Normaliser les guillemets
+    .replace(/[""]/g, '"')
+}
+
+/**
+ * Construit un pattern regex pour la recherche souple
+ * Permet d'ignorer les "s" sur CHAQUE mot de l'expression
+ */
+function buildFuzzyPattern(search, options = {}) {
+  // Séparer en mots
+  const words = search.trim().split(/\s+/)
+  const patterns = []
+
+  words.forEach(word => {
+    // Échapper les caractères spéciaux regex
+    let pattern = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+    // Si ignorePlural, rendre le "s" final optionnel pour chaque mot
+    if (options.ignorePlural) {
+      // Si le pattern se termine déjà par "s", le remplacer par "s?" (optionnel)
+      if (/s$/.test(pattern)) {
+        // Remplacer le "s" final par "s?" pour le rendre optionnel
+        pattern = pattern.replace(/s$/, 's?')
+      } else {
+        // Sinon, ajouter "s?" à la fin
+        pattern += 's?'
+      }
+    }
+
+    // Si ignoreAccents, construire une version avec variantes d'accents
+    if (options.ignoreAccents) {
+      const accentMap = {
+        'e': '[eéèêë]',
+        'E': '[EÉÈÊË]',
+        'a': '[aàâä]',
+        'A': '[AÀÂÄ]',
+        'i': '[iîï]',
+        'I': '[IÎÏ]',
+        'o': '[oôö]',
+        'O': '[OÔÖ]',
+        'u': '[uùûü]',
+        'U': '[UÙÛÜ]',
+        'c': '[cç]',
+        'C': '[CÇ]'
+      }
+
+      for (const [base, classPattern] of Object.entries(accentMap)) {
+        // Remplacer le caractère de base par sa classe
+        const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        pattern = pattern.replace(new RegExp(escapedBase, 'g'), classPattern)
+      }
+    }
+
+    // Si ignoreHyphens, permettre tiret ou espace ou rien entre les caractères
+    if (options.ignoreHyphens) {
+      pattern = pattern.replace(/\\-/g, '[-\\s]?').replace(/\\ /g, '[-\\s]?')
+    }
+
+    // Si ignoreApostrophes, accepter apostrophe droite, courbe ou espace
+    if (options.ignoreApostrophes) {
+      // Remplacer les apostrophes (droite échappée \' et courbe non-échappée ')
+      pattern = pattern.replace(/\\'/g, '[\'\\u2019\\s]')  // Apostrophe droite échappée
+      pattern = pattern.replace(/'/g, '[\'\\u2019\\s]')    // Apostrophe courbe (U+2019)
+    }
+
+    patterns.push(`\\b${pattern}\\b`)
+  })
+
+  // Joindre les mots avec des espaces/tirets selon les options
+  const separator = options.ignoreHyphens ? '[-\\s]+' : '\\s+'
+  const fullPattern = patterns.join(separator)
+
+  // Construire les flags
+  let flags = 'g'
+  if (options.ignoreCase) {
+    flags += 'i'
+  }
+
+  return new RegExp(fullPattern, flags)
+}
+
+/**
+ * Applique une règle de vocabulaire à un texte
+ */
+function applyVocabularyRule(text, rule) {
+  if (!rule.enabled) {
+    return { text, matched: false, corrections: [] }
+  }
+
+  let corrected = text
+  const corrections = []
+
+  try {
+    switch (rule.type) {
+      case 'exact':
+        // Recherche de variantes exactes
+        if (rule.variants && Array.isArray(rule.variants)) {
+          rule.variants.forEach(variant => {
+            // Échapper les caractères spéciaux regex
+            const escapedVariant = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            // Recherche avec limites de mots
+            const pattern = new RegExp(`\\b${escapedVariant}\\b`, 'g')
+
+            const matches = corrected.match(pattern)
+            if (matches && matches.length > 0) {
+              // Stocker le texte exact trouvé (le premier match) comme original
+              const foundText = matches[0]
+              corrected = corrected.replace(pattern, rule.replace)
+              corrections.push({
+                type: 'fault',
+                original: foundText,  // Texte réellement trouvé, pas le pattern
+                corrected: rule.replace,
+                reason: rule.reason || 'Règle de vocabulaire',
+                count: matches.length
+              })
+            }
+          })
+        }
+        break
+
+      case 'souple':
+        // Recherche souple avec normalisation
+        const options = rule.options || {}
+        const search = rule.search || ''
+
+        if (search) {
+          // Construire un pattern regex intelligent basé sur les options
+          // Cela permet d'ignorer les "s" sur CHAQUE mot de l'expression
+          const pattern = buildFuzzyPattern(search, options)
+          const matches = corrected.match(pattern)
+
+          if (matches && matches.length > 0) {
+            // Stocker le texte exact trouvé (le premier match) comme original
+            const foundText = matches[0]
+            corrected = corrected.replace(pattern, rule.replace)
+            corrections.push({
+              type: 'fault',
+              original: foundText,  // Texte réellement trouvé, pas le pattern
+              corrected: rule.replace,
+              reason: rule.reason || 'Règle de vocabulaire',
+              count: matches.length
+            })
+          }
+        }
+        break
+
+      case 'regex':
+        // Recherche avec regex personnalisée
+        const regexFlags = rule.options?.flags || 'g'
+        const regexPattern = new RegExp(rule.search, regexFlags)
+        const regexMatches = corrected.match(regexPattern)
+
+        if (regexMatches && regexMatches.length > 0) {
+          // Stocker le texte exact trouvé (le premier match) comme original
+          const foundText = regexMatches[0]
+          corrected = corrected.replace(regexPattern, rule.replace)
+          corrections.push({
+            type: 'fault',
+            original: foundText,  // Texte réellement trouvé, pas le pattern
+            corrected: rule.replace,
+            reason: rule.reason || 'Règle de vocabulaire',
+            count: regexMatches.length
+          })
+        }
+        break
+    }
+  } catch (error) {
+    console.error(`[Pass 5] Error applying rule ${rule.id}:`, error.message)
+  }
+
+  return {
+    text: corrected,
+    matched: corrections.length > 0,
+    corrections
+  }
+}
+
+/**
+ * Applique toutes les règles de vocabulaire à un bloc
+ * @param {Object} block - Bloc SRT à corriger
+ * @param {Object} vocabularyRules - Règles de vocabulaire à appliquer
+ */
+function applyVocabularyRules(block, vocabularyRules) {
+  // Partir du texte déjà corrigé par les passes précédentes
+  let corrected = block.corrected || block.text || ''
+  const vocabularyCorrections = []
+
+  const rules = vocabularyRules?.rules || []
+
+  rules.forEach(rule => {
+    const result = applyVocabularyRule(corrected, rule)
+    if (result.matched) {
+      corrected = result.text
+      vocabularyCorrections.push(...result.corrections)
+    }
+  })
+
+  // Fusionner les corrections existantes avec les nouvelles corrections de vocabulaire
+  const existingCorrections = block.corrections || []
+  const allCorrections = [...existingCorrections, ...vocabularyCorrections]
+
+  return {
+    ...block,
+    corrected: corrected,  // Mettre à jour le champ "corrected", pas "text"
+    corrections: allCorrections,  // Fusionner toutes les corrections
+    correctedByPass5: vocabularyCorrections.length > 0
+  }
 }
 
 /**
@@ -1563,8 +2049,11 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
       }
 
       // Valider que l'original retourné par Claude correspond au texte du bloc
-      const normalizedClaudeOriginal = correctedBlock.original?.toLowerCase().trim()
-      let normalizedBlockText = originalBlock.text.toLowerCase().trim()
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+      // Utiliser une normalisation robuste pour gérer espaces insécables, multi-lignes, etc.
+      const normalizedClaudeOriginal = normalizeForComparison(correctedBlock.original || '')
+      const originalBlockText = originalBlock.original || originalBlock.text
+      let normalizedBlockText = normalizeForComparison(originalBlockText)
 
       if (normalizedClaudeOriginal && normalizedClaudeOriginal !== normalizedBlockText) {
         // Pour Pass 4, Claude peut se tromper d'index de ±1 car il y a beaucoup de blocs
@@ -1577,7 +2066,8 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
           let foundCorrectBlock = null
           for (const adjacentBlock of adjacentBlocks) {
-            const normalizedAdjacent = adjacentBlock.text.toLowerCase().trim()
+            const adjacentText = adjacentBlock.original || adjacentBlock.text
+            const normalizedAdjacent = normalizeForComparison(adjacentText)
             if (normalizedAdjacent === normalizedClaudeOriginal) {
               foundCorrectBlock = adjacentBlock
               console.log(`[correctWithClaude] Pass 4 - Block #${correctedBlock.index}: Index mismatch, found correct text in block #${adjacentBlock.index}`)
@@ -1588,17 +2078,20 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
           if (foundCorrectBlock) {
             // Utiliser le bon bloc et corriger l'index
             originalBlock = foundCorrectBlock
-            normalizedBlockText = foundCorrectBlock.text.toLowerCase().trim()
+            const foundText = foundCorrectBlock.original || foundCorrectBlock.text
+            normalizedBlockText = normalizeForComparison(foundText)
             correctedBlock.index = foundCorrectBlock.index
           } else {
+            const expectedText = originalBlock.original || originalBlock.text
             console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text and no adjacent match found`)
-            console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+            console.warn(`[correctWithClaude]   Expected: "${expectedText.substring(0, 60)}..."`)
             console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
             return null
           }
         } else {
+          const expectedText = originalBlock.original || originalBlock.text
           console.warn(`[correctWithClaude] Pass ${pass} - Block #${correctedBlock.index}: Claude's "original" doesn't match block text`)
-          console.warn(`[correctWithClaude]   Expected: "${originalBlock.text.substring(0, 60)}..."`)
+          console.warn(`[correctWithClaude]   Expected: "${expectedText.substring(0, 60)}..."`)
           console.warn(`[correctWithClaude]   Got: "${correctedBlock.original?.substring(0, 60)}..."`)
           // Ne pas retourner ce bloc, il y a une confusion d'index
           return null
@@ -1615,7 +2108,8 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
           }
 
           // VALIDATION : Vérifier que la correction appartient bien à ce bloc
-          const blockTextToCheck = pass === 1 ? originalBlock.text : originalBlock.text  // Pour pass 2, on vérifie contre le texte d'entrée
+          // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+          const blockTextToCheck = originalBlock.original || originalBlock.text
 
           // DEBUG Pass 4 : Log validation
           if (pass === 4) {
@@ -1670,7 +2164,8 @@ async function correctWithClaude(blocks, modelType = 'haiku', pass = 1, debugLog
 
       // Récupérer le texte original depuis NOS blocs parsés (source de vérité)
       // Ne PAS faire confiance à correctedBlock.original qui peut être incorrect
-      const originalText = originalBlock ? originalBlock.text : ''
+      // Support pour inputBlocks (qui ont 'original') ET blocs parsés (qui ont 'text')
+      const originalText = originalBlock ? (originalBlock.original || originalBlock.text) : ''
 
       // TOUJOURS reconstruire le texte corrigé nous-mêmes
       // Ne JAMAIS faire confiance à correctedBlock.corrected de Claude (peut être incorrect)

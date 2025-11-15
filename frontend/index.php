@@ -18,6 +18,112 @@ try {
     die("Erreur de configuration : " . $e->getMessage() . "<br>Vérifiez que tous les fichiers sont présents.");
 }
 
+// Vérifier le mode maintenance
+$configFile = __DIR__ . '/config/app-config.json';
+$maintenanceMode = false;
+
+if (file_exists($configFile)) {
+    $configContent = file_get_contents($configFile);
+    $appConfig = json_decode($configContent, true);
+    if ($appConfig && isset($appConfig['general']['maintenanceMode'])) {
+        $maintenanceMode = $appConfig['general']['maintenanceMode'];
+    }
+}
+
+if ($maintenanceMode) {
+    // Afficher la page de maintenance
+    ?>
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Site en maintenance - SRT Corrector Pro</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                padding: 2rem;
+            }
+            .maintenance-container {
+                background: white;
+                border-radius: 16px;
+                padding: 3rem 2rem;
+                max-width: 600px;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            }
+            .maintenance-icon {
+                font-size: 5rem;
+                margin-bottom: 1.5rem;
+            }
+            h1 {
+                color: #1f2937;
+                font-size: 2rem;
+                margin-bottom: 1rem;
+            }
+            p {
+                color: #6b7280;
+                font-size: 1.125rem;
+                line-height: 1.6;
+                margin-bottom: 2rem;
+            }
+            .info-box {
+                background: #eff6ff;
+                border-left: 4px solid #3b82f6;
+                padding: 1rem;
+                border-radius: 4px;
+                text-align: left;
+            }
+            .info-box p {
+                color: #1e40af;
+                font-size: 0.875rem;
+                margin: 0;
+            }
+            .admin-link {
+                display: inline-block;
+                margin-top: 2rem;
+                padding: 0.75rem 1.5rem;
+                background: #4f46e5;
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 600;
+                transition: background 0.2s;
+            }
+            .admin-link:hover {
+                background: #4338ca;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="maintenance-container">
+            <div class="maintenance-icon">🔧</div>
+            <h1>Site en maintenance</h1>
+            <p>
+                Notre site est actuellement en cours de maintenance pour vous offrir une meilleure expérience.
+                Nous serons de retour très bientôt !
+            </p>
+            <div class="info-box">
+                <p><strong>ℹ️ Note :</strong> Cette maintenance est temporaire. Merci de votre patience et de votre compréhension.</p>
+            </div>
+            <a href="admin/index.php" class="admin-link">🔐 Accès administrateur</a>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 // Traitement de l'upload si formulaire soumis
 $uploadResult = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {

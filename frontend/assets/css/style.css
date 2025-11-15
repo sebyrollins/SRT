@@ -2053,6 +2053,11 @@ body {
   opacity: 0.3;
 }
 
+.minimap-block.minimap-validated-fault {
+  background: var(--color-fault-bg);  /* Vert clair pour fautes validées */
+  opacity: 0.9;
+}
+
 .minimap-block.minimap-validated-doubt {
   background: #ffe0b2;
   opacity: 0.7;
@@ -2094,6 +2099,10 @@ body {
 
 .minimap-block.minimap-current.minimap-doubt {
   background: #ff9800 !important;
+}
+
+.minimap-block.minimap-current.minimap-validated-fault {
+  background: var(--color-fault-bg) !important;
 }
 
 .minimap-block.minimap-current.minimap-validated-doubt {
