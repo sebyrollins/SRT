@@ -641,6 +641,52 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
 }
 
 /**
+ * Détecte si Claude a défait des corrections de Pass 0
+ * @param {Array} pass0Corrections - Corrections faites par Pass 0
+ * @param {string} textAfterPass0 - Texte après Pass 0
+ * @param {string} textAfterPass1 - Texte après Pass 1 (Claude)
+ * @returns {Array} Liste des corrections "minor" pour les corrections défaites
+ */
+function detectUndonePass0Corrections(pass0Corrections, textAfterPass0, textAfterPass1) {
+  const undoneCorrections = []
+
+  // Si aucune correction Pass 0, rien à vérifier
+  if (!pass0Corrections || pass0Corrections.length === 0) {
+    return undoneCorrections
+  }
+
+  // Si les textes sont identiques, Claude n'a rien défait
+  if (textAfterPass0 === textAfterPass1) {
+    return undoneCorrections
+  }
+
+  // Pour chaque correction de Pass 0, vérifier si Claude l'a défaite
+  for (const pass0Corr of pass0Corrections) {
+    // Pass 0 a corrigé : pass0Corr.original → pass0Corr.corrected
+    // Si Pass 1 contient pass0Corr.original, cela signifie que Claude a défait la correction
+
+    // Vérifier si le texte original (l'erreur) réapparaît dans le texte après Pass 1
+    if (textAfterPass1.includes(pass0Corr.original)) {
+      // Claude a défait cette correction de Pass 0
+      undoneCorrections.push({
+        type: 'minor',
+        original: pass0Corr.corrected,  // Ce que Pass 0 avait corrigé
+        corrected: pass0Corr.original,  // Ce que Claude a remis (l'erreur)
+        reason: `Claude a défait une correction Pass 0: ${pass0Corr.reason}`
+      })
+
+      console.log(`[detectUndonePass0Corrections] Claude undid Pass 0 correction: "${pass0Corr.original}" → "${pass0Corr.corrected}" reverted to "${pass0Corr.original}"`)
+    }
+  }
+
+  if (undoneCorrections.length > 0) {
+    console.log(`[detectUndonePass0Corrections] Found ${undoneCorrections.length} undone Pass 0 corrections`)
+  }
+
+  return undoneCorrections
+}
+
+/**
  * Traitement du contenu SRT avec Claude (optimisé avec parallélisme)
  * @param {string} srtContent - Contenu du fichier SRT (optionnel si inputBlocks fourni)
  * @param {string} modelType - Type de modèle à utiliser : 'cleaning' (regex uniquement), 'sonnet' (qualité)
@@ -760,15 +806,23 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const pass1Block = pass1Map.get(pass0Block.index)
 
       if (pass1Block) {
-        // Ne PAS fusionner les corrections de Pass 0 car elles sont déjà appliquées au texte
-        // Le texte original est avant Pass 0, le texte corrigé est après Pass 1
-        // Les corrections Pass 0 seraient redondantes et apparaîtraient comme "déjà corrigées"
+        // Détecter si Claude a défait des corrections de Pass 0
+        const undoneCorrections = detectUndonePass0Corrections(
+          pass0Block.corrections || [],
+          pass0Block.corrected,
+          pass1Block.corrected
+        )
+
+        // Fusionner les corrections de Pass 1 avec les corrections défaites
+        const allCorrections = [...pass1Block.corrections, ...undoneCorrections]
+
         return {
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,  // Le vrai original (avant Pass 0)
           corrected: pass1Block.corrected,  // Texte final après Pass 1
-          corrections: pass1Block.corrections  // Seulement les corrections de Pass 1
+          corrections: allCorrections,  // Pass 1 + corrections défaites par Claude
+          pass0Corrections: pass0Block.corrections  // Stocké mais non affiché
         }
       } else {
         // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
@@ -778,7 +832,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           timecode: pass0Block.timecode,
           original: pass0Block.original,
           corrected: pass0Block.corrected,  // Texte après Pass 0
-          corrections: []  // Pas de corrections à afficher (déjà appliquées)
+          corrections: [],  // Pas de corrections à afficher (déjà appliquées)
+          pass0Corrections: pass0Block.corrections  // Stocké pour référence
         }
       }
     })
