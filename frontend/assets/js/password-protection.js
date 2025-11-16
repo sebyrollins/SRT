@@ -86,7 +86,7 @@ function togglePasswordVisibility() {
 /**
  * Valide le mot de passe
  */
-function validatePassword() {
+async function validatePassword() {
     const input = document.getElementById('passwordInput');
     const error = document.getElementById('passwordError');
 
@@ -95,7 +95,7 @@ function validatePassword() {
     const enteredPassword = input.value;
 
     // Hash le mot de passe entré et comparer avec le hash stocké
-    const enteredHash = sha256(enteredPassword);
+    const enteredHash = await sha256(enteredPassword);
     const expectedHash = window.APP_CONFIG?.security?.passwordHash;
 
     if (enteredHash === expectedHash) {
