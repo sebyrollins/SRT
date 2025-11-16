@@ -509,8 +509,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
             workerUrl: '<?php echo WORKER_URL; ?>',
             maxFileSize: <?php echo MAX_FILE_SIZE; ?>,
             security: {
-                privateMode: <?php echo $appConfig['private_mode'] ? 'true' : 'false'; ?>,
-                passwordHash: '<?php echo hash('sha256', $appConfig['password']); ?>'
+                privateMode: <?php echo ($appConfig['security']['privateMode'] ?? false) ? 'true' : 'false'; ?>,
+                passwordHash: '<?php echo hash('sha256', $appConfig['security']['password'] ?? '1974'); ?>'
             }
         };
 
