@@ -116,11 +116,18 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
     const originalEl = document.createElement('div')
     originalEl.className = 'block-section block-original'
+
+    // Fusionner corrections pour le surlignage (validation + Pass 0 pour surlignage uniquement)
+    const correctionsForHighlight = [
+      ...(block.corrections || []),
+      ...(block.pass0Corrections || [])
+    ]
+
     originalEl.innerHTML = `
       <div class="block-label">ORIGINAL :</div>
       <div class="block-content">${
-        block.corrections && block.corrections.length > 0
-          ? SRTParser.highlightOriginalErrors(block.original, block.corrections, block.index, AppState.validatedCorrections)
+        correctionsForHighlight.length > 0
+          ? SRTParser.highlightOriginalErrors(block.original, correctionsForHighlight, block.index, AppState.validatedCorrections)
           : SRTParser.escapeHtml(block.original)
       }</div>
     `

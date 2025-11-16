@@ -790,17 +790,18 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const totalTime = Date.now() - startTime
       console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
 
-      // En mode Cleaning, afficher TOUTES les corrections Pass 0
-      const blocksWithAllCorrections = blocksAfterPass0.map(block => {
+      // En mode Cleaning, ne pas valider les corrections Pass 0
+      // Les mettre dans pass0Corrections pour le surlignage uniquement
+      const blocksWithPass0 = blocksAfterPass0.map(block => {
         return {
           ...block,
-          // Les corrections sont déjà dans block.corrections, pas besoin de filtrer
-          pass0Corrections: block.corrections  // Garder une copie pour référence
+          corrections: [],  // Vide : Pass 0 ne se valide pas
+          pass0Corrections: block.corrections  // Pour le surlignage uniquement
         }
       })
 
       return {
-        blocks: blocksWithAllCorrections,
+        blocks: blocksWithPass0,
         debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
         pass0Stats: pass0Stats
       }
@@ -843,11 +844,9 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           pass1Block.corrected
         )
 
-        // Afficher TOUTES les corrections Pass 0 (pour que tout soit surligné en jaune)
-        const pass0CorrectionsToShow = pass0Block.corrections || []
-
-        // Fusionner : Pass 1 + corrections défaites + TOUTES les corrections Pass 0
-        const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...pass0CorrectionsToShow]
+        // Fusionner uniquement : Pass 1 + corrections défaites par Claude
+        // Les corrections Pass 0 normales sont dans pass0Corrections (pour le surlignage uniquement)
+        const allCorrections = [...pass1Block.corrections, ...undoneCorrections]
 
         return {
           index: pass0Block.index,
@@ -855,22 +854,20 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           original: pass0Block.original,  // Le vrai original (avant Pass 0)
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass1Block.corrected,  // Texte final après Pass 1
-          corrections: allCorrections,  // Pass 1 + corrections défaites + espaces multiples
-          pass0Corrections: pass0Block.corrections  // Stocké mais non affiché
+          corrections: allCorrections,  // Pass 1 + corrections défaites (à valider)
+          pass0Corrections: pass0Block.corrections  // Pour le surlignage uniquement
         }
       } else {
         // Pas de corrections en Pass 1
-        // Afficher TOUTES les corrections Pass 0
-        const pass0CorrectionsToShow = pass0Block.corrections || []
-
+        // Ne rien mettre dans corrections (Pass 0 ne se valide pas)
         return {
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass0Block.corrected,  // Texte après Pass 0
-          corrections: pass0CorrectionsToShow,  // Afficher TOUTES les corrections Pass 0
-          pass0Corrections: pass0Block.corrections  // Stocké pour référence
+          corrections: [],  // Vide : Pass 0 ne se valide pas
+          pass0Corrections: pass0Block.corrections  // Pour le surlignage uniquement
         }
       }
     })
