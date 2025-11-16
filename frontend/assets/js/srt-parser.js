@@ -193,6 +193,18 @@ const SRTParser = {
    * @returns {string} Texte échappé
    */
   escapeHtml(text) {
+    // Protection contre undefined/null
+    if (text === undefined || text === null) {
+      console.warn('[escapeHtml] Received undefined/null text, returning empty string')
+      return ''
+    }
+
+    // Protection contre les non-strings
+    if (typeof text !== 'string') {
+      console.warn('[escapeHtml] Received non-string text:', typeof text, text)
+      return String(text)
+    }
+
     const map = {
       '&': '&amp;',
       '<': '&lt;',

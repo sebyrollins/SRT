@@ -243,7 +243,7 @@ export function updateMinimap(DOM, AppState) {
     if (!minimapBlock) return
 
     // Retirer toutes les classes d'état
-    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
+    minimapBlock.classList.remove('minimap-validated', 'minimap-validated-fault', 'minimap-validated-doubt', 'minimap-no-correction', 'minimap-fault', 'minimap-doubt')
 
     // Ajouter la nouvelle classe
     const blockClass = getBlockMinimapClass(block, state)

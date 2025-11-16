@@ -515,7 +515,23 @@ export async function processUploadedFile(content, filename, DOM, AppState, SRTP
     // Envoyer au Worker Cloudflare en 4 passes séquentielles
     const result = await sendToWorkerMultiPass(content, filename, DOM, updateProgressUI)
     const correctedBlocks = result.blocks
-    const pass0Stats = result.pass0Stats
+    let pass0Stats = result.pass0Stats
+
+    // Debug: Vérifier la structure des blocs AVANT les transformations
+    if (correctedBlocks.length > 0) {
+      console.log('[processUploadedFile] Block structure FROM WORKER (before transformations):', {
+        index: correctedBlocks[0].index,
+        hasOriginal: 'original' in correctedBlocks[0],
+        originalValue: correctedBlocks[0].original,
+        originalType: typeof correctedBlocks[0].original,
+        hasText: 'text' in correctedBlocks[0],
+        textValue: correctedBlocks[0].text ? correctedBlocks[0].text.substring(0, 50) : null,
+        hasCorrected: 'corrected' in correctedBlocks[0],
+        correctedValue: correctedBlocks[0].corrected ? correctedBlocks[0].corrected.substring(0, 50) : null,
+        hasTimecode: 'timecode' in correctedBlocks[0],
+        keys: Object.keys(correctedBlocks[0])
+      })
+    }
 
     // Transformer les apostrophes et compter les conversions
     const curlyApostrophesCount = convertStraightApostrophesToCurly(correctedBlocks)
