@@ -14,13 +14,21 @@ ini_set('log_errors', '1');
 
 try {
     require_once __DIR__ . '/lib/functions.php';
-    require_once __DIR__ . '/lib/config-manager.php';
 } catch (Throwable $e) {
     die("Erreur de configuration : " . $e->getMessage() . "<br>Vérifiez que tous les fichiers sont présents.");
 }
 
-// Charger la configuration de sécurité
-$appConfig = loadAppConfig();
+// Charger la configuration de sécurité depuis config/app-config.json
+$configFile = __DIR__ . '/config/app-config.json';
+$appConfig = ['security' => ['privateMode' => false, 'password' => '1974']];
+
+if (file_exists($configFile)) {
+    $content = file_get_contents($configFile);
+    $config = json_decode($content, true);
+    if ($config && isset($config['security'])) {
+        $appConfig = $config;
+    }
+}
 
 // Traitement de l'upload si formulaire soumis
 $uploadResult = null;
