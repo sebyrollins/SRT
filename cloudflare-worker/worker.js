@@ -790,24 +790,17 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const totalTime = Date.now() - startTime
       console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
 
-      // En mode Cleaning, afficher uniquement les corrections Pass 0 concernant les espaces
-      const blocksWithFilteredCorrections = blocksAfterPass0.map(block => {
-        const spaceCorrections = (block.corrections || [])
-          .filter(corr => corr.reason && (
-            corr.reason.includes('Espaces multiples') ||
-            corr.reason.includes('Espace après apostrophe')
-          ))
-          // Pas besoin de map(), elles sont déjà de type 'fault'
-
+      // En mode Cleaning, afficher TOUTES les corrections Pass 0
+      const blocksWithAllCorrections = blocksAfterPass0.map(block => {
         return {
           ...block,
-          corrections: spaceCorrections,  // Afficher les corrections espaces
-          pass0Corrections: block.corrections  // Garder toutes les corrections Pass 0 pour référence
+          // Les corrections sont déjà dans block.corrections, pas besoin de filtrer
+          pass0Corrections: block.corrections  // Garder une copie pour référence
         }
       })
 
       return {
-        blocks: blocksWithFilteredCorrections,
+        blocks: blocksWithAllCorrections,
         debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
         pass0Stats: pass0Stats
       }
@@ -850,16 +843,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           pass1Block.corrected
         )
 
-        // Extraire les corrections Pass 0 concernant les espaces (espaces multiples + espace après apostrophe)
-        const spaceCorrections = (pass0Block.corrections || [])
-          .filter(corr => corr.reason && (
-            corr.reason.includes('Espaces multiples') ||
-            corr.reason.includes('Espace après apostrophe')
-          ))
-          // Pas besoin de map(), elles sont déjà de type 'fault'
+        // Afficher TOUTES les corrections Pass 0 (pour que tout soit surligné en jaune)
+        const pass0CorrectionsToShow = pass0Block.corrections || []
 
-        // Fusionner : Pass 1 + corrections défaites + corrections espaces
-        const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...spaceCorrections]
+        // Fusionner : Pass 1 + corrections défaites + TOUTES les corrections Pass 0
+        const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...pass0CorrectionsToShow]
 
         return {
           index: pass0Block.index,
@@ -872,13 +860,8 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         }
       } else {
         // Pas de corrections en Pass 1
-        // Mais on affiche quand même les corrections Pass 0 concernant les espaces
-        const spaceCorrections = (pass0Block.corrections || [])
-          .filter(corr => corr.reason && (
-            corr.reason.includes('Espaces multiples') ||
-            corr.reason.includes('Espace après apostrophe')
-          ))
-          // Pas besoin de map(), elles sont déjà de type 'fault'
+        // Afficher TOUTES les corrections Pass 0
+        const pass0CorrectionsToShow = pass0Block.corrections || []
 
         return {
           index: pass0Block.index,
@@ -886,7 +869,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           original: pass0Block.original,
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass0Block.corrected,  // Texte après Pass 0
-          corrections: spaceCorrections,  // Afficher les corrections espaces
+          corrections: pass0CorrectionsToShow,  // Afficher TOUTES les corrections Pass 0
           pass0Corrections: pass0Block.corrections  // Stocké pour référence
         }
       }
