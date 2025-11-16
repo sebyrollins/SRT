@@ -69,6 +69,10 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
           correction.reason = correction.originalReason
           delete correction.originalReason
         }
+        // Retirer le flag de modification manuelle
+        if (correction.isManuallyEdited) {
+          correction.isManuallyEdited = false
+        }
       })
 
       // Restaurer le texte corrigé original de Claude (toutes les passes)
