@@ -195,11 +195,16 @@ export function getBlockMinimapClass(block, AppState) {
     const hasFault = block.corrections.some(c => c.type === 'fault')
     const hasDoubt = block.corrections.some(c => c.type === 'doubt')
 
+    console.log(`[Minimap] Bloc #${block.index} - Toutes validées | hasFault: ${hasFault} | hasDoubt: ${hasDoubt}`)
+
     if (hasFault) {
+      console.log(`[Minimap] Bloc #${block.index} → minimap-validated (VERT CLAIR - fautes validées)`)
       return 'minimap-validated'
     } else if (hasDoubt) {
+      console.log(`[Minimap] Bloc #${block.index} → minimap-validated-doubt (orange clair)`)
       return 'minimap-validated-doubt'
     } else {
+      console.log(`[Minimap] Bloc #${block.index} → minimap-validated (VERT CLAIR - autres validées)`)
       return 'minimap-validated'
     }
   }
