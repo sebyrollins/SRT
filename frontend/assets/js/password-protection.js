@@ -8,6 +8,48 @@ let isPasswordValidated = false;
 let selectedModel = 'sonnet'; // Par défaut
 
 /**
+ * Sauvegarde la validation du mot de passe avec timestamp
+ */
+function savePasswordValidation() {
+    const timestamp = Date.now();
+    sessionStorage.setItem('passwordValidatedAt', timestamp.toString());
+}
+
+/**
+ * Vérifie si la validation du mot de passe est encore valide
+ * @returns {boolean} true si la validation est encore valide
+ */
+function isPasswordValidationStillValid() {
+    const validatedAt = sessionStorage.getItem('passwordValidatedAt');
+    if (!validatedAt) {
+        return false;
+    }
+
+    const timestamp = parseInt(validatedAt, 10);
+    const now = Date.now();
+    const durationMinutes = window.APP_CONFIG?.security?.passwordDuration || 30; // 30 minutes par défaut
+    const durationMs = durationMinutes * 60 * 1000;
+
+    // Vérifier si le temps écoulé est inférieur à la durée configurée
+    const isValid = (now - timestamp) < durationMs;
+
+    if (!isValid) {
+        // Expiration : nettoyer le storage
+        sessionStorage.removeItem('passwordValidatedAt');
+    }
+
+    return isValid;
+}
+
+/**
+ * Réinitialise la validation du mot de passe
+ */
+function clearPasswordValidation() {
+    sessionStorage.removeItem('passwordValidatedAt');
+    isPasswordValidated = false;
+}
+
+/**
  * Vérifie si la protection par mot de passe doit être activée
  */
 function shouldShowPasswordModal() {
@@ -21,7 +63,13 @@ function shouldShowPasswordModal() {
         return false;
     }
 
-    // Si déjà validé, ne pas redemander
+    // Vérifier si la validation est encore valide (avec durée)
+    if (isPasswordValidationStillValid()) {
+        isPasswordValidated = true;
+        return false;
+    }
+
+    // Si déjà validé dans cette session (variable), ne pas redemander
     if (isPasswordValidated) {
         return false;
     }
@@ -101,10 +149,12 @@ async function validatePassword() {
     if (enteredHash === expectedHash) {
         // Mot de passe correct
         isPasswordValidated = true;
+        savePasswordValidation(); // Sauvegarder avec timestamp
         hidePasswordModal();
 
-        // Message de succès
-        showToast('✓ Accès autorisé au mode Sonnet Pro', 'success');
+        // Message de succès avec durée
+        const durationMinutes = window.APP_CONFIG?.security?.passwordDuration || 30;
+        showToast(`✓ Accès autorisé au mode Sonnet Pro (${durationMinutes} min)`, 'success');
 
         // Forcer le modèle sur Sonnet
         const modelSelect = document.getElementById('modelSelect');
@@ -216,7 +266,7 @@ function handleModelChange(event) {
 
     // Si on passe à Cleaning, réinitialiser la validation
     if (newModel === 'cleaning') {
-        isPasswordValidated = false;
+        clearPasswordValidation();
     }
 }
 

@@ -510,7 +510,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
             maxFileSize: <?php echo MAX_FILE_SIZE; ?>,
             security: {
                 privateMode: <?php echo ($appConfig['security']['privateMode'] ?? false) ? 'true' : 'false'; ?>,
-                passwordHash: '<?php echo hash('sha256', $appConfig['security']['password'] ?? '1974'); ?>'
+                passwordHash: '<?php echo hash('sha256', $appConfig['security']['password'] ?? '1974'); ?>',
+                passwordDuration: <?php echo intval($appConfig['security']['passwordDuration'] ?? 30); ?>
             }
         };
 

@@ -212,6 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_config'])) {
     }
     $config['security']['privateMode'] = isset($_POST['private_mode']) && $_POST['private_mode'] === '1';
     $config['security']['password'] = $_POST['password'] ?? '1974';
+    $config['security']['passwordDuration'] = isset($_POST['password_duration']) ? intval($_POST['password_duration']) : 30;
 
     // Worker
     $config['worker']['url'] = $_POST['worker_url'] ?? '';
@@ -242,7 +243,8 @@ if (!$config) {
         ],
         'security' => [
             'privateMode' => false,
-            'password' => '1974'
+            'password' => '1974',
+            'passwordDuration' => 30
         ],
         'worker' => [
             'url' => 'https://srt-corrector-worker.sraynal.workers.dev'
@@ -263,7 +265,8 @@ if (!isset($config['general'])) {
 if (!isset($config['security'])) {
     $config['security'] = [
         'privateMode' => false,
-        'password' => '1974'
+        'password' => '1974',
+        'passwordDuration' => 30
     ];
 }
 ?>
@@ -532,6 +535,21 @@ if (!isset($config['security'])) {
                         required
                     >
                     <small>Mot de passe demandé lors de l'utilisation du mode Sonnet (appels API)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password_duration">Durée de validité du mot de passe (en minutes)</label>
+                    <input
+                        type="number"
+                        id="password_duration"
+                        name="password_duration"
+                        value="<?php echo htmlspecialchars($config['security']['passwordDuration'] ?? '30'); ?>"
+                        min="1"
+                        max="1440"
+                        placeholder="30"
+                        required
+                    >
+                    <small>Durée pendant laquelle le mot de passe reste valide (par défaut : 30 minutes, max : 1440 = 24h)</small>
                 </div>
 
                 <div class="info-box">
