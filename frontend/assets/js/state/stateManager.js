@@ -149,7 +149,12 @@ export function resetBlock(blockIndex) {
 export function resetAllValidations() {
   // Restaurer tous les blocs à leur état original
   AppState.blocks.forEach(block => {
+    // CAS 1 : Bloc sans corrections - restaurer quand même le texte original
     if (!block.corrections || block.corrections.length === 0) {
+      // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
+      if (block.hasOwnProperty('originalCorrected')) {
+        block.corrected = block.originalCorrected
+      }
       return
     }
 

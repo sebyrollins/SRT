@@ -2063,8 +2063,8 @@ body {
 
 /* États des blocs dans la minimap */
 .minimap-block.minimap-validated {
-  background: var(--color-border);
-  opacity: 0.3;
+  background: #90ee90; /* Vert clair pour les blocs avec fautes validées */
+  opacity: 0.7;
 }
 
 .minimap-block.minimap-validated-doubt {
@@ -2108,6 +2108,10 @@ body {
 
 .minimap-block.minimap-current.minimap-doubt {
   background: #ff9800 !important;
+}
+
+.minimap-block.minimap-current.minimap-validated {
+  background: #90ee90 !important; /* Vert clair pour les blocs avec fautes validées */
 }
 
 .minimap-block.minimap-current.minimap-validated-doubt {
