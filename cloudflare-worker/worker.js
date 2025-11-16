@@ -772,8 +772,25 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
     if (modelType === 'cleaning') {
       const totalTime = Date.now() - startTime
       console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
+
+      // En mode Cleaning, afficher uniquement les corrections Pass 0 concernant les espaces multiples
+      const blocksWithFilteredCorrections = blocksAfterPass0.map(block => {
+        const multipleSpacesCorrections = (block.corrections || [])
+          .filter(corr => corr.reason && corr.reason.includes('Espaces multiples'))
+          .map(corr => ({
+            ...corr,
+            type: 'minor'  // Les marquer comme corrections mineures
+          }))
+
+        return {
+          ...block,
+          corrections: multipleSpacesCorrections,  // Afficher seulement les espaces multiples
+          pass0Corrections: block.corrections  // Garder toutes les corrections Pass 0 pour référence
+        }
+      })
+
       return {
-        blocks: blocksAfterPass0,
+        blocks: blocksWithFilteredCorrections,
         debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
         pass0Stats: pass0Stats
       }
@@ -816,8 +833,16 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           pass1Block.corrected
         )
 
-        // Fusionner les corrections de Pass 1 avec les corrections défaites
-        const allCorrections = [...pass1Block.corrections, ...undoneCorrections]
+        // Extraire les corrections Pass 0 concernant les espaces multiples pour les afficher
+        const multipleSpacesCorrections = (pass0Block.corrections || [])
+          .filter(corr => corr.reason && corr.reason.includes('Espaces multiples'))
+          .map(corr => ({
+            ...corr,
+            type: 'minor'  // Les marquer comme corrections mineures
+          }))
+
+        // Fusionner : Pass 1 + corrections défaites + espaces multiples
+        const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...multipleSpacesCorrections]
 
         return {
           index: pass0Block.index,
@@ -825,19 +850,26 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           original: pass0Block.original,  // Le vrai original (avant Pass 0)
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass1Block.corrected,  // Texte final après Pass 1
-          corrections: allCorrections,  // Pass 1 + corrections défaites par Claude
+          corrections: allCorrections,  // Pass 1 + corrections défaites + espaces multiples
           pass0Corrections: pass0Block.corrections  // Stocké mais non affiché
         }
       } else {
-        // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
-        // car elles sont déjà appliquées dans le champ corrected
+        // Pas de corrections en Pass 1
+        // Mais on affiche quand même les corrections Pass 0 concernant les espaces multiples
+        const multipleSpacesCorrections = (pass0Block.corrections || [])
+          .filter(corr => corr.reason && corr.reason.includes('Espaces multiples'))
+          .map(corr => ({
+            ...corr,
+            type: 'minor'  // Les marquer comme corrections mineures
+          }))
+
         return {
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass0Block.corrected,  // Texte après Pass 0
-          corrections: [],  // Pas de corrections à afficher (déjà appliquées)
+          corrections: multipleSpacesCorrections,  // Afficher les espaces multiples
           pass0Corrections: pass0Block.corrections  // Stocké pour référence
         }
       }

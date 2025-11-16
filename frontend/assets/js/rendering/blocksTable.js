@@ -120,7 +120,7 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
       <div class="block-label">ORIGINAL :</div>
       <div class="block-content">${
         block.corrections && block.corrections.length > 0
-          ? SRTParser.highlightOriginalErrors(block.original, block.corrections)
+          ? SRTParser.highlightOriginalErrors(block.original, block.corrections, block.index, AppState.validatedCorrections)
           : SRTParser.escapeHtml(block.original)
       }</div>
     `

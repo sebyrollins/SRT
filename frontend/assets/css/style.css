@@ -1651,6 +1651,18 @@ body {
   text-decoration-style: wavy;
 }
 
+/* Surlignage jaune pour les corrections non validées (jaune foncé) */
+.error-highlight-unvalidated {
+  background-color: #ffd700; /* Jaune foncé / gold */
+  color: #000;
+}
+
+/* Surlignage jaune pour les corrections validées (jaune clair) */
+.error-highlight-validated {
+  background-color: #ffeb99; /* Jaune clair */
+  color: #000;
+}
+
 /* Validation empty state - removed duplicate, see lines 875-895 for actual styles */
 
 /* Validation cards */

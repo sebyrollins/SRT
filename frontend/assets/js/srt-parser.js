@@ -135,7 +135,7 @@ const SRTParser = {
    * @param {Array} corrections - Tableau de corrections
    * @returns {string} HTML avec erreurs surlignées (texte original intact)
    */
-  highlightOriginalErrors(text, corrections) {
+  highlightOriginalErrors(text, corrections, blockIndex, validatedCorrections) {
     if (!corrections || corrections.length === 0) {
       return this.escapeHtml(text)
     }
@@ -147,7 +147,7 @@ const SRTParser = {
     let result = ''
     let lastIndex = 0
 
-    sortedCorrections.forEach(correction => {
+    sortedCorrections.forEach((correction, corrIndex) => {
       const { original, type, position } = correction
       const startPos = position
       const endPos = startPos + original.length
@@ -156,9 +156,16 @@ const SRTParser = {
         // Ajouter le texte avant l'erreur (échappé)
         result += this.escapeHtml(text.substring(lastIndex, startPos))
 
+        // Vérifier si cette correction est validée
+        const correctionId = `${blockIndex}-${corrIndex}`
+        const isValidated = validatedCorrections && validatedCorrections.has(correctionId)
+
+        // Classe CSS : jaune foncé si non validé, jaune clair si validé
+        const highlightClass = isValidated ? 'error-highlight-validated' : 'error-highlight-unvalidated'
+
         // Ajouter l'erreur surlignée (texte échappé dans un span)
         const errorText = text.substring(startPos, endPos)
-        result += `<span class="error-highlight error-highlight-${type}">${this.escapeHtml(errorText)}</span>`
+        result += `<span class="error-highlight ${highlightClass} error-highlight-${type}">${this.escapeHtml(errorText)}</span>`
 
         // Mettre à jour la position
         lastIndex = endPos
