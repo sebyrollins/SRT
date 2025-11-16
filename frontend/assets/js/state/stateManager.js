@@ -149,7 +149,12 @@ export function resetBlock(blockIndex) {
 export function resetAllValidations() {
   // Restaurer tous les blocs à leur état original
   AppState.blocks.forEach(block => {
+    // CAS 1 : Bloc sans corrections - restaurer quand même le texte original
     if (!block.corrections || block.corrections.length === 0) {
+      // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
+      if (block.hasOwnProperty('originalCorrected')) {
+        block.corrected = block.originalCorrected
+      }
       return
     }
 
@@ -158,10 +163,9 @@ export function resetAllValidations() {
     if (block.corrections.length === 1 && block.corrections[0].wasNoCorrection) {
       block.corrections = []
 
-      // Restaurer le texte corrigé original
+      // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
       if (block.hasOwnProperty('originalCorrected')) {
         block.corrected = block.originalCorrected
-        delete block.originalCorrected
       }
       return
     }
@@ -202,9 +206,9 @@ export function resetAllValidations() {
     })
 
     // Restaurer le texte corrigé original si disponible
+    // NE PAS supprimer originalCorrected, c'est une référence permanente pour les réinitialisations futures
     if (block.hasOwnProperty('originalCorrected')) {
       block.corrected = block.originalCorrected
-      delete block.originalCorrected
     }
   })
 
@@ -284,6 +288,7 @@ export function clearBlockCorrections(blockIndex) {
       })
     }
     block.corrections = []
-    block.corrected = block.original
+    // Restaurer le texte original (résultat de toutes les passes)
+    block.corrected = block.originalCorrected || block.originalAfterPass0 || block.original
   }
 }

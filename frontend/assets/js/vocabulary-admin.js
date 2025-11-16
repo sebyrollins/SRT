@@ -25,6 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderRulesList();
     updateRulesCount();
 
+    // Ouvrir le formulaire par défaut pour faciliter l'ajout de règles
+    const addRuleContent = document.getElementById('addRuleContent');
+    const collapseIcon = document.querySelector('.collapse-icon');
+    if (addRuleContent && collapseIcon) {
+        addRuleContent.classList.add('expanded');
+        collapseIcon.classList.remove('collapsed');
+    }
+
     // Avertir avant de quitter si des changements non sauvegardés
     window.addEventListener('beforeunload', (e) => {
         if (AppState.unsavedChanges) {
@@ -391,6 +399,7 @@ function renderRuleCard(rule) {
             <!-- Partie droite : catégorie + boutons -->
             <div class="rule-meta">
                 <span class="rule-type-badge" style="background: ${categoryColor}; color: white;">${escapeHtml(categoryName)}</span>
+                <button class="btn-test" onclick="testSingleRule('${rule.id}')" title="Tester cette règle">Test</button>
                 <div class="rule-actions">
                     <button class="btn-icon edit" onclick="editRule('${rule.id}')" title="Modifier">✏️</button>
                     <button class="btn-icon toggle ${rule.enabled ? '' : 'disabled-rule'}" onclick="toggleRule('${rule.id}')" title="${rule.enabled ? 'Désactiver' : 'Activer'}">
@@ -486,7 +495,36 @@ function deleteRule(ruleId) {
 }
 
 /**
- * Teste une règle spécifique
+ * Teste une règle spécifique depuis la liste (ouvre le modal)
+ */
+function testSingleRule(ruleId) {
+    const rule = AppState.rules.find(r => r.id === ruleId);
+    if (!rule) return;
+
+    // Ouvrir le modal de test
+    openTestModal();
+
+    // Pré-remplir avec un texte exemple si vide
+    const testTextArea = document.getElementById('testText');
+    if (!testTextArea.value.trim()) {
+        // Générer un texte exemple basé sur la règle
+        let exampleText = '';
+        if (rule.type === 'exact' && rule.variants && rule.variants.length > 0) {
+            exampleText = `Ceci est un test avec ${rule.variants[0]} dans le texte.`;
+        } else if (rule.search) {
+            exampleText = `Ceci est un test avec ${rule.search} dans le texte.`;
+        } else {
+            exampleText = 'Entrez votre texte de test ici...';
+        }
+        testTextArea.value = exampleText;
+    }
+
+    // Stocker l'ID de la règle pour le test
+    testTextArea.dataset.testRuleId = ruleId;
+}
+
+/**
+ * Teste une règle spécifique (ancienne fonction, conservée pour compatibilité)
  */
 async function testRule(ruleId) {
     const rule = AppState.rules.find(r => r.id === ruleId);
@@ -686,3 +724,4 @@ window.editRule = editRule;
 window.toggleRule = toggleRule;
 window.deleteRule = deleteRule;
 window.testRule = testRule;
+window.testSingleRule = testSingleRule;

@@ -135,20 +135,30 @@ const SRTParser = {
    * @param {Array} corrections - Tableau de corrections
    * @returns {string} HTML avec erreurs surlignées (texte original intact)
    */
-  highlightOriginalErrors(text, corrections) {
+  highlightOriginalErrors(text, corrections, blockIndex, validatedCorrections) {
     if (!corrections || corrections.length === 0) {
       return this.escapeHtml(text)
     }
 
+    // Calculer les positions manquantes
+    const correctionsWithPosition = corrections.map(corr => {
+      if (corr.position !== undefined) {
+        return corr
+      }
+      // Calculer la position en cherchant dans le texte
+      const pos = text.indexOf(corr.original)
+      return { ...corr, position: pos >= 0 ? pos : 0 }
+    })
+
     // Trier les corrections par position (du plus petit au plus grand)
-    const sortedCorrections = [...corrections].sort((a, b) => a.position - b.position)
+    const sortedCorrections = [...correctionsWithPosition].sort((a, b) => a.position - b.position)
 
     // Construire le résultat en une seule passe pour éviter le double échappement
     let result = ''
     let lastIndex = 0
 
-    sortedCorrections.forEach(correction => {
-      const { original, type, position } = correction
+    sortedCorrections.forEach((correction) => {
+      const { original, type, position, _validationId } = correction
       const startPos = position
       const endPos = startPos + original.length
 
@@ -156,9 +166,15 @@ const SRTParser = {
         // Ajouter le texte avant l'erreur (échappé)
         result += this.escapeHtml(text.substring(lastIndex, startPos))
 
+        // Vérifier si cette correction est validée (seulement si elle a un _validationId)
+        const isValidated = _validationId && validatedCorrections && validatedCorrections.has(_validationId)
+
+        // Classe CSS : jaune foncé si non validé, jaune clair si validé
+        const highlightClass = isValidated ? 'error-highlight-validated' : 'error-highlight-unvalidated'
+
         // Ajouter l'erreur surlignée (texte échappé dans un span)
         const errorText = text.substring(startPos, endPos)
-        result += `<span class="error-highlight error-highlight-${type}">${this.escapeHtml(errorText)}</span>`
+        result += `<span class="error-highlight ${highlightClass} error-highlight-${type}">${this.escapeHtml(errorText)}</span>`
 
         // Mettre à jour la position
         lastIndex = endPos

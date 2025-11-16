@@ -18,110 +18,16 @@ try {
     die("Erreur de configuration : " . $e->getMessage() . "<br>Vérifiez que tous les fichiers sont présents.");
 }
 
-// Vérifier le mode maintenance
+// Charger la configuration de sécurité depuis config/app-config.json
 $configFile = __DIR__ . '/config/app-config.json';
-$maintenanceMode = false;
+$appConfig = ['security' => ['privateMode' => false, 'password' => '1974']];
 
 if (file_exists($configFile)) {
-    $configContent = file_get_contents($configFile);
-    $appConfig = json_decode($configContent, true);
-    if ($appConfig && isset($appConfig['general']['maintenanceMode'])) {
-        $maintenanceMode = $appConfig['general']['maintenanceMode'];
+    $content = file_get_contents($configFile);
+    $config = json_decode($content, true);
+    if ($config && isset($config['security'])) {
+        $appConfig = $config;
     }
-}
-
-if ($maintenanceMode) {
-    // Afficher la page de maintenance
-    ?>
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Site en maintenance - SRT Corrector Pro</title>
-        <style>
-            * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-            }
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-                padding: 2rem;
-            }
-            .maintenance-container {
-                background: white;
-                border-radius: 16px;
-                padding: 3rem 2rem;
-                max-width: 600px;
-                text-align: center;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            }
-            .maintenance-icon {
-                font-size: 5rem;
-                margin-bottom: 1.5rem;
-            }
-            h1 {
-                color: #1f2937;
-                font-size: 2rem;
-                margin-bottom: 1rem;
-            }
-            p {
-                color: #6b7280;
-                font-size: 1.125rem;
-                line-height: 1.6;
-                margin-bottom: 2rem;
-            }
-            .info-box {
-                background: #eff6ff;
-                border-left: 4px solid #3b82f6;
-                padding: 1rem;
-                border-radius: 4px;
-                text-align: left;
-            }
-            .info-box p {
-                color: #1e40af;
-                font-size: 0.875rem;
-                margin: 0;
-            }
-            .admin-link {
-                display: inline-block;
-                margin-top: 2rem;
-                padding: 0.75rem 1.5rem;
-                background: #4f46e5;
-                color: white;
-                text-decoration: none;
-                border-radius: 6px;
-                font-weight: 600;
-                transition: background 0.2s;
-            }
-            .admin-link:hover {
-                background: #4338ca;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="maintenance-container">
-            <div class="maintenance-icon">🔧</div>
-            <h1>Site en maintenance</h1>
-            <p>
-                Notre site est actuellement en cours de maintenance pour vous offrir une meilleure expérience.
-                Nous serons de retour très bientôt !
-            </p>
-            <div class="info-box">
-                <p><strong>ℹ️ Note :</strong> Cette maintenance est temporaire. Merci de votre patience et de votre compréhension.</p>
-            </div>
-            <a href="admin/index.php" class="admin-link">🔐 Accès administrateur</a>
-        </div>
-    </body>
-    </html>
-    <?php
-    exit;
 }
 
 // Traitement de l'upload si formulaire soumis
@@ -152,6 +58,138 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
     <meta name="description" content="Correcteur professionnel de sous-titres SRT avec IA">
     <title>SRT Corrector Pro - Correction professionnelle de sous-titres</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* Modal de mot de passe */
+        .password-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+        }
+
+        .password-modal-content {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .password-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .password-modal-header h3 {
+            margin: 0;
+            color: #1f2937;
+            font-size: 1.25rem;
+        }
+
+        .password-modal-body {
+            padding: 1.5rem;
+        }
+
+        .password-modal-body p {
+            margin: 0 0 1rem 0;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+
+        .password-input-group {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 0.75rem;
+            padding-right: 3rem;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .password-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 0.5rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .password-toggle-btn:hover {
+            opacity: 1;
+        }
+
+        .password-hint {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            color: #0369a1;
+            margin: 0;
+        }
+
+        .password-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            color: #dc2626;
+            margin-top: 0.75rem;
+        }
+
+        .password-modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+    </style>
 </head>
 <body>
     <!-- Header -->
@@ -427,12 +465,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
         </div>
     </footer>
 
+    <!-- Modal de mot de passe (mode privé) -->
+    <div class="password-modal" id="passwordModal" style="display: none;">
+        <div class="password-modal-overlay"></div>
+        <div class="password-modal-content">
+            <div class="password-modal-header">
+                <h3>🔒 Accès protégé</h3>
+            </div>
+            <div class="password-modal-body">
+                <p>Le mode <strong>Sonnet Pro</strong> est protégé par mot de passe pour préserver les coûts d'API.</p>
+                <div class="password-input-group">
+                    <input
+                        type="password"
+                        id="passwordInput"
+                        class="password-input"
+                        placeholder="Entrez le mot de passe"
+                        autocomplete="off"
+                    >
+                    <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility()">👁️</button>
+                </div>
+                <p class="password-hint">
+                    💡 Sans mot de passe correct, l'outil basculera en mode <strong>Cleaning</strong> (sans coût API).
+                </p>
+                <div id="passwordError" class="password-error" style="display: none;">
+                    ❌ Mot de passe incorrect. Basculement en mode Cleaning...
+                </div>
+            </div>
+            <div class="password-modal-footer">
+                <button type="button" class="btn btn-outline" onclick="cancelPassword()">
+                    Annuler (mode Cleaning)
+                </button>
+                <button type="button" class="btn btn-primary" onclick="validatePassword()">
+                    Valider
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>
         // Configuration globale
         window.APP_CONFIG = {
             workerUrl: '<?php echo WORKER_URL; ?>',
-            maxFileSize: <?php echo MAX_FILE_SIZE; ?>
+            maxFileSize: <?php echo MAX_FILE_SIZE; ?>,
+            security: {
+                privateMode: <?php echo ($appConfig['security']['privateMode'] ?? false) ? 'true' : 'false'; ?>,
+                passwordHash: '<?php echo hash('sha256', $appConfig['security']['password'] ?? '1974'); ?>',
+                passwordDuration: <?php echo intval($appConfig['security']['passwordDuration'] ?? 30); ?>
+            }
         };
 
         <?php if ($uploadResult && $uploadResult['success']): ?>
@@ -444,6 +524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
         <?php endif; ?>
     </script>
     <script src="assets/js/srt-parser.js"></script>
+    <script src="assets/js/password-protection.js"></script>
     <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>

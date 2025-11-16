@@ -1,11 +1,19 @@
 {
   "version": "1.0",
-  "lastUpdate": "2025-11-13T00:00:00Z",
+  "lastUpdate": "2025-11-16T00:00:00Z",
+  "general": {
+    "maxFileSize": 200,
+    "maintenanceMode": false
+  },
+  "security": {
+    "privateMode": false,
+    "password": "1974"
+  },
   "worker": {
     "url": "https://votre-worker.workers.dev"
   },
   "prompts": {
-    "pass1": "Corrige les sous-titres comme un professionnel de l'orthographe, conjugaison, grammaire et typographie...",
+    "pass1": "Corrige les sous-titres comme un professionnel...",
     "pass2": "Tu reçois un texte DÉJÀ CORRIGÉ. Applique ces règles...",
     "pass3": "Tu reçois un texte DÉJÀ CORRIGÉ. Applique CES DEUX règles...",
     "pass4": "Tu corriges des sous-titres français. RÈGLE UNIQUE À APPLIQUER..."

@@ -442,6 +442,25 @@ $categories = $rulesData['categories'] ?? getDefaultCategories();
             color: #9f1239;
         }
 
+        /* Bouton Test (texte uniquement) */
+        .btn-test {
+            padding: 0.375rem 0.75rem;
+            border: 1px solid var(--color-border, #d1d5db);
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--color-primary, #4f46e5);
+            white-space: nowrap;
+        }
+
+        .btn-test:hover {
+            background: #eff6ff;
+            border-color: var(--color-primary, #4f46e5);
+        }
+
         /* Boutons d'action avec icônes uniquement */
         .rule-actions {
             display: flex;

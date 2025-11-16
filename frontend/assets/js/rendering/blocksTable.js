@@ -137,11 +137,30 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
 
     const originalEl = document.createElement('div')
     originalEl.className = 'block-section block-original'
+
+    // Ajouter un ID de validation stable à chaque correction de block.corrections
+    const correctionsWithIds = (block.corrections || []).map((corr, idx) => ({
+      ...corr,
+      _validationId: `${block.index}-${idx}`
+    }))
+
+    // Filtrer pass0Corrections pour éviter les doublons (corrections déjà dans block.corrections)
+    const pass0Only = (block.pass0Corrections || []).filter(p0corr => {
+      return !correctionsWithIds.some(corr =>
+        corr.original === p0corr.original &&
+        corr.corrected === p0corr.corrected &&
+        corr.reason === p0corr.reason
+      )
+    })
+
+    // Fusionner sans doublons pour le surlignage
+    const correctionsForHighlight = [...correctionsWithIds, ...pass0Only]
+
     originalEl.innerHTML = `
       <div class="block-label">ORIGINAL :</div>
       <div class="block-content">${
-        block.corrections && block.corrections.length > 0
-          ? SRTParser.highlightOriginalErrors(block.original, block.corrections)
+        correctionsForHighlight.length > 0
+          ? SRTParser.highlightOriginalErrors(block.original, correctionsForHighlight, block.index, AppState.validatedCorrections)
           : SRTParser.escapeHtml(block.original)
       }</div>
     `

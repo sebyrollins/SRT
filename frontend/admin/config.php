@@ -206,6 +206,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_config'])) {
     $config['general']['maxFileSize'] = intval($_POST['max_file_size'] ?? 200);
     $config['general']['maintenanceMode'] = isset($_POST['maintenance_mode']) && $_POST['maintenance_mode'] === '1';
 
+    // Sécurité (mode privé et mot de passe)
+    if (!isset($config['security'])) {
+        $config['security'] = [];
+    }
+    $config['security']['privateMode'] = isset($_POST['private_mode']) && $_POST['private_mode'] === '1';
+    $config['security']['password'] = $_POST['password'] ?? '1974';
+    $config['security']['passwordDuration'] = isset($_POST['password_duration']) ? intval($_POST['password_duration']) : 30;
+
     // Worker
     $config['worker']['url'] = $_POST['worker_url'] ?? '';
 
@@ -233,6 +241,11 @@ if (!$config) {
             'maxFileSize' => 200,
             'maintenanceMode' => false
         ],
+        'security' => [
+            'privateMode' => false,
+            'password' => '1974',
+            'passwordDuration' => 30
+        ],
         'worker' => [
             'url' => 'https://srt-corrector-worker.sraynal.workers.dev'
         ],
@@ -245,6 +258,15 @@ if (!isset($config['general'])) {
     $config['general'] = [
         'maxFileSize' => 200,
         'maintenanceMode' => false
+    ];
+}
+
+// S'assurer que les paramètres de sécurité existent
+if (!isset($config['security'])) {
+    $config['security'] = [
+        'privateMode' => false,
+        'password' => '1974',
+        'passwordDuration' => 30
     ];
 }
 ?>
@@ -478,6 +500,63 @@ if (!isset($config['general'])) {
                 <div class="info-box">
                     <p><strong>ℹ️ Mode maintenance :</strong> Utilisez cette option pour effectuer des mises à jour sans perturber les utilisateurs.</p>
                     <p>Un message clair sera affiché sur la page d'accueil indiquant que le site est temporairement indisponible.</p>
+                </div>
+            </div>
+
+            <!-- Section Sécurité -->
+            <div class="config-section">
+                <h2>🔒 Sécurité et accès</h2>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input
+                            type="checkbox"
+                            id="private_mode"
+                            name="private_mode"
+                            value="1"
+                            <?php echo ($config['security']['privateMode'] ?? false) ? 'checked' : ''; ?>
+                            style="width: auto; cursor: pointer;"
+                        >
+                        <span>Activer le mode privé (protection par mot de passe)</span>
+                    </label>
+                    <small style="margin-left: 1.75rem;">
+                        Protection par mot de passe du mode "Sonnet Pro" pour préserver les coûts d'API
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Mot de passe d'accès au mode Sonnet</label>
+                    <input
+                        type="text"
+                        id="password"
+                        name="password"
+                        value="<?php echo htmlspecialchars($config['security']['password'] ?? '1974'); ?>"
+                        placeholder="1974"
+                        required
+                    >
+                    <small>Mot de passe demandé lors de l'utilisation du mode Sonnet (appels API)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password_duration">Durée de validité du mot de passe (en minutes)</label>
+                    <input
+                        type="number"
+                        id="password_duration"
+                        name="password_duration"
+                        value="<?php echo htmlspecialchars($config['security']['passwordDuration'] ?? '30'); ?>"
+                        min="1"
+                        max="1440"
+                        placeholder="30"
+                        required
+                    >
+                    <small>Durée pendant laquelle le mot de passe reste valide (par défaut : 30 minutes, max : 1440 = 24h)</small>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>ℹ️ Mode privé :</strong> Protège l'accès au mode Sonnet Pro (appels API coûteux).</p>
+                    <p>• Mode privé activé + Sonnet → Demande de mot de passe</p>
+                    <p>• Mot de passe incorrect → Basculement automatique en mode Cleaning (gratuit)</p>
+                    <p>• Mode Cleaning → Aucune protection (pas d'appel API)</p>
                 </div>
             </div>
 

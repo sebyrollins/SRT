@@ -156,6 +156,7 @@ function preProcessWithRegex(text) {
   if (trimmed !== corrected) {
     corrections.push({
       type: 'fault',
+      position: 0,  // Début du texte
       original: corrected,
       corrected: trimmed,
       reason: 'Espaces en début/fin'
@@ -165,101 +166,115 @@ function preProcessWithRegex(text) {
 
   // 1. ELLIPSIS : ... → …
   if (/\.\.\./.test(corrected)) {
-    const matches = corrected.match(/\.\.\./g)
-    if (matches) {
+    const regex = /\.\.\./g
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
+        position: match.index,
         original: '...',
         corrected: '…',
         reason: 'Ellipsis typographique'
       })
-      corrected = corrected.replace(/\.\.\./g, '…')
     }
+    corrected = corrected.replace(/\.\.\./g, '…')
   }
 
   // 2. ESPACES MULTIPLES : "  " → " "
   if (/ {2,}/.test(corrected)) {
-    const beforeSpaces = corrected.match(/ {2,}/g)
-    if (beforeSpaces && beforeSpaces.length > 0) {
+    const regex = / {2,}/g
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: beforeSpaces[0],
+        position: match.index,
+        original: match[0],
         corrected: ' ',
         reason: 'Espaces multiples'
       })
-      corrected = corrected.replace(/ {2,}/g, ' ')
     }
+    corrected = corrected.replace(/ {2,}/g, ' ')
   }
 
   // 3. ESPACE AVANT PONCTUATION SIMPLE : "texte ." → "texte."
   if (/ ([,.])/.test(corrected)) {
-    const matches = corrected.match(/ ([,.])/g)
-    if (matches) {
+    const regex = / ([,.])/g
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: matches[0],
-        corrected: matches[0].trim(),
+        position: match.index,
+        original: match[0],
+        corrected: match[1],
         reason: 'Espace avant ponctuation'
       })
-      corrected = corrected.replace(/ ([,.])/g, '$1')
     }
+    corrected = corrected.replace(/ ([,.])/g, '$1')
   }
 
   // 4. ESPACE INSÉCABLE APRÈS PONCTUATION HAUTE : ": " → ":\u00A0"
-  const punctuationHaute = /([;:!?]) /g
-  if (punctuationHaute.test(corrected)) {
-    const matches = corrected.match(/([;:!?]) /g)
-    if (matches) {
+  const regex4 = /([;:!?]) /g
+  if (regex4.test(corrected)) {
+    regex4.lastIndex = 0  // Reset regex
+    let match
+    while ((match = regex4.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: matches[0],
-        corrected: matches[0].replace(' ', '\u00A0'),
+        position: match.index,
+        original: match[0],
+        corrected: match[0].replace(' ', '\u00A0'),
         reason: 'Espace insécable après ponctuation haute'
       })
-      corrected = corrected.replace(/([;:!?]) /g, '$1\u00A0')
     }
+    corrected = corrected.replace(/([;:!?]) /g, '$1\u00A0')
   }
 
   // 5. GUILLEMETS FRANÇAIS : "texte" → « texte »
   if (/"[^"]+"/g.test(corrected)) {
-    const matches = corrected.match(/"([^"]+)"/g)
-    if (matches) {
+    const regex = /"([^"]+)"/g
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: matches[0],
-        corrected: matches[0].replace(/"/g, '«').replace(/«([^«]+)«/g, '«\u00A0$1\u00A0»'),
+        position: match.index,
+        original: match[0],
+        corrected: '«\u00A0' + match[1] + '\u00A0»',
         reason: 'Guillemets français'
       })
-      corrected = corrected.replace(/"([^"]+)"/g, '«\u00A0$1\u00A0»')
     }
+    corrected = corrected.replace(/"([^"]+)"/g, '«\u00A0$1\u00A0»')
   }
 
   // 6. ESPACES APRÈS APOSTROPHES : "l' école" → "l'école", "qu' on" → "qu'on"
   if (/\b([ldnjmtscq]|qu)'\s+/gi.test(corrected)) {
-    const matches = corrected.match(/\b([ldnjmtscq]|qu)'\s+/gi)
-    if (matches) {
+    const regex = /\b([ldnjmtscq]|qu)'\s+/gi
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: matches[0],
-        corrected: matches[0].replace(/'\s+/, "'"),
+        position: match.index,
+        original: match[0],
+        corrected: match[0].replace(/'\s+/, "'"),
         reason: 'Espace après apostrophe'
       })
-      corrected = corrected.replace(/\b([ldnjmtscq]|qu)'\s+/gi, "$1'")
     }
+    corrected = corrected.replace(/\b([ldnjmtscq]|qu)'\s+/gi, "$1'")
   }
 
   // 7. DOUBLES PONCTUATIONS : ",," → "," ou ";;" → ";"
   if (/([,;])\1/.test(corrected)) {
-    const matches = corrected.match(/([,;])\1/g)
-    if (matches) {
+    const regex = /([,;])\1/g
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: matches[0],
-        corrected: matches[0][0],
+        position: match.index,
+        original: match[0],
+        corrected: match[0][0],
         reason: 'Ponctuation doublée'
       })
-      corrected = corrected.replace(/([,;])\1/g, '$1')
     }
+    corrected = corrected.replace(/([,;])\1/g, '$1')
   }
 
   // 8. ESPACE INSÉCABLE AVANT UNITÉS
@@ -297,16 +312,18 @@ function preProcessWithRegex(text) {
   ]
 
   unites.forEach(({ pattern, replacement, unit }) => {
-    const matches = corrected.match(pattern)
-    if (matches && matches.length > 0) {
+    const regex = new RegExp(pattern.source, pattern.flags)
+    let match
+    while ((match = regex.exec(corrected)) !== null) {
       corrections.push({
         type: 'fault',
-        original: matches[0],
-        corrected: matches[0].replace(pattern, replacement),
+        position: match.index,
+        original: match[0],
+        corrected: match[0].replace(pattern, replacement),
         reason: `Espace insécable avant unité (${unit})`
       })
-      corrected = corrected.replace(pattern, replacement)
     }
+    corrected = corrected.replace(pattern, replacement)
   })
 
   return { corrected, corrections }
@@ -639,10 +656,58 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
       index: blockPass1.index,
       timecode: blockPass1.timecode,
       original: trueOriginal,  // Le vrai original (avant toute correction)
+      originalAfterPass0: blockPass1.originalAfterPass0,  // Texte après Pass 0 (propagé)
       corrected: blockPass2.corrected,  // Le texte final (avec corrections passe 1 + passe 2)
-      corrections: deduplicatedCorrections  // Liste nettoyée et dédupliquée des corrections
+      corrections: deduplicatedCorrections,  // Liste nettoyée et dédupliquée des corrections
+      pass0Corrections: blockPass1.pass0Corrections  // Propagé pour référence
     }
   })
+}
+
+/**
+ * Détecte si Claude a défait des corrections de Pass 0
+ * @param {Array} pass0Corrections - Corrections faites par Pass 0
+ * @param {string} textAfterPass0 - Texte après Pass 0
+ * @param {string} textAfterPass1 - Texte après Pass 1 (Claude)
+ * @returns {Array} Liste des corrections "minor" pour les corrections défaites
+ */
+function detectUndonePass0Corrections(pass0Corrections, textAfterPass0, textAfterPass1) {
+  const undoneCorrections = []
+
+  // Si aucune correction Pass 0, rien à vérifier
+  if (!pass0Corrections || pass0Corrections.length === 0) {
+    return undoneCorrections
+  }
+
+  // Si les textes sont identiques, Claude n'a rien défait
+  if (textAfterPass0 === textAfterPass1) {
+    return undoneCorrections
+  }
+
+  // Pour chaque correction de Pass 0, vérifier si Claude l'a défaite
+  for (const pass0Corr of pass0Corrections) {
+    // Pass 0 a corrigé : pass0Corr.original → pass0Corr.corrected
+    // Si Pass 1 contient pass0Corr.original, cela signifie que Claude a défait la correction
+
+    // Vérifier si le texte original (l'erreur) réapparaît dans le texte après Pass 1
+    if (textAfterPass1.includes(pass0Corr.original)) {
+      // Claude a défait cette correction de Pass 0
+      undoneCorrections.push({
+        type: 'minor',
+        original: pass0Corr.corrected,  // Ce que Pass 0 avait corrigé
+        corrected: pass0Corr.original,  // Ce que Claude a remis (l'erreur)
+        reason: `Claude a défait une correction Pass 0: ${pass0Corr.reason}`
+      })
+
+      console.log(`[detectUndonePass0Corrections] Claude undid Pass 0 correction: "${pass0Corr.original}" → "${pass0Corr.corrected}" reverted to "${pass0Corr.original}"`)
+    }
+  }
+
+  if (undoneCorrections.length > 0) {
+    console.log(`[detectUndonePass0Corrections] Found ${undoneCorrections.length} undone Pass 0 corrections`)
+  }
+
+  return undoneCorrections
 }
 
 /**
@@ -713,6 +778,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         index: block.index,
         timecode: block.timecode,
         original: block.text,  // Le vrai texte original (avant regex)
+        originalAfterPass0: corrected,  // Texte après Pass 0 (base pour réinitialisation)
         corrected: corrected,  // Texte après regex
         corrections: corrections  // Corrections faites par regex
       }
@@ -728,8 +794,24 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
     if (modelType === 'cleaning') {
       const totalTime = Date.now() - startTime
       console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
+
+      // En mode Cleaning, afficher seulement les espaces multiples et apostrophes
+      const blocksWithPass0 = blocksAfterPass0.map(block => {
+        const validatablePass0 = (block.corrections || [])
+          .filter(corr => corr.reason && (
+            corr.reason.includes('Espaces multiples') ||
+            corr.reason.includes('Espace après apostrophe')
+          ))
+
+        return {
+          ...block,
+          corrections: validatablePass0,  // Seulement espaces + apostrophes à valider
+          pass0Corrections: block.corrections  // TOUTES Pass 0 pour le surlignage
+        }
+      })
+
       return {
-        blocks: blocksAfterPass0,
+        blocks: blocksWithPass0,
         debugLogs: [`Cleaning mode: ${pass0CorrectionsCount} blocks cleaned with regex in ${totalTime}ms`],
         pass0Stats: pass0Stats
       }
@@ -765,25 +847,60 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const pass1Block = pass1Map.get(pass0Block.index)
 
       if (pass1Block) {
-        // Ne PAS fusionner les corrections de Pass 0 car elles sont déjà appliquées au texte
-        // Le texte original est avant Pass 0, le texte corrigé est après Pass 1
-        // Les corrections Pass 0 seraient redondantes et apparaîtraient comme "déjà corrigées"
+        // Détecter si Claude a défait des corrections de Pass 0
+        const undoneCorrections = detectUndonePass0Corrections(
+          pass0Block.corrections || [],
+          pass0Block.corrected,
+          pass1Block.corrected
+        )
+
+        // Extraire les corrections Pass 0 qui doivent être validables
+        // (espaces multiples + espace après apostrophe)
+        const validatablePass0 = (pass0Block.corrections || [])
+          .filter(corr => corr.reason && (
+            corr.reason.includes('Espaces multiples') ||
+            corr.reason.includes('Espace après apostrophe')
+          ))
+
+        if (validatablePass0.length > 0) {
+          console.log(`[Pass0 Validables] Bloc #${pass0Block.index}: ${validatablePass0.length} corrections validables trouvées`)
+          validatablePass0.forEach(c => console.log(`  - "${c.original}" → "${c.corrected}" (${c.reason})`))
+        }
+
+        // Fusionner : Pass 1 + corrections défaites + espaces à valider
+        const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...validatablePass0]
+
         return {
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,  // Le vrai original (avant Pass 0)
+          originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass1Block.corrected,  // Texte final après Pass 1
-          corrections: pass1Block.corrections  // Seulement les corrections de Pass 1
+          corrections: allCorrections,  // Pass 1 + corrections défaites + espaces validables
+          pass0Corrections: pass0Block.corrections  // TOUTES Pass 0 pour le surlignage
         }
       } else {
-        // Pas de corrections en Pass 1, mais on ne garde pas non plus les corrections Pass 0
-        // car elles sont déjà appliquées dans le champ corrected
+        // Pas de corrections en Pass 1
+        // Afficher seulement les espaces multiples et apostrophes dans la liste de validation
+        const validatablePass0 = (pass0Block.corrections || [])
+          .filter(corr => corr.reason && (
+            corr.reason.includes('Espaces multiples') ||
+            corr.reason.includes('Espace après apostrophe')
+          ))
+
+        if (validatablePass0.length > 0) {
+          console.log(`[Pass0 Validables sans Pass1] Bloc #${pass0Block.index}: ${validatablePass0.length} corrections`)
+          validatablePass0.forEach(c => console.log(`  - "${c.original}" → "${c.corrected}" (${c.reason})`))
+        }
+
         return {
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,
+          originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass0Block.corrected,  // Texte après Pass 0
-          corrections: []  // Pas de corrections à afficher (déjà appliquées)
+          corrections: validatablePass0,  // Seulement espaces multiples + apostrophes à valider
+          pass0Corrections: pass0Block.corrections  // TOUTES Pass 0 pour le surlignage
         }
       }
     })

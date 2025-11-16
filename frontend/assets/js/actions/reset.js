@@ -60,9 +60,8 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
   if (block.corrected === block.original && block.hasOwnProperty('originalCorrected')) {
     console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex} retour à l'original, restauration du texte corrigé`)
 
-    // Restaurer le texte corrigé original
+    // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
     block.corrected = block.originalCorrected
-    delete block.originalCorrected
 
     // Restaurer toutes les corrections à leur état original
     block.corrections.forEach((corr, idx) => {
@@ -104,13 +103,9 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
   if (correction.wasNoCorrection) {
     console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex} était sans correction, restauration`)
 
-    // Restaurer le texte original corrigé (avant modification)
-    if (block.hasOwnProperty('originalCorrected')) {
-      block.corrected = block.originalCorrected
-      delete block.originalCorrected
-    } else {
-      block.corrected = block.original
-    }
+    // Restaurer le texte original corrigé (résultat de toutes les passes)
+    // NE PAS supprimer originalCorrected car c'est une référence permanente
+    block.corrected = block.originalCorrected || block.originalAfterPass0 || block.original
 
     // Supprimer toutes les corrections
     block.corrections.forEach((_, idx) => {
@@ -163,10 +158,9 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
       }
     })
 
-    // Restaurer le texte corrigé original
+    // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
     if (block.hasOwnProperty('originalCorrected')) {
       block.corrected = block.originalCorrected
-      delete block.originalCorrected
     }
 
     // Dévalider toutes les corrections restaurées
@@ -374,10 +368,9 @@ export function resetBlockToInitialState(blockIndex, AppState, SRTParser, update
     // Supprimer toutes les corrections et restaurer le texte corrigé original
     block.corrections = []
 
-    // Restaurer le texte corrigé original (pas l'original avec fautes)
+    // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
     if (block.hasOwnProperty('originalCorrected')) {
       block.corrected = block.originalCorrected
-      delete block.originalCorrected
     }
     // Si pas d'originalCorrected, c'est que le texte n'a jamais été modifié, donc on ne touche pas
 
@@ -483,8 +476,8 @@ export function resetBlockToInitialState(blockIndex, AppState, SRTParser, update
     }
 
     // Ensuite restaurer le texte corrigé
+    // NE PAS supprimer originalCorrected, c'est une référence permanente pour les réinitialisations futures
     block.corrected = block.originalCorrected
-    delete block.originalCorrected
 
     // Mettre à jour les stats et la jauge
     const stats = SRTParser.calculateStats(AppState.blocks)
