@@ -67,6 +67,15 @@ function cleanPhantomCorrections(blocks) {
       const removed = []
 
       block.corrections = block.corrections.filter(correction => {
+        // IMPORTANT : Ne PAS vérifier les corrections Pass 0 d'espaces
+        // car .trim() supprime les espaces, rendant ces corrections "fantômes"
+        if (correction.reason && (
+          correction.reason.includes('Espaces multiples') ||
+          correction.reason.includes('Espace après apostrophe')
+        )) {
+          return true  // Toujours garder ces corrections
+        }
+
         const normalizedOriginal = correction.original.normalize('NFC').trim()
         const normalizedCorrected = correction.corrected.normalize('NFC').trim()
 
