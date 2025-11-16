@@ -14,9 +14,13 @@ ini_set('log_errors', '1');
 
 try {
     require_once __DIR__ . '/lib/functions.php';
+    require_once __DIR__ . '/lib/config-manager.php';
 } catch (Throwable $e) {
     die("Erreur de configuration : " . $e->getMessage() . "<br>Vérifiez que tous les fichiers sont présents.");
 }
+
+// Charger la configuration de sécurité
+$appConfig = loadAppConfig();
 
 // Traitement de l'upload si formulaire soumis
 $uploadResult = null;
@@ -46,6 +50,138 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
     <meta name="description" content="Correcteur professionnel de sous-titres SRT avec IA">
     <title>SRT Corrector Pro - Correction professionnelle de sous-titres</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        /* Modal de mot de passe */
+        .password-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+        }
+
+        .password-modal-content {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .password-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .password-modal-header h3 {
+            margin: 0;
+            color: #1f2937;
+            font-size: 1.25rem;
+        }
+
+        .password-modal-body {
+            padding: 1.5rem;
+        }
+
+        .password-modal-body p {
+            margin: 0 0 1rem 0;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+
+        .password-input-group {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 0.75rem;
+            padding-right: 3rem;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .password-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 0.5rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .password-toggle-btn:hover {
+            opacity: 1;
+        }
+
+        .password-hint {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            color: #0369a1;
+            margin: 0;
+        }
+
+        .password-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            color: #dc2626;
+            margin-top: 0.75rem;
+        }
+
+        .password-modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+    </style>
 </head>
 <body>
     <!-- Header -->
@@ -321,12 +457,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
         </div>
     </footer>
 
+    <!-- Modal de mot de passe (mode privé) -->
+    <div class="password-modal" id="passwordModal" style="display: none;">
+        <div class="password-modal-overlay"></div>
+        <div class="password-modal-content">
+            <div class="password-modal-header">
+                <h3>🔒 Accès protégé</h3>
+            </div>
+            <div class="password-modal-body">
+                <p>Le mode <strong>Sonnet Pro</strong> est protégé par mot de passe pour préserver les coûts d'API.</p>
+                <div class="password-input-group">
+                    <input
+                        type="password"
+                        id="passwordInput"
+                        class="password-input"
+                        placeholder="Entrez le mot de passe"
+                        autocomplete="off"
+                    >
+                    <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility()">👁️</button>
+                </div>
+                <p class="password-hint">
+                    💡 Sans mot de passe correct, l'outil basculera en mode <strong>Cleaning</strong> (sans coût API).
+                </p>
+                <div id="passwordError" class="password-error" style="display: none;">
+                    ❌ Mot de passe incorrect. Basculement en mode Cleaning...
+                </div>
+            </div>
+            <div class="password-modal-footer">
+                <button type="button" class="btn btn-outline" onclick="cancelPassword()">
+                    Annuler (mode Cleaning)
+                </button>
+                <button type="button" class="btn btn-primary" onclick="validatePassword()">
+                    Valider
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script>
         // Configuration globale
         window.APP_CONFIG = {
             workerUrl: '<?php echo WORKER_URL; ?>',
-            maxFileSize: <?php echo MAX_FILE_SIZE; ?>
+            maxFileSize: <?php echo MAX_FILE_SIZE; ?>,
+            security: {
+                privateMode: <?php echo $appConfig['private_mode'] ? 'true' : 'false'; ?>,
+                passwordHash: '<?php echo hash('sha256', $appConfig['password']); ?>'
+            }
         };
 
         <?php if ($uploadResult && $uploadResult['success']): ?>
@@ -338,6 +515,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['srtFile'])) {
         <?php endif; ?>
     </script>
     <script src="assets/js/srt-parser.js"></script>
+    <script src="assets/js/password-protection.js"></script>
     <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>
