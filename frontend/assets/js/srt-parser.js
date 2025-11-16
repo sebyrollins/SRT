@@ -140,8 +140,18 @@ const SRTParser = {
       return this.escapeHtml(text)
     }
 
+    // Calculer les positions manquantes
+    const correctionsWithPosition = corrections.map(corr => {
+      if (corr.position !== undefined) {
+        return corr
+      }
+      // Calculer la position en cherchant dans le texte
+      const pos = text.indexOf(corr.original)
+      return { ...corr, position: pos >= 0 ? pos : 0 }
+    })
+
     // Trier les corrections par position (du plus petit au plus grand)
-    const sortedCorrections = [...corrections].sort((a, b) => a.position - b.position)
+    const sortedCorrections = [...correctionsWithPosition].sort((a, b) => a.position - b.position)
 
     // Construire le résultat en une seule passe pour éviter le double échappement
     let result = ''
