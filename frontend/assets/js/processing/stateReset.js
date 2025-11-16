@@ -46,7 +46,8 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
       // supprimer toutes les corrections créées manuellement
       if (block.hadOriginalCorrections === false) {
         block.corrections = []
-        block.corrected = block.original
+        // Utiliser originalAfterPass0 pour garder les corrections Pass 0
+        block.corrected = block.originalAfterPass0 || block.original
         return // Passer au bloc suivant
       }
 
@@ -71,8 +72,10 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
       })
 
       // Reconstruire block.corrected en appliquant toutes les corrections restaurées
+      // IMPORTANT : Utiliser originalAfterPass0 (texte après Pass 0 regex) comme base
+      // Car les corrections Pass 0 sont déjà appliquées et ne doivent pas être réinitialisées
       const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
-      let correctedText = block.original
+      let correctedText = block.originalAfterPass0 || block.original  // Fallback sur original si pas de Pass 0
       let offset = 0
 
       sortedCorrections.forEach(correction => {

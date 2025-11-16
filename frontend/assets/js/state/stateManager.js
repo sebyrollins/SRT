@@ -284,6 +284,7 @@ export function clearBlockCorrections(blockIndex) {
       })
     }
     block.corrections = []
-    block.corrected = block.original
+    // Utiliser originalAfterPass0 pour garder les corrections Pass 0 (regex)
+    block.corrected = block.originalAfterPass0 || block.original
   }
 }

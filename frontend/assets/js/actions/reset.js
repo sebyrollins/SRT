@@ -109,7 +109,8 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
       block.corrected = block.originalCorrected
       delete block.originalCorrected
     } else {
-      block.corrected = block.original
+      // Utiliser originalAfterPass0 pour garder les corrections Pass 0 (regex)
+      block.corrected = block.originalAfterPass0 || block.original
     }
 
     // Supprimer toutes les corrections

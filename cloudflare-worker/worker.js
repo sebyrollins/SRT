@@ -634,8 +634,10 @@ function mergePass1AndPass2(blocksAfterPass1, pass2Blocks, originalBlocks) {
       index: blockPass1.index,
       timecode: blockPass1.timecode,
       original: trueOriginal,  // Le vrai original (avant toute correction)
+      originalAfterPass0: blockPass1.originalAfterPass0,  // Texte après Pass 0 (propagé)
       corrected: blockPass2.corrected,  // Le texte final (avec corrections passe 1 + passe 2)
-      corrections: deduplicatedCorrections  // Liste nettoyée et dédupliquée des corrections
+      corrections: deduplicatedCorrections,  // Liste nettoyée et dédupliquée des corrections
+      pass0Corrections: blockPass1.pass0Corrections  // Propagé pour référence
     }
   })
 }
@@ -754,6 +756,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
         index: block.index,
         timecode: block.timecode,
         original: block.text,  // Le vrai texte original (avant regex)
+        originalAfterPass0: corrected,  // Texte après Pass 0 (base pour réinitialisation)
         corrected: corrected,  // Texte après regex
         corrections: corrections  // Corrections faites par regex
       }
@@ -820,6 +823,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,  // Le vrai original (avant Pass 0)
+          originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass1Block.corrected,  // Texte final après Pass 1
           corrections: allCorrections,  // Pass 1 + corrections défaites par Claude
           pass0Corrections: pass0Block.corrections  // Stocké mais non affiché
@@ -831,6 +835,7 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,
+          originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass0Block.corrected,  // Texte après Pass 0
           corrections: [],  // Pas de corrections à afficher (déjà appliquées)
           pass0Corrections: pass0Block.corrections  // Stocké pour référence

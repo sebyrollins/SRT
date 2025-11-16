@@ -160,7 +160,8 @@ function processBlockEdit(newValue, block, AppState, SRTParser, updateStats, ren
       }
 
       // Mettre le texte corrigé = texte original (refus des corrections)
-      block.corrected = block.original
+      // Utiliser originalAfterPass0 pour garder les corrections Pass 0 (regex)
+      block.corrected = block.originalAfterPass0 || block.original
 
       // Mettre à jour les stats
       const stats = SRTParser.calculateStats(AppState.blocks)
