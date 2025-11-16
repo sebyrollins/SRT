@@ -71,35 +71,40 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
         }
       })
 
-      // Reconstruire block.corrected en appliquant toutes les corrections restaurées
-      // IMPORTANT : Utiliser originalAfterPass0 (texte après Pass 0 regex) comme base
-      // Car les corrections Pass 0 sont déjà appliquées et ne doivent pas être réinitialisées
-      const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
-      let correctedText = block.originalAfterPass0 || block.original  // Fallback sur original si pas de Pass 0
-      let offset = 0
+      // Restaurer le texte corrigé original de Claude (toutes les passes)
+      // Comportement identique aux boutons de réinitialisation individuels
+      if (block.hasOwnProperty('originalCorrected')) {
+        // Utiliser le texte corrigé original sauvegardé par Claude (après toutes les passes)
+        block.corrected = block.originalCorrected
+      } else {
+        // Fallback : reconstruire uniquement si originalCorrected n'existe pas
+        // (cas rare où le bloc n'a jamais été modifié)
+        const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
+        let correctedText = block.originalAfterPass0 || block.original
+        let offset = 0
 
-      sortedCorrections.forEach(correction => {
-        // Pour les corrections "doubt" de GENRE, ne jamais les appliquer dans le rebuild
-        // Elles seront re-validées après mais montrent l'original par défaut
-        // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
-        if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
-          return
-        }
+        sortedCorrections.forEach(correction => {
+          // Pour les corrections "doubt" de GENRE, ne jamais les appliquer dans le rebuild
+          // Elles seront re-validées après mais montrent l'original par défaut
+          if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
+            return
+          }
 
-        const startPos = correction.position + offset
-        const endPos = startPos + correction.original.length
+          const startPos = correction.position + offset
+          const endPos = startPos + correction.original.length
 
-        // Vérifier que la position est valide
-        if (correctedText.substring(startPos, endPos) === correction.original) {
-          // Remplacer l'original par le corrigé
-          correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
+          // Vérifier que la position est valide
+          if (correctedText.substring(startPos, endPos) === correction.original) {
+            // Remplacer l'original par le corrigé
+            correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
 
-          // Ajuster l'offset pour les prochaines corrections
-          offset += correction.corrected.length - correction.original.length
-        }
-      })
+            // Ajuster l'offset pour les prochaines corrections
+            offset += correction.corrected.length - correction.original.length
+          }
+        })
 
-      block.corrected = correctedText
+        block.corrected = correctedText
+      }
     }
   })
 
