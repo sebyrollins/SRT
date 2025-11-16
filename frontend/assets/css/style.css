@@ -1655,12 +1655,14 @@ body {
 .error-highlight-unvalidated {
   background-color: #ffd700; /* Jaune foncé / gold */
   color: #000;
+  text-decoration: none; /* Enlever le soulignement */
 }
 
 /* Surlignage jaune pour les corrections validées (jaune clair) */
 .error-highlight-validated {
   background-color: #ffeb99; /* Jaune clair */
   color: #000;
+  text-decoration: none; /* Enlever le soulignement */
 }
 
 /* Validation empty state - removed duplicate, see lines 875-895 for actual styles */

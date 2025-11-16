@@ -857,6 +857,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
             corr.reason.includes('Espace après apostrophe')
           ))
 
+        if (validatablePass0.length > 0) {
+          console.log(`[Pass0 Validables] Bloc #${pass0Block.index}: ${validatablePass0.length} corrections validables trouvées`)
+          validatablePass0.forEach(c => console.log(`  - "${c.original}" → "${c.corrected}" (${c.reason})`))
+        }
+
         // Fusionner : Pass 1 + corrections défaites + espaces à valider
         const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...validatablePass0]
 
@@ -877,6 +882,11 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
             corr.reason.includes('Espaces multiples') ||
             corr.reason.includes('Espace après apostrophe')
           ))
+
+        if (validatablePass0.length > 0) {
+          console.log(`[Pass0 Validables sans Pass1] Bloc #${pass0Block.index}: ${validatablePass0.length} corrections`)
+          validatablePass0.forEach(c => console.log(`  - "${c.original}" → "${c.corrected}" (${c.reason})`))
+        }
 
         return {
           index: pass0Block.index,
