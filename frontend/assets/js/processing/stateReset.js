@@ -46,8 +46,8 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
       // supprimer toutes les corrections créées manuellement
       if (block.hadOriginalCorrections === false) {
         block.corrections = []
-        // Utiliser originalAfterPass0 pour garder les corrections Pass 0
-        block.corrected = block.originalAfterPass0 || block.original
+        // Restaurer le texte original (résultat de toutes les passes)
+        block.corrected = block.originalCorrected || block.originalAfterPass0 || block.original
         return // Passer au bloc suivant
       }
 

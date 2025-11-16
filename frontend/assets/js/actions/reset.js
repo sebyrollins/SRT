@@ -104,14 +104,9 @@ export function resetToOriginalSuggestion(blockIndex, corrIndex, AppState, SRTPa
   if (correction.wasNoCorrection) {
     console.log(`[resetToOriginalSuggestion] Bloc #${blockIndex} était sans correction, restauration`)
 
-    // Restaurer le texte original corrigé (avant modification)
-    if (block.hasOwnProperty('originalCorrected')) {
-      block.corrected = block.originalCorrected
-      delete block.originalCorrected
-    } else {
-      // Utiliser originalAfterPass0 pour garder les corrections Pass 0 (regex)
-      block.corrected = block.originalAfterPass0 || block.original
-    }
+    // Restaurer le texte original corrigé (résultat de toutes les passes)
+    // NE PAS supprimer originalCorrected car c'est une référence permanente
+    block.corrected = block.originalCorrected || block.originalAfterPass0 || block.original
 
     // Supprimer toutes les corrections
     block.corrections.forEach((_, idx) => {
