@@ -158,10 +158,9 @@ export function resetAllValidations() {
     if (block.corrections.length === 1 && block.corrections[0].wasNoCorrection) {
       block.corrections = []
 
-      // Restaurer le texte corrigé original
+      // Restaurer le texte corrigé original (NE PAS supprimer originalCorrected)
       if (block.hasOwnProperty('originalCorrected')) {
         block.corrected = block.originalCorrected
-        delete block.originalCorrected
       }
       return
     }
@@ -202,9 +201,9 @@ export function resetAllValidations() {
     })
 
     // Restaurer le texte corrigé original si disponible
+    // NE PAS supprimer originalCorrected, c'est une référence permanente pour les réinitialisations futures
     if (block.hasOwnProperty('originalCorrected')) {
       block.corrected = block.originalCorrected
-      delete block.originalCorrected
     }
   })
 
