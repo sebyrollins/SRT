@@ -790,13 +790,18 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
       const totalTime = Date.now() - startTime
       console.log(`[processSRT] === CLEANING MODE: Completed in ${totalTime}ms ===`)
 
-      // En mode Cleaning, ne pas valider les corrections Pass 0
-      // Les mettre dans pass0Corrections pour le surlignage uniquement
+      // En mode Cleaning, afficher seulement les espaces multiples et apostrophes
       const blocksWithPass0 = blocksAfterPass0.map(block => {
+        const validatablePass0 = (block.corrections || [])
+          .filter(corr => corr.reason && (
+            corr.reason.includes('Espaces multiples') ||
+            corr.reason.includes('Espace après apostrophe')
+          ))
+
         return {
           ...block,
-          corrections: [],  // Vide : Pass 0 ne se valide pas
-          pass0Corrections: block.corrections  // Pour le surlignage uniquement
+          corrections: validatablePass0,  // Seulement espaces + apostrophes à valider
+          pass0Corrections: block.corrections  // TOUTES Pass 0 pour le surlignage
         }
       })
 
@@ -844,9 +849,16 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           pass1Block.corrected
         )
 
-        // Fusionner uniquement : Pass 1 + corrections défaites par Claude
-        // Les corrections Pass 0 normales sont dans pass0Corrections (pour le surlignage uniquement)
-        const allCorrections = [...pass1Block.corrections, ...undoneCorrections]
+        // Extraire les corrections Pass 0 qui doivent être validables
+        // (espaces multiples + espace après apostrophe)
+        const validatablePass0 = (pass0Block.corrections || [])
+          .filter(corr => corr.reason && (
+            corr.reason.includes('Espaces multiples') ||
+            corr.reason.includes('Espace après apostrophe')
+          ))
+
+        // Fusionner : Pass 1 + corrections défaites + espaces à valider
+        const allCorrections = [...pass1Block.corrections, ...undoneCorrections, ...validatablePass0]
 
         return {
           index: pass0Block.index,
@@ -854,20 +866,26 @@ async function processSRT(srtContent, modelType = 'sonnet', pass = null, inputBl
           original: pass0Block.original,  // Le vrai original (avant Pass 0)
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass1Block.corrected,  // Texte final après Pass 1
-          corrections: allCorrections,  // Pass 1 + corrections défaites (à valider)
-          pass0Corrections: pass0Block.corrections  // Pour le surlignage uniquement
+          corrections: allCorrections,  // Pass 1 + corrections défaites + espaces validables
+          pass0Corrections: pass0Block.corrections  // TOUTES Pass 0 pour le surlignage
         }
       } else {
         // Pas de corrections en Pass 1
-        // Ne rien mettre dans corrections (Pass 0 ne se valide pas)
+        // Afficher seulement les espaces multiples et apostrophes dans la liste de validation
+        const validatablePass0 = (pass0Block.corrections || [])
+          .filter(corr => corr.reason && (
+            corr.reason.includes('Espaces multiples') ||
+            corr.reason.includes('Espace après apostrophe')
+          ))
+
         return {
           index: pass0Block.index,
           timecode: pass0Block.timecode,
           original: pass0Block.original,
           originalAfterPass0: pass0Block.corrected,  // Texte après Pass 0 (base pour réinitialisation)
           corrected: pass0Block.corrected,  // Texte après Pass 0
-          corrections: [],  // Vide : Pass 0 ne se valide pas
-          pass0Corrections: pass0Block.corrections  // Pour le surlignage uniquement
+          corrections: validatablePass0,  // Seulement espaces multiples + apostrophes à valider
+          pass0Corrections: pass0Block.corrections  // TOUTES Pass 0 pour le surlignage
         }
       }
     })
