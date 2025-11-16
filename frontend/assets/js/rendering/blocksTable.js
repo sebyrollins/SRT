@@ -117,11 +117,23 @@ export function renderBlocksTable(DOM, AppState, SRTParser, actions) {
     const originalEl = document.createElement('div')
     originalEl.className = 'block-section block-original'
 
-    // Fusionner corrections pour le surlignage (validation + Pass 0 pour surlignage uniquement)
-    const correctionsForHighlight = [
-      ...(block.corrections || []),
-      ...(block.pass0Corrections || [])
-    ]
+    // Ajouter un ID de validation stable à chaque correction de block.corrections
+    const correctionsWithIds = (block.corrections || []).map((corr, idx) => ({
+      ...corr,
+      _validationId: `${block.index}-${idx}`
+    }))
+
+    // Filtrer pass0Corrections pour éviter les doublons (corrections déjà dans block.corrections)
+    const pass0Only = (block.pass0Corrections || []).filter(p0corr => {
+      return !correctionsWithIds.some(corr =>
+        corr.original === p0corr.original &&
+        corr.corrected === p0corr.corrected &&
+        corr.reason === p0corr.reason
+      )
+    })
+
+    // Fusionner sans doublons pour le surlignage
+    const correctionsForHighlight = [...correctionsWithIds, ...pass0Only]
 
     originalEl.innerHTML = `
       <div class="block-label">ORIGINAL :</div>

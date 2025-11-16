@@ -157,8 +157,8 @@ const SRTParser = {
     let result = ''
     let lastIndex = 0
 
-    sortedCorrections.forEach((correction, corrIndex) => {
-      const { original, type, position } = correction
+    sortedCorrections.forEach((correction) => {
+      const { original, type, position, _validationId } = correction
       const startPos = position
       const endPos = startPos + original.length
 
@@ -166,9 +166,8 @@ const SRTParser = {
         // Ajouter le texte avant l'erreur (échappé)
         result += this.escapeHtml(text.substring(lastIndex, startPos))
 
-        // Vérifier si cette correction est validée
-        const correctionId = `${blockIndex}-${corrIndex}`
-        const isValidated = validatedCorrections && validatedCorrections.has(correctionId)
+        // Vérifier si cette correction est validée (seulement si elle a un _validationId)
+        const isValidated = _validationId && validatedCorrections && validatedCorrections.has(_validationId)
 
         // Classe CSS : jaune foncé si non validé, jaune clair si validé
         const highlightClass = isValidated ? 'error-highlight-validated' : 'error-highlight-unvalidated'
