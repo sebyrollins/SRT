@@ -51,29 +51,58 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
         return // Passer au bloc suivant
       }
 
-      // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
-      block.corrections.forEach((correction, corrIndex) => {
-        // Restaurer la suggestion originale si elle a été modifiée ou rejetée
-        if (correction.hasOwnProperty('originalSuggestion')) {
-          correction.corrected = correction.originalSuggestion
-          delete correction.originalSuggestion
-        }
+      // CAS SPÉCIAL : Bloc avec plusieurs fautes remplacé par une correction globale manuelle
+      // Restaurer les fautes originales
+      if (block.hasOwnProperty('originalCorrections') && block.corrections.length === 1 && block.corrections[0].isManuallyEdited) {
+        console.log(`[resetToInitialState] Bloc #${block.index} restauration des corrections originales`)
 
-        // Si le type a été modifié, le restaurer
-        if (correction.hasOwnProperty('originalType')) {
-          correction.type = correction.originalType
-          delete correction.originalType
-        }
-        // Restaurer la raison originale si elle existe
-        if (correction.hasOwnProperty('originalReason')) {
-          correction.reason = correction.originalReason
-          delete correction.originalReason
-        }
-        // Retirer le flag de modification manuelle
-        if (correction.isManuallyEdited) {
-          correction.isManuallyEdited = false
-        }
-      })
+        // Restaurer les corrections originales
+        block.corrections = block.originalCorrections.map(c => ({...c}))
+        delete block.originalCorrections
+
+        // Nettoyer les types originaux des corrections restaurées
+        block.corrections.forEach((correction, idx) => {
+          if (correction.hasOwnProperty('originalType')) {
+            correction.type = correction.originalType
+            delete correction.originalType
+          }
+          if (correction.hasOwnProperty('originalSuggestion')) {
+            correction.corrected = correction.originalSuggestion
+            delete correction.originalSuggestion
+          }
+          if (correction.hasOwnProperty('originalReason')) {
+            correction.reason = correction.originalReason
+            delete correction.originalReason
+          }
+          if (correction.isManuallyEdited) {
+            correction.isManuallyEdited = false
+          }
+        })
+      } else {
+        // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
+        block.corrections.forEach((correction, corrIndex) => {
+          // Restaurer la suggestion originale si elle a été modifiée ou rejetée
+          if (correction.hasOwnProperty('originalSuggestion')) {
+            correction.corrected = correction.originalSuggestion
+            delete correction.originalSuggestion
+          }
+
+          // Si le type a été modifié, le restaurer
+          if (correction.hasOwnProperty('originalType')) {
+            correction.type = correction.originalType
+            delete correction.originalType
+          }
+          // Restaurer la raison originale si elle existe
+          if (correction.hasOwnProperty('originalReason')) {
+            correction.reason = correction.originalReason
+            delete correction.originalReason
+          }
+          // Retirer le flag de modification manuelle
+          if (correction.isManuallyEdited) {
+            correction.isManuallyEdited = false
+          }
+        })
+      }
 
       // Restaurer le texte corrigé original de Claude (toutes les passes)
       // Comportement identique aux boutons de réinitialisation individuels
