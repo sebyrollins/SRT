@@ -49,6 +49,11 @@ export function validateAllBlockCorrections(blockIndex, AppState, SRTParser, upd
     return
   }
 
+  // Sauvegarder originalCorrected avant toute modification (si pas déjà fait)
+  if (!block.hasOwnProperty('originalCorrected')) {
+    block.originalCorrected = block.corrected
+  }
+
   // Valider toutes les corrections du bloc
   block.corrections.forEach((correction, corrIndex) => {
     const correctionId = `${blockIndex}-${corrIndex}`
@@ -98,6 +103,11 @@ export function validateSingleCorrection(blockIndex, corrIndex, AppState, SRTPar
   const block = AppState.blocks.find(b => b.index === blockIndex)
   if (block && block.corrections && block.corrections[corrIndex]) {
     const correction = block.corrections[corrIndex]
+
+    // Sauvegarder originalCorrected avant toute modification (si pas déjà fait)
+    if (!block.hasOwnProperty('originalCorrected')) {
+      block.originalCorrected = block.corrected
+    }
 
     // Appliquer la correction au texte du bloc
     // Remplacer le texte original par le texte corrigé
