@@ -51,55 +51,93 @@ export function resetToInitialState(AppState, SRTParser, updateStats, renderBloc
         return // Passer au bloc suivant
       }
 
-      // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
-      block.corrections.forEach((correction, corrIndex) => {
-        // Restaurer la suggestion originale si elle a été modifiée ou rejetée
-        if (correction.hasOwnProperty('originalSuggestion')) {
-          correction.corrected = correction.originalSuggestion
-          delete correction.originalSuggestion
-        }
+      // CAS SPÉCIAL : Bloc avec plusieurs fautes remplacé par une correction globale manuelle
+      // Restaurer les fautes originales
+      if (block.hasOwnProperty('originalCorrections') && block.corrections.length === 1 && block.corrections[0].isManuallyEdited) {
+        console.log(`[resetToInitialState] Bloc #${block.index} restauration des corrections originales`)
 
-        // Si le type a été modifié, le restaurer
-        if (correction.hasOwnProperty('originalType')) {
-          correction.type = correction.originalType
-          delete correction.originalType
-        }
-        // Restaurer la raison originale si elle existe
-        if (correction.hasOwnProperty('originalReason')) {
-          correction.reason = correction.originalReason
-          delete correction.originalReason
-        }
-      })
+        // Restaurer les corrections originales
+        block.corrections = block.originalCorrections.map(c => ({...c}))
+        delete block.originalCorrections
 
-      // Reconstruire block.corrected en appliquant toutes les corrections restaurées
-      // IMPORTANT : Utiliser originalAfterPass0 (texte après Pass 0 regex) comme base
-      // Car les corrections Pass 0 sont déjà appliquées et ne doivent pas être réinitialisées
-      const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
-      let correctedText = block.originalAfterPass0 || block.original  // Fallback sur original si pas de Pass 0
-      let offset = 0
+        // Nettoyer les types originaux des corrections restaurées
+        block.corrections.forEach((correction, idx) => {
+          if (correction.hasOwnProperty('originalType')) {
+            correction.type = correction.originalType
+            delete correction.originalType
+          }
+          if (correction.hasOwnProperty('originalSuggestion')) {
+            correction.corrected = correction.originalSuggestion
+            delete correction.originalSuggestion
+          }
+          if (correction.hasOwnProperty('originalReason')) {
+            correction.reason = correction.originalReason
+            delete correction.originalReason
+          }
+          if (correction.isManuallyEdited) {
+            correction.isManuallyEdited = false
+          }
+        })
+      } else {
+        // CAS NORMAL : Le bloc avait des corrections à l'origine, les restaurer
+        block.corrections.forEach((correction, corrIndex) => {
+          // Restaurer la suggestion originale si elle a été modifiée ou rejetée
+          if (correction.hasOwnProperty('originalSuggestion')) {
+            correction.corrected = correction.originalSuggestion
+            delete correction.originalSuggestion
+          }
 
-      sortedCorrections.forEach(correction => {
-        // Pour les corrections "doubt" de GENRE, ne jamais les appliquer dans le rebuild
-        // Elles seront re-validées après mais montrent l'original par défaut
-        // MAIS pour les corrections modifiées manuellement, on DOIT les appliquer
-        if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
-          return
-        }
+          // Si le type a été modifié, le restaurer
+          if (correction.hasOwnProperty('originalType')) {
+            correction.type = correction.originalType
+            delete correction.originalType
+          }
+          // Restaurer la raison originale si elle existe
+          if (correction.hasOwnProperty('originalReason')) {
+            correction.reason = correction.originalReason
+            delete correction.originalReason
+          }
+          // Retirer le flag de modification manuelle
+          if (correction.isManuallyEdited) {
+            correction.isManuallyEdited = false
+          }
+        })
+      }
 
-        const startPos = correction.position + offset
-        const endPos = startPos + correction.original.length
+      // Restaurer le texte corrigé original de Claude (toutes les passes)
+      // Comportement identique aux boutons de réinitialisation individuels
+      if (block.hasOwnProperty('originalCorrected')) {
+        // Utiliser le texte corrigé original sauvegardé par Claude (après toutes les passes)
+        block.corrected = block.originalCorrected
+      } else {
+        // Fallback : reconstruire uniquement si originalCorrected n'existe pas
+        // (cas rare où le bloc n'a jamais été modifié)
+        const sortedCorrections = [...block.corrections].sort((a, b) => a.position - b.position)
+        let correctedText = block.originalAfterPass0 || block.original
+        let offset = 0
 
-        // Vérifier que la position est valide
-        if (correctedText.substring(startPos, endPos) === correction.original) {
-          // Remplacer l'original par le corrigé
-          correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
+        sortedCorrections.forEach(correction => {
+          // Pour les corrections "doubt" de GENRE, ne jamais les appliquer dans le rebuild
+          // Elles seront re-validées après mais montrent l'original par défaut
+          if (correction.type === 'doubt' && correction.alternative && !correction.isManuallyEdited) {
+            return
+          }
 
-          // Ajuster l'offset pour les prochaines corrections
-          offset += correction.corrected.length - correction.original.length
-        }
-      })
+          const startPos = correction.position + offset
+          const endPos = startPos + correction.original.length
 
-      block.corrected = correctedText
+          // Vérifier que la position est valide
+          if (correctedText.substring(startPos, endPos) === correction.original) {
+            // Remplacer l'original par le corrigé
+            correctedText = correctedText.substring(0, startPos) + correction.corrected + correctedText.substring(endPos)
+
+            // Ajuster l'offset pour les prochaines corrections
+            offset += correction.corrected.length - correction.original.length
+          }
+        })
+
+        block.corrected = correctedText
+      }
     }
   })
 

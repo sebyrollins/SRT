@@ -2063,17 +2063,17 @@ body {
 
 /* États des blocs dans la minimap */
 .minimap-block.minimap-validated {
-  background: #90ee90; /* Vert clair pour les blocs avec fautes validées */
+  background: #d1fae5; /* Vert clair - même couleur que le fond des blocs validés */
   opacity: 0.7;
 }
 
 .minimap-block.minimap-validated-fault {
-  background: var(--color-fault-bg);  /* Vert clair pour fautes validées */
+  background: #d1fae5;  /* Vert clair - même couleur que le fond des blocs fautes validées */
   opacity: 0.9;
 }
 
 .minimap-block.minimap-validated-doubt {
-  background: #ffe0b2;
+  background: #fff3e0; /* Orange clair - même couleur que le fond des blocs doutes validés */
   opacity: 0.7;
 }
 
@@ -2116,11 +2116,11 @@ body {
 }
 
 .minimap-block.minimap-current.minimap-validated {
-  background: #90ee90 !important; /* Vert clair pour les blocs avec fautes validées */
+  background: #d1fae5 !important; /* Vert clair - même couleur que le fond des blocs validés */
 }
 
 .minimap-block.minimap-current.minimap-validated-doubt {
-  background: #ffe0b2 !important;
+  background: #fff3e0 !important; /* Orange clair - même couleur que le fond des blocs doutes validés */
 }
 
 /* Tooltip au survol */
